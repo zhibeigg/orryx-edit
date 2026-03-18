@@ -11,6 +11,10 @@ application {
     mainClass.set("com.orryx.editor.ApplicationKt")
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 repositories {
     mavenCentral()
 }
