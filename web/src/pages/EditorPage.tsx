@@ -2,6 +2,7 @@ import { X, Upload, Terminal, ChevronDown, ChevronUp } from "lucide-react"
 import { useState } from "react"
 import { useEditorStore } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
+import { getFileIconInfo } from "@/lib/file-icons"
 import { YamlEditor } from "@/components/editor/YamlEditor"
 import { SkillEditor } from "@/components/editor/SkillEditor"
 import { JobEditor } from "@/components/editor/JobEditor"
@@ -102,7 +103,9 @@ export function EditorPage() {
       {/* 标签栏 */}
       <div className="flex border-b border-border bg-background shrink-0">
         <div className="flex-1 flex overflow-x-auto">
-          {openFiles.map((file) => (
+          {openFiles.map((file) => {
+              const { icon: FileIcon, color: iconColor } = getFileIconInfo(file.path)
+              return (
             <div
               key={file.path}
               className={cn(
@@ -111,6 +114,7 @@ export function EditorPage() {
               )}
               onClick={() => setActiveFile(file.path)}
             >
+              <FileIcon className={cn("w-3.5 h-3.5 shrink-0", iconColor)} />
               <span className="truncate max-w-[150px]">{file.name}</span>
               {file.dirty && <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0" />}
               <button
@@ -123,7 +127,8 @@ export function EditorPage() {
                 <X className="w-3 h-3" />
               </button>
             </div>
-          ))}
+              )
+          })}
         </div>
         <button
           onClick={() => setShowPublish(!showPublish)}

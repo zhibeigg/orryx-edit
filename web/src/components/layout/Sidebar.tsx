@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from "lucide-react"
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw } from "lucide-react"
 import type { FileTreeNode } from "@/types"
 import { getConfigType } from "@/types"
+import { getFileIconInfo, getFolderColor } from "@/lib/file-icons"
 import { useFileStore } from "@/store/file-store"
 import { useEditorStore } from "@/store/editor-store"
 import { wsClient } from "@/lib/ws-client"
@@ -173,14 +174,20 @@ function TreeNode({ node, depth = 0, onContextMenu }: { node: FileTreeNode; dept
         {node.isDirectory ? (
           <>
             {expanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-            {expanded ? <FolderOpen className="w-4 h-4 shrink-0 text-yellow-500" /> : <Folder className="w-4 h-4 shrink-0 text-yellow-500" />}
+            {expanded
+              ? <FolderOpen className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
+              : <Folder className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
+            }
           </>
-        ) : (
-          <>
-            <span className="w-4" />
-            <File className="w-4 h-4 shrink-0 text-muted-foreground" />
-          </>
-        )}
+        ) : (() => {
+          const { icon: Icon, color } = getFileIconInfo(node.path)
+          return (
+            <>
+              <span className="w-4" />
+              <Icon className={cn("w-4 h-4 shrink-0", color)} />
+            </>
+          )
+        })()}
         <span className="truncate">{node.name}</span>
       </button>
       {node.isDirectory && expanded && node.children?.map((child) => (
