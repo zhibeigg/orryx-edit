@@ -9,7 +9,7 @@ JAVA_HOME=""  # 留空则使用系统默认 java，示例: /usr/lib/jvm/java-21
 # ==================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-JAR="$SCRIPT_DIR/server/build/libs/orryx-editor-server-all.jar"
+JAR="$SCRIPT_DIR/orryx-editor-server-all.jar"
 
 if [ ! -f "$JAR" ]; then
   echo "[错误] 找不到 $JAR"

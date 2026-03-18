@@ -23,6 +23,7 @@ class ServerEndpoint(
     }
 
     suspend fun handleServerMessage(serverSession: WebSocketSession, text: String) {
+        println("[插件端消息] $text")
         val msg = try {
             json.decodeFromString<WsMessage>(text)
         } catch (e: Exception) {

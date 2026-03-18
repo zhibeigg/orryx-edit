@@ -27,7 +27,7 @@ fun main() {
     println("===========================")
 
     embeddedServer(Netty, port = port) {
-        val relayHandler = RelayHandler(registry, licenseManager)
+        val relayHandler = RelayHandler(registry)
         val serverEndpoint = ServerEndpoint(registry, licenseManager)
         configureRouting(licenseManager, registry, adminKey)
         configureWebSockets(relayHandler, serverEndpoint)

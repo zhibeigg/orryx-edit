@@ -20,10 +20,7 @@ fun Application.configureWebSockets(
 
     routing {
         webSocket("/ws") {
-            val remoteIp = call.request.headers["X-Forwarded-For"]?.split(",")?.firstOrNull()?.trim()
-                ?: call.request.local.remoteAddress
-            log.info("浏览器客户端已连接: $remoteIp")
-            relayHandler.onBrowserConnect(this, remoteIp)
+            log.info("浏览器客户端已连接")
             try {
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
