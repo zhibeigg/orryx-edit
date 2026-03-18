@@ -8,6 +8,12 @@ import { JobEditor } from "@/components/editor/JobEditor"
 import { StationEditor } from "@/components/editor/StationEditor"
 import { ExperienceEditor } from "@/components/editor/ExperienceEditor"
 import { PlaceholderEditor } from "@/components/editor/PlaceholderEditor"
+import { BloomEditor } from "@/components/editor/BloomEditor"
+import { BuffsEditor } from "@/components/editor/BuffsEditor"
+import { ConfigEditor } from "@/components/editor/ConfigEditor"
+import { KeysEditor } from "@/components/editor/KeysEditor"
+import { NpcEditor } from "@/components/editor/NpcEditor"
+import { SelectorsEditor } from "@/components/editor/SelectorsEditor"
 import { PublishPanel } from "@/components/publish/PublishPanel"
 import { LogConsole } from "@/components/visualizer/LogConsole"
 import { cn } from "@/lib/utils"
@@ -57,6 +63,26 @@ export function EditorPage() {
 
     if (activeFile.path.startsWith("placeholders/")) {
       return <PlaceholderEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
+    }
+
+    // 单文件专用编辑器
+    if (activeFile.path === "bloom.yml") {
+      return <BloomEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "buffs.yml") {
+      return <BuffsEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "config.yml") {
+      return <ConfigEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "keys.yml") {
+      return <KeysEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "npc.yml") {
+      return <NpcEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "selectors.yml") {
+      return <SelectorsEditor key={activeFile.path} content={content} onChange={handleChange} />
     }
 
     return <YamlEditor key={activeFile.path} content={content} onChange={handleChange} />
