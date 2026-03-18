@@ -6,11 +6,13 @@ import { PortalPage } from "@/pages/PortalPage"
 import { useConnectionStore } from "@/store/connection-store"
 import { useDraftSync } from "@/lib/use-draft-sync"
 import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts"
+import { useCrossRefLoader } from "@/lib/use-cross-ref-loader"
 
 export default function App() {
   const authenticated = useConnectionStore((s) => s.authenticated)
   useDraftSync()
   useKeyboardShortcuts()
+  useCrossRefLoader()
 
   const path = window.location.pathname
   if (path === "/admin") return <AdminPage />

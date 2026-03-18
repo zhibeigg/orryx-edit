@@ -13,17 +13,23 @@ export interface OpenFile {
 interface EditorState {
   openFiles: OpenFile[]
   activeFilePath: string | null
+  /** 所有已加载文件的内容缓存（path → content），用于交叉引用分析 */
+  fileContents: Map<string, string>
 
   openFile: (file: Omit<OpenFile, "dirty">) => void
   closeFile: (path: string) => void
   setActiveFile: (path: string) => void
   updateDraft: (path: string, draft: string) => void
   markSaved: (path: string, content: string) => void
+  /** 批量缓存文件内容（用于交叉引用分析） */
+  cacheFileContent: (path: string, content: string) => void
+  cacheFileContents: (files: Map<string, string>) => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   openFiles: [],
   activeFilePath: null,
+  fileContents: new Map(),
 
   openFile: (file) => {
     const { openFiles } = get()
@@ -79,5 +85,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         f.path === path ? { ...f, content, draft: undefined, dirty: false } : f
       ),
     }))
+    // 同步更新缓存
+    get().cacheFileContent(path, content)
+  },
+
+  cacheFileContent: (path, content) => {
+    set((state) => {
+      const newMap = new Map(state.fileContents)
+      newMap.set(path, content)
+      return { fileContents: newMap }
+    })
+  },
+
+  cacheFileContents: (files) => {
+    set((state) => {
+      const newMap = new Map(state.fileContents)
+      for (const [k, v] of files) newMap.set(k, v)
+      return { fileContents: newMap }
+    })
   },
 }))

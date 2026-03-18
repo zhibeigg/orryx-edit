@@ -5,6 +5,7 @@ import { OptionsPanel } from "./OptionsPanel"
 import { VariablesEditor } from "./VariablesEditor"
 import { DescriptionEditor } from "./DescriptionEditor"
 import { ActionsEditor } from "./ActionsEditor"
+import { CrossRefPanel } from "./CrossRefPanel"
 import { SkillTimeline } from "@/components/visualizer/SkillTimeline"
 import { cn } from "@/lib/utils"
 import { parseColliderFromScript } from "@/lib/collider-parser"
@@ -17,11 +18,12 @@ const ColliderPreview = lazy(() =>
 interface SkillEditorProps {
   content: string
   onChange: (yamlContent: string) => void
+  filePath?: string
 }
 
-type Tab = "options" | "variables" | "description" | "actions" | "timeline" | "collider" | "yaml"
+type Tab = "options" | "variables" | "description" | "actions" | "timeline" | "collider" | "refs" | "yaml"
 
-export function SkillEditor({ content, onChange }: SkillEditorProps) {
+export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("options")
   // 保留原始 YAML 文本用于注释保留的增量更新
   const rawYamlRef = useRef(content)
@@ -55,6 +57,7 @@ export function SkillEditor({ content, onChange }: SkillEditorProps) {
     { id: "actions", label: "Actions 脚本" },
     { id: "timeline", label: "时间轴" },
     { id: "collider", label: "碰撞箱" },
+    { id: "refs", label: "引用" },
     { id: "yaml", label: "YAML 源码" },
   ]
 
@@ -150,6 +153,15 @@ export function SkillEditor({ content, onChange }: SkillEditorProps) {
           {activeTab === "collider" && !collider && (
             <div className="p-4 text-sm text-muted-foreground">
               未在 Actions 脚本中检测到碰撞箱选择器（@range / @obb / @sector）。
+            </div>
+          )}
+
+          {activeTab === "refs" && filePath && (
+            <CrossRefPanel currentFile={filePath} />
+          )}
+          {activeTab === "refs" && !filePath && (
+            <div className="p-4 text-sm text-muted-foreground">
+              无法分析引用：未知文件路径。
             </div>
           )}
         </div>

@@ -35,8 +35,8 @@ export function EditorPage() {
     const content = activeFile.draft ?? activeFile.content
     const handleChange = (value: string) => useEditorStore.getState().updateDraft(activeFile.path, value)
 
-    if (activeFile.configType === "skill") {
-      return <SkillEditor key={activeFile.path} content={content} onChange={handleChange} />
+    if (activeFile.configType === "skill" || activeFile.configType === "station") {
+      return <SkillEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
     }
 
     return <YamlEditor key={activeFile.path} content={content} onChange={handleChange} />
