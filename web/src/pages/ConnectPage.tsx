@@ -17,7 +17,8 @@ export function ConnectPage() {
     setError(null)
 
     try {
-      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+      const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`
 
       wsClient.setStatusChangeHandler((connected) => {
         setConnected(connected)
