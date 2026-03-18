@@ -18,6 +18,8 @@ interface EditorState {
 
   openFile: (file: Omit<OpenFile, "dirty">) => void
   closeFile: (path: string) => void
+  closeAllFiles: () => void
+  closeSavedFiles: () => void
   setActiveFile: (path: string) => void
   updateDraft: (path: string, draft: string) => void
   markSaved: (path: string, content: string) => void
@@ -68,6 +70,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       newActive = newFiles[Math.min(idx, newFiles.length - 1)]?.path ?? null
     }
     set({ openFiles: newFiles, activeFilePath: newActive })
+  },
+
+  closeAllFiles: () => {
+    set({ openFiles: [], activeFilePath: null })
+  },
+
+  closeSavedFiles: () => {
+    const { openFiles, activeFilePath } = get()
+    const remaining = openFiles.filter((f) => f.dirty)
+    const newActive = remaining.find((f) => f.path === activeFilePath)?.path ?? remaining[0]?.path ?? null
+    set({ openFiles: remaining, activeFilePath: newActive })
   },
 
   setActiveFile: (path) => set({ activeFilePath: path }),
