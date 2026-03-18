@@ -4,7 +4,7 @@ import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parse
 import { useEditorStore } from "@/store/editor-store"
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface JobEditorProps {
@@ -13,10 +13,7 @@ interface JobEditorProps {
   filePath?: string
 }
 
-type Tab = "general" | "skills" | "attributes" | "scripts" | "refs" | "yaml"
-
 export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("general")
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
 
@@ -42,60 +39,41 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
     updateJob((j) => ({ ...j, Options: { ...j.Options, ...patch } }))
   }, [updateJob])
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "general", label: "基础信息" },
-    { id: "skills", label: "技能列表" },
-    { id: "attributes", label: "属性" },
-    { id: "scripts", label: "脚本" },
-    { id: "refs", label: "引用" },
-    { id: "yaml", label: "YAML 源码" },
-  ]
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="general" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="general">基础信息</TabsTrigger>
+        <TabsTrigger value="skills">技能列表</TabsTrigger>
+        <TabsTrigger value="attributes">属性</TabsTrigger>
+        <TabsTrigger value="scripts">脚本</TabsTrigger>
+        <TabsTrigger value="refs">引用</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "general" && (
-          <GeneralPanel options={job.Options} onChange={updateOptions} />
-        )}
+      <TabsContent value="general" className="flex-1 overflow-y-auto">
+        <GeneralPanel options={job.Options} onChange={updateOptions} />
+      </TabsContent>
 
-        {activeTab === "skills" && (
-          <SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} />
-        )}
+      <TabsContent value="skills" className="flex-1 overflow-y-auto">
+        <SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} />
+      </TabsContent>
 
-        {activeTab === "attributes" && (
-          <AttributesPanel
-            attributes={job.Options.Attributes ?? []}
-            onChange={(attrs) => updateOptions({ Attributes: attrs })}
-          />
-        )}
+      <TabsContent value="attributes" className="flex-1 overflow-y-auto">
+        <AttributesPanel
+          attributes={job.Options.Attributes ?? []}
+          onChange={(attrs) => updateOptions({ Attributes: attrs })}
+        />
+      </TabsContent>
 
-        {activeTab === "scripts" && (
-          <ScriptsPanel options={job.Options} onChange={updateOptions} />
-        )}
+      <TabsContent value="scripts" className="flex-1 overflow-y-auto">
+        <ScriptsPanel options={job.Options} onChange={updateOptions} />
+      </TabsContent>
 
-        {activeTab === "refs" && filePath && <CrossRefPanel currentFile={filePath} />}
-        {activeTab === "refs" && !filePath && (
-          <div className="p-4 text-sm text-muted-foreground">无法分析引用：未知文件路径。</div>
-        )}
+      <TabsContent value="refs" className="flex-1 overflow-y-auto">
+        {filePath ? <CrossRefPanel currentFile={filePath} /> : <div className="p-4 text-sm text-muted-foreground">无法分析引用：未知文件路径。</div>}
+      </TabsContent>
 
-        {activeTab === "yaml" && (
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
           <div className="h-full">
             <Editor
               height="100%"
@@ -116,9 +94,8 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
               }}
             />
           </div>
-        )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

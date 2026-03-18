@@ -6,6 +6,7 @@ import { ActionsEditor } from "./ActionsEditor"
 import { VariablesEditor } from "./VariablesEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface StationEditorProps {
@@ -13,8 +14,6 @@ interface StationEditorProps {
   onChange: (yamlContent: string) => void
   filePath?: string
 }
-
-type Tab = "options" | "variables" | "actions" | "refs" | "yaml"
 
 // 硬编码 fallback（schema 未加载时使用）
 const FALLBACK_EVENTS = [
@@ -36,7 +35,6 @@ const FALLBACK_EVENTS = [
 const PRIORITIES = ["LOWEST", "LOW", "NORMAL", "HIGH", "HIGHEST", "MONITOR"]
 
 export function StationEditor({ content, onChange, filePath }: StationEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("options")
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
 
@@ -55,46 +53,41 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
     updateStation((s) => ({ ...s, Options: { ...s.Options, ...patch } }))
   }, [updateStation])
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "options", label: "事件配置" },
-    { id: "variables", label: "变量" },
-    { id: "actions", label: "Actions 脚本" },
-    { id: "refs", label: "引用" },
-    { id: "yaml", label: "YAML 源码" },
-  ]
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={cn("px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-            )}>{tab.label}</button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto">
-          {activeTab === "options" && <StationOptionsPanel options={station.Options} onChange={updateOptions} />}
-          {activeTab === "variables" && (
-            <VariablesEditor variables={station.Options.Variables ?? {}} onChange={(v) => updateOptions({ Variables: v })} />
-          )}
-          {activeTab === "actions" && (
-            <div className="h-full">
-              <ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" />
-            </div>
-          )}
-          {activeTab === "refs" && filePath && <CrossRefPanel currentFile={filePath} />}
-          {activeTab === "refs" && !filePath && <div className="p-4 text-sm text-muted-foreground">无法分析引用。</div>}
-          {activeTab === "yaml" && (
-            <div className="h-full">
-              <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
-                options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
-            </div>
-          )}
+    <Tabs defaultValue="options" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="options">事件配置</TabsTrigger>
+        <TabsTrigger value="variables">变量</TabsTrigger>
+        <TabsTrigger value="actions">Actions 脚本</TabsTrigger>
+        <TabsTrigger value="refs">引用</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="options" className="flex-1 overflow-y-auto">
+        <StationOptionsPanel options={station.Options} onChange={updateOptions} />
+      </TabsContent>
+
+      <TabsContent value="variables" className="flex-1 overflow-y-auto">
+        <VariablesEditor variables={station.Options.Variables ?? {}} onChange={(v) => updateOptions({ Variables: v })} />
+      </TabsContent>
+
+      <TabsContent value="actions" className="flex-1 overflow-y-auto">
+        <div className="h-full">
+          <ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" />
         </div>
-      </div>
-    </div>
+      </TabsContent>
+
+      <TabsContent value="refs" className="flex-1 overflow-y-auto">
+        {filePath ? <CrossRefPanel currentFile={filePath} /> : <div className="p-4 text-sm text-muted-foreground">无法分析引用。</div>}
+      </TabsContent>
+
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
+        <div className="h-full">
+          <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
+            options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

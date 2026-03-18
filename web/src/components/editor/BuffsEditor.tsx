@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface BuffsEditorProps {
@@ -8,10 +8,7 @@ interface BuffsEditorProps {
   onChange: (yaml: string) => void
 }
 
-type Tab = "visual" | "yaml"
-
 export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("visual")
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const rawRef = useRef(content)
   rawRef.current = content
@@ -49,10 +46,13 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <TabBar active={activeTab} onChange={setActiveTab} />
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "visual" && (
+    <Tabs defaultValue="visual" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="visual">可视化</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="visual" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3 max-w-3xl">
             <div className="flex justify-end">
               <button onClick={addBuff} className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded">添加 Buff</button>
@@ -82,31 +82,14 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
             ))}
             {buffs.length === 0 && <div className="text-sm text-muted-foreground py-8 text-center">暂无 Buff 配置</div>}
           </div>
-        )}
-        {activeTab === "yaml" && <YamlTab content={content} onChange={onChange} />}
-      </div>
-    </div>
-  )
-}
+      </TabsContent>
 
-function TabBar({ active, onChange }: { active: string; onChange: (t: "visual" | "yaml") => void }) {
-  return (
-    <div className="flex border-b border-border bg-background shrink-0">
-      {(["visual", "yaml"] as const).map((t) => (
-        <button key={t} onClick={() => onChange(t)} className={cn("px-4 py-2 text-sm border-b-2 transition-colors",
-          active === t ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-          {t === "visual" ? "可视化" : "YAML 源码"}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function YamlTab({ content, onChange }: { content: string; onChange: (v: string) => void }) {
-  return (
-    <div className="h-full">
-      <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
-        options={{ fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
-    </div>
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
+          <div className="h-full">
+            <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
+              options={{ fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
+          </div>
+      </TabsContent>
+    </Tabs>
   )
 }

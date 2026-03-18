@@ -3,6 +3,7 @@ import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parse
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 // ---- 完整类型定义（基于源码） ----
@@ -75,10 +76,7 @@ interface StatusEditorProps {
   filePath?: string
 }
 
-type Tab = "overview" | "states" | "dispatch" | "refs" | "yaml"
-
 export function StatusEditor({ content, onChange, filePath }: StatusEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("overview")
   const [selectedState, setSelectedState] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
@@ -96,77 +94,66 @@ export function StatusEditor({ content, onChange, filePath }: StatusEditorProps)
 
   const stateNames = Object.keys(data.States ?? {})
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "总览" },
-    { id: "states", label: `状态 (${stateNames.length})` },
-    { id: "dispatch", label: "输入分发" },
-    { id: "refs", label: "引用" },
-    { id: "yaml", label: "YAML 源码" },
-  ]
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={cn("px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="overview" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="overview">总览</TabsTrigger>
+        <TabsTrigger value="states">状态 ({stateNames.length})</TabsTrigger>
+        <TabsTrigger value="dispatch">输入分发</TabsTrigger>
+        <TabsTrigger value="refs">引用</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-hidden flex">
-        {activeTab === "states" && (
-          <div className="w-52 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
-            <div className="p-2 space-y-0.5">
-              {stateNames.map((name) => (
-                <button key={name} onClick={() => setSelectedState(name)}
-                  className={cn("w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2",
-                    selectedState === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}>
-                  <TypeBadge type={data.States[name].Type} />
-                  <span className="truncate">{name}</span>
-                </button>
-              ))}
-            </div>
+      <TabsContent value="overview" className="flex-1 overflow-y-auto">
+        <OverviewPanel data={data} stateNames={stateNames} onChange={(opts) => updateData((d) => ({ ...d, Options: opts }))} />
+      </TabsContent>
+
+      <TabsContent value="states" className="flex-1 overflow-hidden flex">
+        <div className="w-52 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
+          <div className="p-2 space-y-0.5">
+            {stateNames.map((name) => (
+              <button key={name} onClick={() => setSelectedState(name)}
+                className={cn("w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2",
+                  selectedState === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}>
+                <TypeBadge type={data.States[name].Type} />
+                <span className="truncate">{name}</span>
+              </button>
+            ))}
           </div>
-        )}
-
+        </div>
         <div className="flex-1 overflow-y-auto">
-          {activeTab === "overview" && (
-            <OverviewPanel data={data} stateNames={stateNames} onChange={(opts) => updateData((d) => ({ ...d, Options: opts }))} />
-          )}
-
-          {activeTab === "states" && selectedState && data.States[selectedState] && (
+          {selectedState && data.States[selectedState] ? (
             <StatePanel
               name={selectedState}
               state={data.States[selectedState]}
               onChange={(s) => updateData((d) => ({ ...d, States: { ...d.States, [selectedState]: s } }))}
             />
-          )}
-          {activeTab === "states" && !selectedState && <div className="p-4 text-sm text-muted-foreground">从左侧选择一个状态</div>}
-
-          {activeTab === "dispatch" && (
-            <div className="h-full flex flex-col">
-              <div className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
-                输入分发脚本 — 可用变量: &input (按键输入)。用 running "状态名" 切换状态
-              </div>
-              <div className="flex-1"><ActionsEditor value={data.Action ?? ""} onChange={(v) => updateData((d) => ({ ...d, Action: v }))} height="100%" /></div>
-            </div>
-          )}
-
-          {activeTab === "refs" && filePath && <CrossRefPanel currentFile={filePath} />}
-          {activeTab === "refs" && !filePath && <div className="p-4 text-sm text-muted-foreground">无法分析引用。</div>}
-
-          {activeTab === "yaml" && (
-            <div className="h-full">
-              <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
-                options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
-            </div>
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">从左侧选择一个状态</div>
           )}
         </div>
-      </div>
-    </div>
+      </TabsContent>
+
+      <TabsContent value="dispatch" className="flex-1 overflow-y-auto">
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
+            输入分发脚本 — 可用变量: &input (按键输入)。用 running "状态名" 切换状态
+          </div>
+          <div className="flex-1"><ActionsEditor value={data.Action ?? ""} onChange={(v) => updateData((d) => ({ ...d, Action: v }))} height="100%" /></div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="refs" className="flex-1 overflow-y-auto">
+        {filePath ? <CrossRefPanel currentFile={filePath} /> : <div className="p-4 text-sm text-muted-foreground">无法分析引用。</div>}
+      </TabsContent>
+
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
+        <div className="h-full">
+          <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
+            options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

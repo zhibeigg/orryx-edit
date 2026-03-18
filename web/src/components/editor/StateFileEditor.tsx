@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 // 复用 StatusEditor 的类型（GlobalStates 和 States 结构一致）
@@ -36,7 +37,6 @@ interface StateFileEditorProps {
 }
 
 export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
-  const [activeTab, setActiveTab] = useState<"visual" | "yaml">("visual")
   const [selected, setSelected] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
@@ -61,53 +61,43 @@ export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {(["visual", "yaml"] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={cn("px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            {tab === "visual" ? `全局状态 (${stateNames.length})` : "YAML 源码"}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="visual" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="visual">全局状态 ({stateNames.length})</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-hidden flex">
-        {activeTab === "visual" && (
-          <>
-            <div className="w-48 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
-              <div className="p-2 space-y-0.5">
-                {stateNames.map((name) => (
-                  <button key={name} onClick={() => setSelected(name)}
-                    className={cn("w-full text-left px-2 py-1.5 rounded text-sm",
-                      selected === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}>
-                    <div className="flex items-center gap-2">
-                      <TypeBadge type={data.GlobalStates[name].Type} />
-                      <span className="font-medium truncate">{name}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {selectedState ? (
-                <GlobalStatePanel name={selected!} state={selectedState} onChange={updateState} />
-              ) : (
-                <div className="p-4 text-sm text-muted-foreground">从左侧选择一个全局状态进行编辑</div>
-              )}
-            </div>
-          </>
-        )}
-
-        {activeTab === "yaml" && (
-          <div className="flex-1">
-            <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
-              options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
+      <TabsContent value="visual" className="flex-1 overflow-hidden flex">
+        <div className="w-48 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
+          <div className="p-2 space-y-0.5">
+            {stateNames.map((name) => (
+              <button key={name} onClick={() => setSelected(name)}
+                className={cn("w-full text-left px-2 py-1.5 rounded text-sm",
+                  selected === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}>
+                <div className="flex items-center gap-2">
+                  <TypeBadge type={data.GlobalStates[name].Type} />
+                  <span className="font-medium truncate">{name}</span>
+                </div>
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {selectedState ? (
+            <GlobalStatePanel name={selected!} state={selectedState} onChange={updateState} />
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">从左侧选择一个全局状态进行编辑</div>
+          )}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
+        <div className="flex-1">
+          <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
+            options={{ fontSize: 13, fontFamily: "var(--font-mono)", minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

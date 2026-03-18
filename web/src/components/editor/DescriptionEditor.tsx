@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { Plus, Trash2, GripVertical, Eye } from "lucide-react"
 import { evaluateKether } from "@/lib/kether-eval"
+import { Slider } from "@/components/ui/slider"
 
 interface DescriptionEditorProps {
   descriptions: string[]
@@ -222,13 +223,12 @@ export function DescriptionEditor({ descriptions, variables, minLevel, maxLevel,
           {/* 等级滑块 */}
           <div className="flex items-center gap-3 px-4 py-2 bg-[#252526]">
             <span className="text-[11px] text-[#858585]">预览等级</span>
-            <input
-              type="range"
+            <Slider
               min={minLevel}
               max={maxLevel}
-              value={previewLevel}
-              onChange={(e) => setPreviewLevel(parseInt(e.target.value))}
-              className="flex-1 h-1 accent-[#007acc]"
+              value={[previewLevel]}
+              onValueChange={(v) => setPreviewLevel(v[0])}
+              className="flex-1"
             />
             <span className="text-[13px] text-[#007acc] font-mono w-8 text-center">{previewLevel}</span>
           </div>

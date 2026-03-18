@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react"
 import { Copy, Check } from "lucide-react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface PlaceholderEditorProps {
@@ -16,10 +16,7 @@ interface PlaceholderEntry {
   script: string
 }
 
-type Tab = "visual" | "yaml"
-
 export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("visual")
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
@@ -64,29 +61,13 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {([
-          { id: "visual" as Tab, label: "可视化" },
-          { id: "yaml" as Tab, label: "YAML 源码" },
-        ]).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="visual" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="visual">可视化</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "visual" && (
+      <TabsContent value="visual" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3 max-w-4xl">
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
@@ -147,9 +128,9 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
               </div>
             ))}
           </div>
-        )}
+      </TabsContent>
 
-        {activeTab === "yaml" && (
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
           <div className="h-full">
             <Editor
               height="100%"
@@ -170,9 +151,8 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
               }}
             />
           </div>
-        )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

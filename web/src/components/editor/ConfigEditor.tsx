@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface ConfigEditorProps {
@@ -8,10 +8,7 @@ interface ConfigEditorProps {
   onChange: (yaml: string) => void
 }
 
-type Tab = "general" | "database" | "integration" | "yaml"
-
 export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("general")
   const rawRef = useRef(content)
   rawRef.current = content
 
@@ -33,26 +30,16 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
   const ai = (config.OpenAI ?? {}) as Record<string, unknown>
   const editor = (config.Editor ?? {}) as Record<string, unknown>
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "general", label: "基础" },
-    { id: "database", label: "数据库" },
-    { id: "integration", label: "集成" },
-    { id: "yaml", label: "YAML 源码" },
-  ]
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {tabs.map((t) => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} className={cn("px-4 py-2 text-sm border-b-2 transition-colors",
-            activeTab === t.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="general" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="general">基础</TabsTrigger>
+        <TabsTrigger value="database">数据库</TabsTrigger>
+        <TabsTrigger value="integration">集成</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "general" && (
+      <TabsContent value="general" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-5 max-w-2xl">
             <Section title="基础设置">
               <div className="grid grid-cols-2 gap-3">
@@ -106,9 +93,9 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               </select>
             </Section>
           </div>
-        )}
+      </TabsContent>
 
-        {activeTab === "database" && (
+      <TabsContent value="database" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-4 max-w-2xl">
             <Section title="数据库类型">
               <select className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
@@ -136,9 +123,9 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               </Section>
             )}
           </div>
-        )}
+      </TabsContent>
 
-        {activeTab === "integration" && (
+      <TabsContent value="integration" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-5 max-w-2xl">
             <Section title="飞书文档 (LarkSuite)">
               <div className="grid grid-cols-2 gap-3">
@@ -160,16 +147,15 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               <Field label="License"><StrInput value={editor.License as string} onChange={(v) => save({ Editor: { ...editor, License: v } })} /></Field>
             </Section>
           </div>
-        )}
+      </TabsContent>
 
-        {activeTab === "yaml" && (
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
           <div className="h-full">
             <Editor height="100%" defaultLanguage="yaml" value={content} onChange={(v) => onChange(v ?? "")} theme="vs-dark"
               options={{ fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false, wordWrap: "on", tabSize: 2, insertSpaces: true, automaticLayout: true, padding: { top: 4 } }} />
           </div>
-        )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

@@ -1,5 +1,5 @@
 import { X, Upload, Terminal, ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { useEditorStore } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
 import { getFileIconInfo } from "@/lib/file-icons"
@@ -19,6 +19,7 @@ import { NpcEditor } from "@/components/editor/NpcEditor"
 import { SelectorsEditor } from "@/components/editor/SelectorsEditor"
 import { PublishPanel } from "@/components/publish/PublishPanel"
 import { LogConsole } from "@/components/visualizer/LogConsole"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
 type BottomPanel = "log" | null
@@ -28,17 +29,7 @@ export function EditorPage() {
   const connected = useConnectionStore((s) => s.connected)
   const [showPublish, setShowPublish] = useState(false)
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null)
-  const [showTabMenu, setShowTabMenu] = useState(false)
-  const tabMenuRef = useRef<HTMLDivElement>(null)
   const dirtyCount = openFiles.filter((f) => f.dirty).length
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (tabMenuRef.current && !tabMenuRef.current.contains(e.target as Node)) setShowTabMenu(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
 
   if (openFiles.length === 0) {
     return (
@@ -143,54 +134,42 @@ export function EditorPage() {
           })}
         </div>
         {/* 标签栏菜单 */}
-        <div className="relative shrink-0" ref={tabMenuRef}>
-          <button
-            onClick={() => setShowTabMenu(!showTabMenu)}
-            className="flex items-center px-2 py-[6px] text-[13px] border-l border-[#3c3c3c] hover:bg-[#2a2d2e] text-[#969696]"
-            title="标签操作"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-          {showTabMenu && (
-            <div className="absolute right-0 top-full mt-0 z-30 bg-[#252526] border border-[#3c3c3c] shadow-lg py-1 min-w-[180px]">
-              <button
-                onClick={() => { closeSavedFiles(); setShowTabMenu(false) }}
-                className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center justify-between"
-              >
-                关闭已保存
-                <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K U</kbd>
-              </button>
-              <button
-                onClick={async () => {
-                  // 全部保存再关闭
-                  const store = useEditorStore.getState()
-                  const { wsClient } = await import("@/lib/ws-client")
-                  for (const f of store.openFiles.filter(f => f.dirty)) {
-                    try {
-                      const content = f.draft ?? f.content
-                      await wsClient.fileWrite(f.path, content)
-                      store.markSaved(f.path, content)
-                    } catch { /* skip */ }
-                  }
-                  store.closeAllFiles()
-                  setShowTabMenu(false)
-                }}
-                className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center justify-between"
-              >
-                全部保存并关闭
-                <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K S</kbd>
-              </button>
-              <div className="border-t border-border my-1" />
-              <button
-                onClick={() => { closeAllFiles(); setShowTabMenu(false) }}
-                className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent text-red-400 flex items-center justify-between"
-              >
-                全部关闭
-                <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K W</kbd>
-              </button>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex items-center px-2 py-[6px] text-[13px] border-l border-[#3c3c3c] hover:bg-[#2a2d2e] text-[#969696] shrink-0"
+              title="标签操作"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => closeSavedFiles()}>
+              <span className="flex-1">关闭已保存</span>
+              <kbd className="text-[10px] text-[#858585] bg-[#2d2d2d] px-1.5 py-0.5 ml-4">Ctrl+K U</kbd>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => {
+              const store = useEditorStore.getState()
+              const { wsClient } = await import("@/lib/ws-client")
+              for (const f of store.openFiles.filter(f => f.dirty)) {
+                try {
+                  const content = f.draft ?? f.content
+                  await wsClient.fileWrite(f.path, content)
+                  store.markSaved(f.path, content)
+                } catch { /* skip */ }
+              }
+              store.closeAllFiles()
+            }}>
+              <span className="flex-1">全部保存并关闭</span>
+              <kbd className="text-[10px] text-[#858585] bg-[#2d2d2d] px-1.5 py-0.5 ml-4">Ctrl+K S</kbd>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => closeAllFiles()} className="text-[#f44747] hover:text-white">
+              <span className="flex-1">全部关闭</span>
+              <kbd className="text-[10px] text-[#858585] bg-[#2d2d2d] px-1.5 py-0.5 ml-4">Ctrl+K W</kbd>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <button
           onClick={() => setShowPublish(!showPublish)}
           className={cn(

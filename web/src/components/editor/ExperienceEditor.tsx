@@ -3,7 +3,7 @@ import type { ExperienceData, ExperienceOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { evaluateKether, formatKetherScript } from "@/lib/kether-eval"
 import { ActionsEditor } from "./ActionsEditor"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
 interface ExperienceEditorProps {
@@ -12,10 +12,7 @@ interface ExperienceEditorProps {
   filePath?: string
 }
 
-type Tab = "editor" | "curve" | "yaml"
-
 export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("editor")
   const rawYamlRef = useRef(content)
   rawYamlRef.current = content
 
@@ -46,41 +43,23 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
     updateOptions({ ExperienceOfLevel: v })
   }, [updateOptions])
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "editor", label: "经验配置" },
-    { id: "curve", label: "经验曲线" },
-    { id: "yaml", label: "YAML 源码" },
-  ]
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-background shrink-0">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm border-b-2 transition-colors",
-              activeTab === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <Tabs defaultValue="editor" className="h-full flex flex-col">
+      <TabsList>
+        <TabsTrigger value="editor">经验配置</TabsTrigger>
+        <TabsTrigger value="curve">经验曲线</TabsTrigger>
+        <TabsTrigger value="yaml">YAML 源码</TabsTrigger>
+      </TabsList>
 
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "editor" && (
-          <ConfigPanel options={data.Options} onChange={updateOptions} formulaValue={formulaValue} onFormulaChange={updateFormula} />
-        )}
+      <TabsContent value="editor" className="flex-1 overflow-y-auto">
+        <ConfigPanel options={data.Options} onChange={updateOptions} formulaValue={formulaValue} onFormulaChange={updateFormula} />
+      </TabsContent>
 
-        {activeTab === "curve" && (
-          <CurvePreview options={{ ...data.Options, ExperienceOfLevel: formulaValue }} />
-        )}
+      <TabsContent value="curve" className="flex-1 overflow-y-auto">
+        <CurvePreview options={{ ...data.Options, ExperienceOfLevel: formulaValue }} />
+      </TabsContent>
 
-        {activeTab === "yaml" && (
+      <TabsContent value="yaml" className="flex-1 overflow-y-auto">
           <div className="h-full">
             <Editor
               height="100%"
@@ -101,9 +80,8 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
               }}
             />
           </div>
-        )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState, Suspense, lazy } from "react"
-import { createPortal } from "react-dom"
 import { parseTimeline, type TimelineEvent } from "@/lib/skill-timeline"
-import { X, Box } from "lucide-react"
+import { Box } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const ColliderPreview = lazy(() =>
   import("./ColliderPreview").then(m => ({ default: m.ColliderPreview }))
@@ -181,32 +181,26 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
         )}
       </div>
 
-      {/* 碰撞箱 3D 预览弹窗 — portal 到 body 避免定位被父容器影响 */}
-      {previewCollider && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setPreviewCollider(null)}>
-          <div className="bg-[#252526] border border-[#3c3c3c] shadow-lg w-[560px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#3c3c3c] bg-[#3c3c3c] shrink-0">
-              <div className="flex items-center gap-2">
-                <Box className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[13px] text-white">{previewCollider.label}</span>
-                <span className="text-[11px] text-[#858585]">@{previewCollider.tick}t</span>
-              </div>
-              <button onClick={() => setPreviewCollider(null)} className="p-0.5 hover:bg-[#505050]">
-                <X className="w-3.5 h-3.5 text-[#cccccc]" />
-              </button>
-            </div>
-            <div className="h-[400px]">
-              <Suspense fallback={<div className="flex items-center justify-center h-full text-[13px] text-[#858585]">加载 3D 预览...</div>}>
-                <ColliderPreview type={previewCollider.type} params={previewCollider.params} offset={previewCollider.offset} />
-              </Suspense>
-            </div>
-            <div className="px-3 py-1.5 border-t border-[#3c3c3c] text-[11px] text-[#858585] shrink-0">
-              鼠标拖拽旋转，滚轮缩放。黄色线框为玩家参考位置。
-            </div>
+      {/* 碰撞箱 3D 预览弹窗 */}
+      <Dialog open={!!previewCollider} onOpenChange={(open) => { if (!open) setPreviewCollider(null) }}>
+        <DialogContent className="w-[560px] max-w-[90vw] max-h-[80vh] flex flex-col p-0">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Box className="w-3.5 h-3.5 text-amber-400" />
+              {previewCollider?.label}
+              <span className="text-[11px] text-[#858585] font-normal">@{previewCollider?.tick}t</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="h-[400px]">
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-[13px] text-[#858585]">加载 3D 预览...</div>}>
+              {previewCollider && <ColliderPreview type={previewCollider.type} params={previewCollider.params} offset={previewCollider.offset} />}
+            </Suspense>
           </div>
-        </div>,
-        document.body
-      )}
+          <div className="px-3 py-1.5 border-t border-[#3c3c3c] text-[11px] text-[#858585] shrink-0">
+            鼠标拖拽旋转，滚轮缩放。黄色线框为玩家参考位置。
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
