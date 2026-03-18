@@ -405,6 +405,43 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
 
   // ---- 语法诊断（警告） ----
   registerDiagnostics(monaco)
+
+  // ---- CodeLens: action 名称左侧显示向导图标 ----
+  monaco.languages.registerCodeLensProvider(KETHER_LANGUAGE_ID, {
+    provideCodeLenses(model) {
+      const lenses: languages.CodeLens[] = []
+      const schema = getActionsSchema()
+      if (!schema) return { lenses, dispose: () => {} }
+
+      const actionNames = new Set<string>()
+      for (const a of schema.actions) {
+        actionNames.add(a.name.toLowerCase())
+        for (const alias of a.aliases ?? []) actionNames.add(alias.toLowerCase())
+      }
+
+      for (let i = 1; i <= model.getLineCount(); i++) {
+        const line = model.getLineContent(i).trim()
+        if (!line || line.startsWith("#") || line.startsWith("//")) continue
+        const firstToken = line.split(/\s+/)[0]?.toLowerCase()
+        if (firstToken && actionNames.has(firstToken)) {
+          lenses.push({
+            range: new monaco.Range(i, 1, i, 1),
+            command: {
+              id: "kether.openWizard",
+              title: "⚙ 参数向导",
+              arguments: [i, firstToken],
+            },
+          })
+        }
+      }
+      return { lenses, dispose: () => {} }
+    },
+  })
+
+  // 注册 CodeLens 调用的命令
+  monaco.editor.registerCommand("kether.openWizard", (_accessor: unknown, lineNumber: number, actionName: string) => {
+    fireWizardTrigger({ lineNumber, actionName })
+  })
 }
 
 // ---- 语法诊断 ----
@@ -573,6 +610,23 @@ const SNIPPETS = [
   { label: "set-variable", insertText: "set ${1:a} to ${2:expression}", detail: "设置变量" },
   { label: "tell-message", insertText: "tell colored \"${1:&c消息}\"", detail: "发送消息" },
 ]
+
+// ============ 参数向导触发 ============
+
+export type WizardTrigger = { lineNumber: number; actionName: string }
+const wizardTriggerCallbacks: ((trigger: WizardTrigger) => void)[] = []
+
+export function onWizardTrigger(cb: (trigger: WizardTrigger) => void) {
+  wizardTriggerCallbacks.push(cb)
+  return () => {
+    const idx = wizardTriggerCallbacks.indexOf(cb)
+    if (idx >= 0) wizardTriggerCallbacks.splice(idx, 1)
+  }
+}
+
+export function fireWizardTrigger(trigger: WizardTrigger) {
+  for (const cb of wizardTriggerCallbacks) cb(trigger)
+}
 
 /** 找到行中注释开始位置（排除字符串内的 #） */
 function findCommentStart(text: string): number {
