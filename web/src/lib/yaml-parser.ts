@@ -1,4 +1,4 @@
-import { parseDocument, stringify, Document } from "yaml"
+import { parseDocument, stringify, Document, Scalar } from "yaml"
 import type { SkillData } from "@/types"
 
 /**
@@ -31,7 +31,13 @@ export function stringifyYaml(data: unknown): string {
  */
 export function updateYamlField(originalYaml: string, path: string[], value: unknown): string {
   const doc = parseDocument(originalYaml)
-  doc.setIn(path, value)
+  if (typeof value === "string" && value.includes("\n")) {
+    const scalar = new Scalar(value)
+    scalar.type = Scalar.BLOCK_LITERAL
+    doc.setIn(path, scalar)
+  } else {
+    doc.setIn(path, value)
+  }
   return doc.toString()
 }
 
@@ -64,7 +70,14 @@ export function updateYamlFromObject(originalYaml: string, newData: Record<strin
       ) {
         deepUpdate(doc, currentPath, oldVal as Record<string, unknown>, newVal as Record<string, unknown>)
       } else {
-        doc.setIn(currentPath, newVal)
+        // 多行字符串使用块标量格式（|），避免转义
+        if (typeof newVal === "string" && newVal.includes("\n")) {
+          const scalar = new Scalar(newVal)
+          scalar.type = Scalar.BLOCK_LITERAL
+          doc.setIn(currentPath, scalar)
+        } else {
+          doc.setIn(currentPath, newVal)
+        }
       }
     }
 
