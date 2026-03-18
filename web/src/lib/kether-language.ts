@@ -457,22 +457,6 @@ function registerDiagnostics(monaco: typeof import("monaco-editor")) {
 
 // ---- 辅助函数 ----
 
-/** 找到行中注释开始位置（排除字符串内的 #） */
-function findCommentStart(line: string): number {
-  let inString = false
-  let stringChar = ""
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (inString) {
-      if (ch === stringChar && line[i - 1] !== "\\") inString = false
-    } else {
-      if (ch === '"' || ch === "'") { inString = true; stringChar = ch }
-      else if (ch === "#") return i
-    }
-  }
-  return -1
-}
-
 function buildDoc(action: ActionDef): string {
   let doc = `**${action.name}**\n\n\`${action.syntax}\`\n\n${action.description}`
   if (action.params?.length) {
