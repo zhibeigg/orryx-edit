@@ -4,6 +4,8 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+    <!-- 屏蔽 Netty 关闭时的 dispatch 错误 -->
+    <logger name="io.ktor.server.netty.CIO" level="OFF"/>
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>

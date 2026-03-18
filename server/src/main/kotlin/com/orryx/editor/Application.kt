@@ -34,7 +34,8 @@ fun main() {
     }
 
     Runtime.getRuntime().addShutdownHook(Thread {
-        server.stop(1000, 2000)
+        println("正在关闭服务器...")
+        server.stop(500, 3000)
     })
 
     server.start(wait = true)
