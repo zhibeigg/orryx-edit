@@ -90,11 +90,11 @@ class LicenseManager(private val dataDir: File) {
         return true
     }
 
-    /** 添加一个 IP 到允许列表 */
+    /** 绑定 IP（替换旧的，一个 key 只绑一个 IP） */
     fun addIp(license: String, ip: String): Boolean {
         val entry = licenses[license] ?: return false
-        if (ip in entry.boundIps) return true
-        licenses[license] = entry.copy(boundIps = entry.boundIps + ip)
+        if (entry.boundIps == listOf(ip)) return true
+        licenses[license] = entry.copy(boundIps = listOf(ip))
         save()
         return true
     }
