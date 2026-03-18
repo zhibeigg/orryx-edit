@@ -66,6 +66,8 @@
 | `pluginVersion` | string | 是 | 插件版本号 |
 | `actions` | Action[] | 是 | 语句列表 |
 | `triggers` | Trigger[] | 否 | 可监听事件列表（Station 编辑器用） |
+| `selectors` | Selector[] | 否 | 选择器列表（`@选择器名` 补全用） |
+| `properties` | Property[] | 否 | 属性对象列表（`&变量名[key]` 补全用） |
 
 ### Action
 
@@ -233,6 +235,237 @@ fun generateActionsSchema(): String {
 }
 ```
 
+### Selector（选择器）
+
+编辑器使用 `selectors` 列表来提供 `@选择器名` 的补全和参数提示。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 选择器名称（不含 `@` 前缀），如 `"range"` |
+| `aliases` | string[] | 否 | 别名列表，如 `["r"]` |
+| `category` | string | 是 | 分类 |
+| `description` | string | 是 | 选择器说明 |
+| `params` | SelectorParam[] | 否 | 参数列表（按顺序） |
+| `syntax` | string | 是 | 语法模板，如 `"@range [DOUBLE(5.0)] [DOUBLE(0.0)]"` |
+| `examples` | string[] | 否 | 使用示例 |
+
+### SelectorParam
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | 是 | 参数类型（`DOUBLE`/`INT`/`BOOLEAN`/`STRING`/`VECTOR`） |
+| `description` | string | 是 | 参数说明 |
+| `default` | string | 否 | 默认值 |
+
+### Selector Category 建议值
+
+| 值 | 说明 |
+|----|------|
+| `geometry` | 几何选择器（范围、扇形、环形等） |
+| `entity` | 实体选择器（自身、目标、队友等） |
+| `location` | 位置选择器（原点、脚下、视线等） |
+| `filter` | 过滤选择器（排除、类型过滤等） |
+| `composite` | 组合选择器 |
+
+### Selector 示例
+
+```json
+{
+  "selectors": [
+    {
+      "name": "range",
+      "aliases": ["r"],
+      "category": "geometry",
+      "description": "球形范围选择器，选取范围内的实体",
+      "params": [
+        { "type": "DOUBLE", "description": "半径", "default": "5.0" },
+        { "type": "DOUBLE", "description": "y轴偏移", "default": "0.0" }
+      ],
+      "syntax": "@range [DOUBLE(5.0)] [DOUBLE(0.0)]",
+      "examples": ["@range 5", "@range 10 2"]
+    },
+    {
+      "name": "frustum",
+      "category": "geometry",
+      "description": "圆台形范围选择器",
+      "params": [
+        { "type": "DOUBLE", "description": "上半径", "default": "1.0" },
+        { "type": "DOUBLE", "description": "下半径", "default": "10.0" },
+        { "type": "DOUBLE", "description": "仰角", "default": "10.0" },
+        { "type": "DOUBLE", "description": "偏航角", "default": "0" },
+        { "type": "DOUBLE", "description": "y轴偏移", "default": "0.0" },
+        { "type": "BOOLEAN", "description": "跟随pitch", "default": "false" }
+      ],
+      "syntax": "@frustum [DOUBLE(1.0)] [DOUBLE(10.0)] [DOUBLE(10.0)] [DOUBLE(0)] [DOUBLE(0.0)] [BOOLEAN(false)]",
+      "examples": ["@frustum 1 5 10 0 1 false"]
+    },
+    {
+      "name": "self",
+      "category": "entity",
+      "description": "选择自身",
+      "params": [],
+      "syntax": "@self"
+    },
+    {
+      "name": "lookat",
+      "aliases": ["look"],
+      "category": "location",
+      "description": "视线目标，选取准星正对的实体",
+      "params": [
+        { "type": "DOUBLE", "description": "最大距离", "default": "32.0" },
+        { "type": "DOUBLE", "description": "角度容差", "default": "5.0" }
+      ],
+      "syntax": "@lookat [DOUBLE(32.0)] [DOUBLE(5.0)]",
+      "examples": ["@lookat 32 5"]
+    }
+  ]
+}
+```
+
+### Property（属性对象）
+
+编辑器使用 `properties` 列表来提供 `&变量名[key]` 的属性补全。当用户输入 `&变量名[` 时，根据变量类型匹配对应的 Property，弹出属性 key 列表。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 属性对象名称，如 `"Location"` |
+| `id` | string | 是 | 属性操作符 ID，如 `"orryx.location.operator"` |
+| `category` | string | 是 | 分类 |
+| `description` | string | 否 | 属性对象说明 |
+| `usage` | string | 否 | 用法说明，如 `"&变量名[key]"` |
+| `keys` | PropertyKey[] | 是 | 属性键列表 |
+
+### PropertyKey
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 属性键名，如 `"x"`、`"health"` |
+| `type` | string | 是 | 值类型（`STRING`/`INT`/`DOUBLE`/`FLOAT`/`BOOLEAN`/`VECTOR`/`ANY`） |
+| `writable` | boolean | 是 | 是否可写（`set &变量名[key] to 值`） |
+| `description` | string | 否 | 属性说明 |
+
+### Property Category 建议值
+
+| 值 | 说明 |
+|----|------|
+| `game` | 原版游戏对象（Location、Entity、ItemStack 等） |
+| `orryx-player` | Orryx 玩家相关（Profile、Skill 等） |
+| `orryx-combat` | Orryx 战斗相关（DamageProcessor 等） |
+| `keysetting` | 按键设置 |
+| `third-party` | 第三方插件对象 |
+
+### Property 示例
+
+```json
+{
+  "properties": [
+    {
+      "name": "Location",
+      "id": "orryx.location.operator",
+      "category": "game",
+      "description": "Bukkit Location 对象，包含坐标、朝向和世界信息",
+      "usage": "&变量名[key]",
+      "keys": [
+        { "name": "x", "type": "DOUBLE", "writable": true, "description": "X 坐标" },
+        { "name": "y", "type": "DOUBLE", "writable": true, "description": "Y 坐标" },
+        { "name": "z", "type": "DOUBLE", "writable": true, "description": "Z 坐标" },
+        { "name": "yaw", "type": "FLOAT", "writable": true, "description": "偏航角" },
+        { "name": "pitch", "type": "FLOAT", "writable": true, "description": "俯仰角" },
+        { "name": "world", "type": "STRING", "writable": false, "description": "世界名称" },
+        { "name": "blockX", "type": "INT", "writable": false, "description": "方块 X 坐标" },
+        { "name": "blockY", "type": "INT", "writable": false, "description": "方块 Y 坐标" },
+        { "name": "blockZ", "type": "INT", "writable": false, "description": "方块 Z 坐标" },
+        { "name": "direction", "type": "VECTOR", "writable": false, "description": "方向向量" },
+        { "name": "length", "type": "DOUBLE", "writable": false, "description": "到原点距离" }
+      ]
+    },
+    {
+      "name": "IEntity",
+      "id": "orryx.entity.operator",
+      "category": "game",
+      "description": "实体对象",
+      "usage": "&变量名[key]",
+      "keys": [
+        { "name": "uniqueId", "type": "STRING", "writable": false, "description": "实体 UUID" },
+        { "name": "entityId", "type": "INT", "writable": false, "description": "实体数值 ID" },
+        { "name": "health", "type": "DOUBLE", "writable": true, "description": "当前生命值" },
+        { "name": "maxHealth", "type": "DOUBLE", "writable": false, "description": "最大生命值" },
+        { "name": "name", "type": "STRING", "writable": false, "description": "实体名称" },
+        { "name": "location", "type": "LOCATION", "writable": false, "description": "实体位置" }
+      ]
+    },
+    {
+      "name": "IBindKey",
+      "id": "bindKey.operator",
+      "category": "keysetting",
+      "description": "按键绑定对象",
+      "usage": "&变量名[key]",
+      "keys": [
+        { "name": "key", "type": "STRING", "writable": false, "description": "按键绑定的键名" },
+        { "name": "name", "type": "STRING", "writable": false, "description": "同 key" },
+        { "name": "sort", "type": "INT", "writable": false, "description": "排序权重" }
+      ]
+    }
+  ]
+}
+```
+
+### 插件端生成 Selector 和 Property 参考
+
+```kotlin
+fun generateSelectors(): List<Map<String, Any?>> {
+    return SelectorRegistry.getAll().map { sel ->
+        mapOf(
+            "name" to sel.name,
+            "aliases" to sel.aliases,
+            "category" to sel.category,
+            "description" to sel.description,
+            "params" to sel.params.map { p ->
+                mapOf(
+                    "type" to p.type.name,
+                    "description" to p.description,
+                    "default" to p.default
+                )
+            },
+            "syntax" to sel.syntax,
+            "examples" to sel.examples
+        )
+    }
+}
+
+fun generateProperties(): List<Map<String, Any?>> {
+    return PropertyOperatorRegistry.getAll().map { prop ->
+        mapOf(
+            "name" to prop.name,
+            "id" to prop.id,
+            "category" to prop.category,
+            "description" to prop.description,
+            "usage" to prop.usage,
+            "keys" to prop.keys.map { k ->
+                mapOf(
+                    "name" to k.name,
+                    "type" to k.type.name,
+                    "writable" to k.writable,
+                    "description" to k.description
+                )
+            }
+        )
+    }
+}
+
+// 完整的 generateActionsSchema()
+fun generateActionsSchema(): String {
+    return Json.encodeToString(mapOf(
+        "version" to "1.0",
+        "pluginVersion" to plugin.description.version,
+        "actions" to generateActions(),
+        "triggers" to generateTriggers(),
+        "selectors" to generateSelectors(),
+        "properties" to generateProperties()
+    ))
+}
+```
+
 ## 完整示例
 
 ```json
@@ -371,3 +604,5 @@ fun generateActionsSchema(): String {
 6. **废弃提示**：`deprecated: true` 的语句显示删除线
 7. **Station 事件选择**：`triggers` 列表按 `category` 分组显示在下拉菜单中
 8. **事件变量提示**：选中事件后显示该事件提供的 `variables`，提示 `&event[变量名]` 用法
+9. **选择器补全**：输入 `@` 时弹出 `selectors` 列表，显示参数和默认值
+10. **属性补全**：输入 `&变量名[` 时弹出对应 Property 的 `keys` 列表，区分可读/可写

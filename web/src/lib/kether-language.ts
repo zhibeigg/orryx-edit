@@ -28,16 +28,35 @@ interface ActionsSchema {
   version: string
   pluginVersion: string
   actions: ActionDef[]
-  /** 可用的监听事件（Station 用） */
   triggers?: TriggerDef[]
+  selectors?: SelectorDef[]
+  properties?: PropertyDef[]
 }
 
 interface TriggerDef {
   name: string
   category: string
   description?: string
-  /** 事件提供的变量（可通过 &event[字段名] 访问） */
   variables?: { name: string; type: string; description?: string }[]
+}
+
+interface SelectorDef {
+  name: string
+  aliases?: string[]
+  category: string
+  description: string
+  params?: { type: string; description: string; default?: string }[]
+  syntax: string
+  examples?: string[]
+}
+
+interface PropertyDef {
+  name: string
+  id: string
+  category: string
+  description?: string
+  usage?: string
+  keys: { name: string; type: string; writable: boolean; description?: string }[]
 }
 
 // ---- 全局 schema 缓存 ----
