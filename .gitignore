@@ -1,2 +1,27 @@
 .narrafork/
 .worktrees/
+
+# Frontend
+web/node_modules/
+web/dist/
+
+# Server
+server/.gradle/
+server/build/
+server/.kotlin/
+server/src/main/resources/static/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Orryx data (contains sensitive config)
+Orryx/
+
+# Runtime data
+data/
