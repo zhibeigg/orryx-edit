@@ -64,13 +64,17 @@ fun Application.configureRouting(
                 if (!checkAdmin(call, adminKey)) return@post
                 val body = call.receive<CreateLicenseRequest>()
                 val entry = licenseManager.createLicense(body.owner, body.days)
-                call.respondText(licenseToJson(entry, false), ContentType.Application.Json)
+                call.respondText(licenseToJson(entry, false, 0), ContentType.Application.Json)
             }
 
             get("/licenses") {
                 if (!checkAdmin(call, adminKey)) return@get
                 val onlineKeys = registry.getOnlineServerKeys()
-                val list = licenseManager.list().map { licenseToJson(it, it.serverKey in onlineKeys) }
+                val list = licenseManager.list().map {
+                    val online = it.serverKey in onlineKeys
+                    val count = registry.onlineSessionCount(it.serverKey)
+                    licenseToJson(it, online, count)
+                }
                 call.respondText("[${list.joinToString(",")}]", ContentType.Application.Json)
             }
 
@@ -114,7 +118,8 @@ fun Application.configureRouting(
             get("/info") {
                 val entry = checkLicense(call, licenseManager) ?: return@get
                 val online = registry.isServerOnline(entry.serverKey)
-                call.respondText(licenseToJson(entry, online), ContentType.Application.Json)
+                val count = registry.onlineSessionCount(entry.serverKey)
+                call.respondText(licenseToJson(entry, online, count), ContentType.Application.Json)
             }
 
             // 清空绑定 IP（下次插件连接时会自动添加新 IP）
@@ -136,9 +141,9 @@ fun Application.configureRouting(
     }
 }
 
-private fun licenseToJson(entry: com.orryx.editor.license.LicenseEntry, online: Boolean): String {
+private fun licenseToJson(entry: com.orryx.editor.license.LicenseEntry, online: Boolean, onlineCount: Int = 0): String {
     val ipsJson = entry.boundIps.joinToString(",") { "\"$it\"" }
-    return """{"license":"${entry.license}","owner":"${entry.owner}","serverKey":"${entry.serverKey}","enabled":${entry.enabled},"online":$online,"createdAt":${entry.createdAt},"expiresAt":${entry.expiresAt},"boundIps":[$ipsJson],"remainingDays":${entry.remainingDays()}}"""
+    return """{"license":"${entry.license}","owner":"${entry.owner}","serverKey":"${entry.serverKey}","enabled":${entry.enabled},"online":$online,"onlineCount":$onlineCount,"createdAt":${entry.createdAt},"expiresAt":${entry.expiresAt},"boundIps":[$ipsJson],"remainingDays":${entry.remainingDays()}}"""
 }
 
 private suspend fun checkAdmin(call: ApplicationCall, adminKey: String): Boolean {

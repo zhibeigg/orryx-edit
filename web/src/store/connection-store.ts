@@ -6,10 +6,11 @@ interface ConnectionState {
   reconnecting: boolean
   token: string | null
   serverName: string | null
+  onlineCount: number
   error: string | null
 
   setConnected: (connected: boolean) => void
-  setAuthenticated: (authenticated: boolean, serverName?: string) => void
+  setAuthenticated: (authenticated: boolean, serverName?: string, onlineCount?: number) => void
   setReconnecting: (reconnecting: boolean) => void
   setToken: (token: string | null) => void
   setError: (error: string | null) => void
@@ -22,6 +23,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   reconnecting: false,
   token: null,
   serverName: null,
+  onlineCount: 0,
   error: null,
 
   setConnected: (connected) => {
@@ -37,9 +39,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       })
     }
   },
-  setAuthenticated: (authenticated, serverName) => set({ authenticated, serverName: serverName ?? null, reconnecting: false }),
+  setAuthenticated: (authenticated, serverName, onlineCount) => set({ authenticated, serverName: serverName ?? null, onlineCount: onlineCount ?? 0, reconnecting: false }),
   setReconnecting: (reconnecting) => set({ reconnecting }),
   setToken: (token) => set({ token }),
   setError: (error) => set({ error }),
-  reset: () => set({ connected: false, authenticated: false, reconnecting: false, token: null, serverName: null, error: null }),
+  reset: () => set({ connected: false, authenticated: false, reconnecting: false, token: null, serverName: null, onlineCount: 0, error: null }),
 }))

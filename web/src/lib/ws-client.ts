@@ -9,7 +9,7 @@ const pendingRequests = new Map<string, { resolve: (data: unknown) => void; reje
 const listeners = new Map<string, Set<MessageHandler>>()
 let onStatusChange: ((connected: boolean) => void) | null = null
 let onReconnectFailed: (() => void) | null = null
-let onReconnected: ((serverName?: string) => void) | null = null
+let onReconnected: ((serverName?: string, onlineCount?: number) => void) | null = null
 
 // 重连状态
 let reconnectUrl: string | null = null
@@ -27,7 +27,7 @@ export function setStatusChangeHandler(handler: (connected: boolean) => void) {
   onStatusChange = handler
 }
 
-export function setReconnectedHandler(handler: (serverName?: string) => void) {
+export function setReconnectedHandler(handler: (serverName?: string, onlineCount?: number) => void) {
   onReconnected = handler
 }
 
@@ -51,10 +51,10 @@ function scheduleReconnect() {
     try {
       await connect(reconnectUrl!)
       // 重连成功，自动重新认证
-      const authResult = await request<{ success: boolean; serverName?: string }>(MSG.AUTH, { token: reconnectToken })
+      const authResult = await request<{ success: boolean; serverName?: string; onlineCount?: number }>(MSG.AUTH, { token: reconnectToken })
       if (authResult.success) {
         reconnectAttempts = 0
-        onReconnected?.(authResult.serverName)
+        onReconnected?.(authResult.serverName, authResult.onlineCount)
       }
     } catch {
       scheduleReconnect()
@@ -185,7 +185,7 @@ export const wsClient = {
 
   async auth(token: string) {
     reconnectToken = token // 记录 token 用于自动重连
-    return request<{ success: boolean; permissions?: string[]; serverName?: string }>(MSG.AUTH, { token })
+    return request<{ success: boolean; permissions?: string[]; serverName?: string; onlineCount?: number }>(MSG.AUTH, { token })
   },
 
   async fileList(path?: string) {

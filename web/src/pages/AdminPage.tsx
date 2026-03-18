@@ -9,6 +9,7 @@ interface License {
   serverKey: string
   enabled: boolean
   online: boolean
+  onlineCount: number
   createdAt: number
   expiresAt: number
   boundIps: string[]
@@ -207,7 +208,9 @@ export function AdminPage() {
                     {lic.enabled ? (
                       <span className="flex items-center gap-1.5 text-xs">
                         <span className={`w-2 h-2 rounded-sm ${lic.online ? "bg-green-400" : "bg-zinc-600"}`} />
-                        {lic.online ? "在线" : "离线"}
+                        {lic.online ? (
+                          <span>在线 <span className="text-[#007acc] font-medium">{lic.onlineCount} 子服</span></span>
+                        ) : "离线"}
                       </span>
                     ) : (
                       <span className="text-xs text-red-400">已禁用</span>

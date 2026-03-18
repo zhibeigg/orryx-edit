@@ -31,8 +31,8 @@ export function ConnectPage() {
         setConnected(connected)
       })
 
-      wsClient.setReconnectedHandler((serverName) => {
-        setAuthenticated(true, serverName)
+      wsClient.setReconnectedHandler((serverName, onlineCount) => {
+        setAuthenticated(true, serverName, onlineCount)
       })
 
       wsClient.setReconnectFailedHandler(() => {
@@ -51,7 +51,7 @@ export function ConnectPage() {
         return
       }
 
-      setAuthenticated(true, authResult.serverName)
+      setAuthenticated(true, authResult.serverName, authResult.onlineCount)
 
       const url = new URL(window.location.href)
       if (url.searchParams.has("token")) {

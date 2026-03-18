@@ -2,7 +2,7 @@ import { Wifi, WifiOff, Server, RefreshCw } from "lucide-react"
 import { useConnectionStore } from "@/store/connection-store"
 
 export function Header() {
-  const { connected, reconnecting, serverName } = useConnectionStore()
+  const { connected, reconnecting, serverName, onlineCount } = useConnectionStore()
 
   const statusColor = connected ? "text-green-400" : reconnecting ? "text-yellow-400" : "text-red-400"
   const statusText = connected ? "已连接" : reconnecting ? "重连中..." : "未连接"
@@ -18,6 +18,9 @@ export function Header() {
           <div className="flex items-center gap-1 text-[#858585]">
             <Server className="w-3 h-3" />
             <span>{serverName}</span>
+            {onlineCount > 0 && (
+              <span className="px-1 py-0 bg-[#007acc] text-white text-[10px] rounded-sm">{onlineCount} 子服</span>
+            )}
           </div>
         )}
         <div className={`flex items-center gap-1 ${statusColor}`}>

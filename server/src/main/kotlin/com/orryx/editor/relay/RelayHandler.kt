@@ -66,7 +66,8 @@ class RelayHandler(private val registry: SessionRegistry) {
             try { session.send(json.encodeToString(WsMessage.serializer(), msg)) } catch (_: Exception) { }
         }
 
-        browserSession.send("""{"type":"auth.result","id":"${msg.id}","data":{"success":true,"serverName":"${server.serverName}","permissions":["*"]}}""")
+        val onlineCount = registry.onlineSessionCount(server.serverKey)
+        browserSession.send("""{"type":"auth.result","id":"${msg.id}","data":{"success":true,"serverName":"${server.serverName}","onlineCount":$onlineCount,"permissions":["*"]}}""")
     }
 
     fun onBrowserDisconnect(browserSession: WebSocketSession) {

@@ -126,5 +126,7 @@ class SessionRegistry {
 
     fun isServerOnline(serverKey: String): Boolean = !serverSessions[serverKey].isNullOrEmpty()
 
+    fun onlineSessionCount(serverKey: String): Int = serverSessions[serverKey]?.size ?: 0
+
     fun getOnlineServerKeys(): Set<String> = serverSessions.keys.filter { !serverSessions[it].isNullOrEmpty() }.toSet()
 }
