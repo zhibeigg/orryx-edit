@@ -3,9 +3,6 @@ package com.orryx.editor.relay
 import io.ktor.websocket.*
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * 已注册的游戏服务器
- */
 data class GameServer(
     val serverKey: String,
     val serverName: String,
@@ -13,9 +10,6 @@ data class GameServer(
     val registeredAt: Long = System.currentTimeMillis()
 )
 
-/**
- * 已注册的 Token
- */
 data class RegisteredToken(
     val token: String,
     val serverKey: String,
@@ -24,62 +18,60 @@ data class RegisteredToken(
     val expiresAt: Long
 )
 
-/**
- * 中心服务器的 Session 注册表
- *
- * 管理三种映射：
- * - serverKey → GameServer（插件端 WS 连接）
- * - token → RegisteredToken（token 到插件端的映射）
- * - browserSession → serverKey（浏览器到插件端的绑定）
- */
 class SessionRegistry {
 
-    // 插件端连接：serverKey → GameServer
-    private val servers = ConcurrentHashMap<String, GameServer>()
+    // 同一个 serverKey 可以有多个 session（多服共用 license）
+    // session → GameServer
+    private val sessions = ConcurrentHashMap<WebSocketSession, GameServer>()
 
-    // Token 映射：token → RegisteredToken
+    // serverKey → 该 key 下所有 session
+    private val serverSessions = ConcurrentHashMap<String, MutableSet<WebSocketSession>>()
+
     private val tokens = ConcurrentHashMap<String, RegisteredToken>()
-
-    // 浏览器绑定：browserSession → serverKey
     private val browserBindings = ConcurrentHashMap<WebSocketSession, String>()
-
-    // 反向映射：serverKey → 绑定到该服务器的所有浏览器 session
     private val serverBrowsers = ConcurrentHashMap<String, MutableSet<WebSocketSession>>()
 
     // ---- 插件端管理 ----
 
-    fun registerServer(serverKey: String, serverName: String, session: WebSocketSession): Boolean {
-        // 如果已有同 key 的连接，踢掉旧的
-        servers[serverKey]?.let { old ->
-            // 旧连接会在 onDisconnect 中清理
-        }
-        servers[serverKey] = GameServer(serverKey, serverName, session)
+    fun registerServer(serverKey: String, serverName: String, session: WebSocketSession) {
+        val server = GameServer(serverKey, serverName, session)
+        sessions[session] = server
+        serverSessions.getOrPut(serverKey) { ConcurrentHashMap.newKeySet() }.add(session)
         serverBrowsers.putIfAbsent(serverKey, ConcurrentHashMap.newKeySet())
-        return true
     }
 
     fun unregisterServer(session: WebSocketSession) {
-        val entry = servers.entries.find { it.value.session == session } ?: return
-        val serverKey = entry.key
-        servers.remove(serverKey)
+        val server = sessions.remove(session) ?: return
+        val serverKey = server.serverKey
+        serverSessions[serverKey]?.remove(session)
 
-        // 清理该服务器的所有 token
-        tokens.entries.removeIf { it.value.serverKey == serverKey }
-
-        // 清理绑定到该服务器的浏览器
-        serverBrowsers.remove(serverKey)?.forEach { browserSession ->
-            browserBindings.remove(browserSession)
+        // 如果该 serverKey 下没有任何 session 了，清理 token 和浏览器绑定
+        if (serverSessions[serverKey].isNullOrEmpty()) {
+            serverSessions.remove(serverKey)
+            tokens.entries.removeIf { it.value.serverKey == serverKey }
+            serverBrowsers.remove(serverKey)?.forEach { browserSession ->
+                browserBindings.remove(browserSession)
+            }
         }
     }
 
-    fun getServerBySession(session: WebSocketSession): GameServer? {
-        return servers.values.find { it.session == session }
+    fun getServerBySession(session: WebSocketSession): GameServer? = sessions[session]
+
+    /** 获取该 serverKey 下所有在线的插件端 session */
+    fun getServerSessions(serverKey: String): Set<WebSocketSession> {
+        return serverSessions[serverKey] ?: emptySet()
+    }
+
+    /** 获取该 serverKey 下任意一个 GameServer（用于读取 serverName 等信息） */
+    fun getAnyServer(serverKey: String): GameServer? {
+        return serverSessions[serverKey]?.firstOrNull()?.let { sessions[it] }
     }
 
     // ---- Token 管理 ----
 
     fun registerToken(token: String, serverKey: String, playerName: String, expiresIn: Long): Boolean {
-        if (!servers.containsKey(serverKey)) return false
+        // 只要该 serverKey 下有至少一个在线 session 就允许注册
+        if (serverSessions[serverKey].isNullOrEmpty()) return false
         tokens[token] = RegisteredToken(
             token = token,
             serverKey = serverKey,
@@ -93,17 +85,14 @@ class SessionRegistry {
         tokens.remove(token)
     }
 
-    /**
-     * 验证 token 并返回对应的 GameServer
-     * 验证成功后 token 不会被消费（允许断线重连复用）
-     */
     fun validateToken(token: String): GameServer? {
         val registered = tokens[token] ?: return null
         if (System.currentTimeMillis() > registered.expiresAt) {
             tokens.remove(token)
             return null
         }
-        return servers[registered.serverKey]
+        // 返回该 serverKey 下任意一个在线 server
+        return getAnyServer(registered.serverKey)
     }
 
     fun getTokenEntry(token: String): RegisteredToken? = tokens[token]
@@ -120,9 +109,9 @@ class SessionRegistry {
         serverBrowsers[serverKey]?.remove(browserSession)
     }
 
-    fun getServerForBrowser(browserSession: WebSocketSession): GameServer? {
-        val serverKey = browserBindings[browserSession] ?: return null
-        return servers[serverKey]
+    /** 获取浏览器绑定的 serverKey */
+    fun getServerKeyForBrowser(browserSession: WebSocketSession): String? {
+        return browserBindings[browserSession]
     }
 
     fun getBrowsersForServer(serverKey: String): Set<WebSocketSession> {
@@ -131,11 +120,11 @@ class SessionRegistry {
 
     // ---- 统计 ----
 
-    fun serverCount(): Int = servers.size
+    fun serverCount(): Int = sessions.size
     fun tokenCount(): Int = tokens.size
     fun browserCount(): Int = browserBindings.size
 
-    fun isServerOnline(serverKey: String): Boolean = servers.containsKey(serverKey)
+    fun isServerOnline(serverKey: String): Boolean = !serverSessions[serverKey].isNullOrEmpty()
 
-    fun getOnlineServerKeys(): Set<String> = servers.keys.toSet()
+    fun getOnlineServerKeys(): Set<String> = serverSessions.keys.filter { !serverSessions[it].isNullOrEmpty() }.toSet()
 }

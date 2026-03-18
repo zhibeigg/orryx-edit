@@ -30,16 +30,21 @@ class RelayHandler(private val registry: SessionRegistry) {
             return
         }
 
-        val server = registry.getServerForBrowser(browserSession)
-        if (server == null) {
+        // 透传给该 serverKey 下所有在线的插件端
+        val serverKey = registry.getServerKeyForBrowser(browserSession)
+        if (serverKey == null) {
             browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"游戏服务器已断开连接"}}""")
             return
         }
 
-        try {
-            server.session.send(text)
-        } catch (e: Exception) {
-            browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"转发消息失败: ${e.message}"}}""")
+        val sessions = registry.getServerSessions(serverKey)
+        if (sessions.isEmpty()) {
+            browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"游戏服务器已断开连接"}}""")
+            return
+        }
+
+        for (session in sessions) {
+            try { session.send(text) } catch (_: Exception) { }
         }
     }
 
@@ -55,9 +60,11 @@ class RelayHandler(private val registry: SessionRegistry) {
         registry.bindBrowser(browserSession, server.serverKey)
         authenticatedBrowsers.add(browserSession)
 
-        try {
-            server.session.send(json.encodeToString(WsMessage.serializer(), msg))
-        } catch (_: Exception) { }
+        // 通知所有插件端有浏览器连接了
+        val sessions = registry.getServerSessions(server.serverKey)
+        for (session in sessions) {
+            try { session.send(json.encodeToString(WsMessage.serializer(), msg)) } catch (_: Exception) { }
+        }
 
         browserSession.send("""{"type":"auth.result","id":"${msg.id}","data":{"success":true,"serverName":"${server.serverName}","permissions":["*"]}}""")
     }

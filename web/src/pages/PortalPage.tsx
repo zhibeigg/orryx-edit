@@ -7,7 +7,7 @@ interface LicenseInfo {
   enabled: boolean
   online: boolean
   expiresAt: number
-  boundIp: string
+  boundIps: string[]
   remainingDays: number
 }
 
@@ -116,9 +116,9 @@ export function PortalPage() {
             <div className="flex items-center gap-2 text-zinc-400 text-xs">
               <MapPin className="w-3.5 h-3.5" />绑定 IP
             </div>
-            {info.boundIp ? (
+            {info.boundIps.length > 0 ? (
               <div className="flex items-center justify-between">
-                <code className="text-sm text-zinc-200 font-mono">{info.boundIp}</code>
+                <code className="text-sm text-zinc-200 font-mono">{info.boundIps.join(", ")}</code>
                 <button onClick={handleUnbindIp} disabled={unbinding}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-yellow-400 hover:bg-yellow-400/10 disabled:opacity-40">
                   <Unlink className="w-3 h-3" />{unbinding ? "解绑中..." : "解绑"}

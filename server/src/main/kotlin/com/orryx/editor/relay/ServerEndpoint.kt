@@ -14,8 +14,6 @@ class ServerEndpoint(
     private val licenseManager: LicenseManager
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-
-    // session → 连接 IP
     private val sessionIps = ConcurrentHashMap<WebSocketSession, String>()
 
     fun onServerConnect(session: WebSocketSession, remoteIp: String) {
@@ -23,7 +21,6 @@ class ServerEndpoint(
     }
 
     suspend fun handleServerMessage(serverSession: WebSocketSession, text: String) {
-        println("[插件端消息] $text")
         val msg = try {
             json.decodeFromString<WsMessage>(text)
         } catch (e: Exception) {
@@ -52,22 +49,21 @@ class ServerEndpoint(
         val connectIp = sessionIps[session] ?: ""
         val entry = licenseManager.validate(license, connectIp)
         if (entry == null) {
-            // 区分错误原因
             val raw = licenseManager.get(license)
             val reason = when {
                 raw == null -> "license 不存在"
                 !raw.enabled -> "license 已禁用"
                 raw.isExpired() -> "license 已过期"
-                raw.boundIp.isNotEmpty() && raw.boundIp != connectIp -> "IP 不匹配 (绑定: ${raw.boundIp}, 当前: $connectIp)"
+                !raw.isIpAllowed(connectIp) -> "IP 不在允许列表 (当前: $connectIp)"
                 else -> "license 无效"
             }
             session.send("""{"type":"server.register.result","id":"${msg.id}","data":{"success":false,"message":"$reason"}}""")
             return
         }
 
-        // 注册成功，自动绑定 IP（如果尚未绑定）
-        if (entry.boundIp.isEmpty() && connectIp.isNotEmpty()) {
-            licenseManager.updateIp(license, connectIp)
+        // 自动将新 IP 添加到允许列表
+        if (connectIp.isNotEmpty() && connectIp !in entry.boundIps) {
+            licenseManager.addIp(license, connectIp)
         }
 
         registry.registerServer(entry.serverKey, name, session)

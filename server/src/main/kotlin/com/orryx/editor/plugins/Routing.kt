@@ -19,9 +19,6 @@ data class CreateLicenseRequest(val owner: String, val days: Int = 30)
 @Serializable
 data class RenewRequest(val days: Int)
 
-@Serializable
-data class UpdateIpRequest(val ip: String)
-
 fun Application.configureRouting(
     licenseManager: LicenseManager,
     registry: SessionRegistry,
@@ -81,12 +78,11 @@ fun Application.configureRouting(
                 call.respondText("""{"success":${licenseManager.renew(license, body.days)}}""", ContentType.Application.Json)
             }
 
-            // 管理员直接设置 IP
+            // 清空绑定 IP 列表
             put("/license/{license}/ip") {
                 if (!checkAdmin(call, adminKey)) return@put
                 val license = call.parameters["license"] ?: ""
-                val body = call.receive<UpdateIpRequest>()
-                call.respondText("""{"success":${licenseManager.updateIp(license, body.ip)}}""", ContentType.Application.Json)
+                call.respondText("""{"success":${licenseManager.clearIps(license)}}""", ContentType.Application.Json)
             }
 
             get("/stats") {
@@ -106,10 +102,10 @@ fun Application.configureRouting(
                 call.respondText(licenseToJson(entry, online), ContentType.Application.Json)
             }
 
-            // 解绑 IP（下次插件连接时会自动绑定新 IP）
+            // 清空绑定 IP（下次插件连接时会自动添加新 IP）
             delete("/ip") {
                 val entry = checkLicense(call, licenseManager) ?: return@delete
-                licenseManager.updateIp(entry.license, "")
+                licenseManager.clearIps(entry.license)
                 call.respondText("""{"success":true}""", ContentType.Application.Json)
             }
         }
@@ -126,7 +122,8 @@ fun Application.configureRouting(
 }
 
 private fun licenseToJson(entry: com.orryx.editor.license.LicenseEntry, online: Boolean): String {
-    return """{"license":"${entry.license}","owner":"${entry.owner}","serverKey":"${entry.serverKey}","enabled":${entry.enabled},"online":$online,"createdAt":${entry.createdAt},"expiresAt":${entry.expiresAt},"boundIp":"${entry.boundIp}","remainingDays":${entry.remainingDays()}}"""
+    val ipsJson = entry.boundIps.joinToString(",") { "\"$it\"" }
+    return """{"license":"${entry.license}","owner":"${entry.owner}","serverKey":"${entry.serverKey}","enabled":${entry.enabled},"online":$online,"createdAt":${entry.createdAt},"expiresAt":${entry.expiresAt},"boundIps":[$ipsJson],"remainingDays":${entry.remainingDays()}}"""
 }
 
 private suspend fun checkAdmin(call: ApplicationCall, adminKey: String): Boolean {

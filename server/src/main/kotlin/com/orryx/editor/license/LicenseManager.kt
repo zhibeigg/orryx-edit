@@ -11,8 +11,8 @@ data class LicenseEntry(
     val license: String,
     val owner: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val expiresAt: Long = 0L,          // 0 = 永久
-    val boundIp: String = "",           // 空 = 未绑定
+    val expiresAt: Long = 0L,
+    val boundIps: List<String> = emptyList(),
     val serverKey: String = UUID.randomUUID().toString().replace("-", ""),
     val enabled: Boolean = true
 ) {
@@ -21,6 +21,11 @@ data class LicenseEntry(
         if (expiresAt <= 0) return -1
         val remaining = expiresAt - System.currentTimeMillis()
         return if (remaining > 0) remaining / 86_400_000 else 0
+    }
+    fun isIpAllowed(ip: String): Boolean {
+        if (boundIps.isEmpty()) return true
+        if (ip.isEmpty()) return true
+        return ip in boundIps
     }
 }
 
@@ -65,15 +70,11 @@ class LicenseManager(private val dataDir: File) {
         return entry
     }
 
-    /**
-     * 验证 license
-     * @param connectIp 连接方 IP，为空则跳过 IP 校验
-     */
     fun validate(license: String, connectIp: String = ""): LicenseEntry? {
         val entry = licenses[license] ?: return null
         if (!entry.enabled) return null
         if (entry.isExpired()) return null
-        if (entry.boundIp.isNotEmpty() && connectIp.isNotEmpty() && entry.boundIp != connectIp) return null
+        if (!entry.isIpAllowed(connectIp)) return null
         return entry
     }
 
@@ -85,9 +86,27 @@ class LicenseManager(private val dataDir: File) {
         return true
     }
 
-    fun updateIp(license: String, ip: String): Boolean {
+    /** 添加一个 IP 到允许列表 */
+    fun addIp(license: String, ip: String): Boolean {
         val entry = licenses[license] ?: return false
-        licenses[license] = entry.copy(boundIp = ip)
+        if (ip in entry.boundIps) return true
+        licenses[license] = entry.copy(boundIps = entry.boundIps + ip)
+        save()
+        return true
+    }
+
+    /** 从允许列表移除一个 IP */
+    fun removeIp(license: String, ip: String): Boolean {
+        val entry = licenses[license] ?: return false
+        licenses[license] = entry.copy(boundIps = entry.boundIps - ip)
+        save()
+        return true
+    }
+
+    /** 清空所有绑定 IP */
+    fun clearIps(license: String): Boolean {
+        val entry = licenses[license] ?: return false
+        licenses[license] = entry.copy(boundIps = emptyList())
         save()
         return true
     }

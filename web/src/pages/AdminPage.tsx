@@ -9,7 +9,7 @@ interface License {
   online: boolean
   createdAt: number
   expiresAt: number
-  boundIp: string
+  boundIps: string[]
   remainingDays: number
 }
 
@@ -209,7 +209,7 @@ export function AdminPage() {
                     <ExpiryBadge expiresAt={lic.expiresAt} remainingDays={lic.remainingDays} />
                   </td>
                   <td className="px-4 py-3 text-xs text-zinc-400 font-mono">
-                    {lic.boundIp || <span className="text-zinc-600">未绑定</span>}
+                    {lic.boundIps.length > 0 ? lic.boundIps.join(", ") : <span className="text-zinc-600">未绑定</span>}
                   </td>
                   <td className="px-4 py-3 text-right space-x-1">
                     <button onClick={() => { setRenewTarget(lic.license); setRenewDays(30) }}
