@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { JobData, JobOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { useEditorStore } from "@/store/editor-store"
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { cn } from "@/lib/utils"
@@ -123,6 +124,19 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
 
 // ---- 基础信息面板 ----
 function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p: Partial<JobOptions>) => void }) {
+  // 从文件缓存中提取 experiences/ 目录下的文件名作为选项
+  const expOptions = useMemo(() => {
+    const cache = useEditorStore.getState().fileContents
+    const names: string[] = []
+    for (const key of cache.keys()) {
+      if (key.startsWith("experiences/") && key.endsWith(".yml")) {
+        names.push(key.replace("experiences/", "").replace(".yml", ""))
+      }
+    }
+    if (names.length === 0) names.push("default")
+    return names
+  }, [])
+
   return (
     <div className="p-4 space-y-4 max-w-2xl">
       <Field label="职业名称">
@@ -134,12 +148,15 @@ function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p
       </Field>
 
       <Field label="经验配置">
-        <input
+        <select
           className="w-full bg-muted border border-border rounded px-3 py-1.5 text-sm"
           value={options.Experience ?? "default"}
           onChange={(e) => onChange({ Experience: e.target.value })}
-          placeholder="default"
-        />
+        >
+          {expOptions.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
       </Field>
     </div>
   )
