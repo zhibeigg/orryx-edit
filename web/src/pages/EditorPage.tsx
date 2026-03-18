@@ -5,6 +5,8 @@ import { useConnectionStore } from "@/store/connection-store"
 import { YamlEditor } from "@/components/editor/YamlEditor"
 import { SkillEditor } from "@/components/editor/SkillEditor"
 import { JobEditor } from "@/components/editor/JobEditor"
+import { StatusEditor } from "@/components/editor/StatusEditor"
+import { StateFileEditor } from "@/components/editor/StateFileEditor"
 import { StationEditor } from "@/components/editor/StationEditor"
 import { ExperienceEditor } from "@/components/editor/ExperienceEditor"
 import { PlaceholderEditor } from "@/components/editor/PlaceholderEditor"
@@ -53,6 +55,10 @@ export function EditorPage() {
       return <StationEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
     }
 
+    if (activeFile.configType === "status") {
+      return <StatusEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
+    }
+
     if (activeFile.configType === "job") {
       return <JobEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
     }
@@ -83,6 +89,9 @@ export function EditorPage() {
     }
     if (activeFile.path === "selectors.yml") {
       return <SelectorsEditor key={activeFile.path} content={content} onChange={handleChange} />
+    }
+    if (activeFile.path === "state.yml") {
+      return <StateFileEditor key={activeFile.path} content={content} onChange={handleChange} />
     }
 
     return <YamlEditor key={activeFile.path} content={content} onChange={handleChange} />
