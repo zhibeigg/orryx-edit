@@ -43,6 +43,16 @@ fun Application.configureRouting(
             default("index.html")
         }
 
+        // ======== Actions Schema API ========
+        get("/api/actions-schema") {
+            val schemaFile = java.io.File("actions-schema.json")
+            if (schemaFile.exists()) {
+                call.respondText(schemaFile.readText(), ContentType.Application.Json)
+            } else {
+                call.respondText("""{"version":"1.0","pluginVersion":"unknown","actions":[]}""", ContentType.Application.Json)
+            }
+        }
+
         // ======== 管理 API ========
         route("/api/admin") {
             post("/license") {

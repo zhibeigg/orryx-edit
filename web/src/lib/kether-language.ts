@@ -2,97 +2,79 @@ import type { languages } from "monaco-editor"
 
 export const KETHER_LANGUAGE_ID = "kether"
 
-export const ketherLanguageDef: languages.IMonarchLanguage = {
-  defaultToken: "",
-  ignoreCase: false,
-
-  keywords: [
-    "if", "then", "else", "not", "any", "all", "for", "in", "range", "to", "while",
-    "check", "set", "get", "return", "break", "continue", "case", "when", "goto",
-  ],
-
-  actions: [
-    "damage", "launch", "flash", "sleep", "sync", "async",
-    "dragon", "entity", "potion", "flag", "cooldown", "mana", "spirit",
-    "buff", "running", "ghost", "superBody", "superFoot",
-    "callDamage", "damageProcessor", "randomAction",
-    "parm", "container", "removeIf", "merge",
-    "math", "calc", "inline", "lazy", "scaled",
-    "player", "vector", "state",
-  ],
-
-  dragonSubs: [
-    "ani", "papi", "func", "sound", "effect", "modelEffect",
-  ],
-
-  selectors: [
-    "@self", "@range", "@obb", "@sector", "@floor", "@offset",
-    "@current", "@origin", "@joiner", "@their", "@target",
-    "@type", "@team", "@pvp",
-  ],
-
-  operators: [
-    ">=", "<=", "==", "!=", ">", "<", "->",
-  ],
-
-  symbols: /[=><!~?:&|+\-*/^%]+/,
-
-  tokenizer: {
-    root: [
-      // 选择器 @xxx
-      [/@[a-zA-Z_]\w*/, "selector"],
-
-      // 变量引用 &xxx 或 &xxx[yyy]
-      [/&[a-zA-Z_]\w*(\[[^\]]*\])?/, "variable.ref"],
-
-      // 模板语法 {{ }}
-      [/\{\{/, { token: "template.bracket", next: "@template" }],
-
-      // 字符串
-      [/"([^"\\]|\\.)*"/, "string"],
-      [/'([^'\\]|\\.)*'/, "string"],
-
-      // 注释
-      [/#.*$/, "comment"],
-
-      // 数字
-      [/\b\d+(\.\d+)?\b/, "number"],
-
-      // 标识符
-      [/[a-zA-Z_\u4e00-\u9fff]\w*/, {
-        cases: {
-          "@keywords": "keyword",
-          "@actions": "action",
-          "@dragonSubs": "dragon.sub",
-          "@default": "identifier",
-        },
-      }],
-
-      // 括号
-      [/[{}()\[\]]/, "bracket"],
-
-      // 运算符
-      [/@symbols/, {
-        cases: {
-          "@operators": "operator",
-          "@default": "",
-        },
-      }],
-
-      // 空白
-      [/\s+/, "white"],
-    ],
-
-    template: [
-      [/\}\}/, { token: "template.bracket", next: "@pop" }],
-      [/[^}]+/, "template.content"],
-    ],
-  },
+// ---- Schema 类型 ----
+interface ActionParam {
+  name: string
+  type: string
+  required: boolean
+  default?: string
+  description?: string
+  options?: string[]
 }
+
+interface ActionDef {
+  name: string
+  aliases?: string[]
+  category: string
+  description: string
+  returnType?: string
+  params?: ActionParam[]
+  syntax: string
+  examples?: string[]
+  deprecated?: boolean
+}
+
+interface ActionsSchema {
+  version: string
+  pluginVersion: string
+  actions: ActionDef[]
+}
+
+// ---- 全局 schema 缓存 ----
+let cachedSchema: ActionsSchema | null = null
+let allActionKeywords: string[] = []
+
+export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema> {
+  const url = baseUrl || `${window.location.origin}/api/actions-schema`
+  try {
+    const res = await fetch(url)
+    if (res.ok) {
+      cachedSchema = await res.json()
+      rebuildFromSchema()
+    }
+  } catch (e) {
+    console.warn("加载 actions-schema 失败:", e)
+  }
+  return cachedSchema || { version: "1.0", pluginVersion: "unknown", actions: [] }
+}
+
+function rebuildFromSchema() {
+  if (!cachedSchema) return
+  allActionKeywords = cachedSchema.actions.flatMap(a => {
+    const first = a.syntax.split(/\s+/)[0].replace(/[<>\[\]]/g, "")
+    const names = [first]
+    if (first.includes("/")) names.push(...first.split("/"))
+    return names
+  })
+  allActionKeywords = [...new Set(allActionKeywords.filter(k => k.length > 0))]
+}
+
+// ---- 静态关键字（Kether 语言本身的） ----
+const BUILTIN_KEYWORDS = [
+  "if", "then", "else", "not", "any", "all", "for", "in", "range", "to", "while",
+  "check", "set", "get", "return", "break", "continue", "case", "when", "goto",
+]
+
+const SELECTORS = [
+  "@self", "@range", "@obb", "@sector", "@floor", "@offset",
+  "@current", "@origin", "@joiner", "@their", "@target",
+  "@type", "@team", "@pvp",
+]
 
 export const ketherThemeRules: { token: string; foreground: string; fontStyle?: string }[] = [
   { token: "keyword", foreground: "C586C0" },
   { token: "action", foreground: "4EC9B0", fontStyle: "bold" },
+  { token: "action.deprecated", foreground: "6A6A6A", fontStyle: "italic strikethrough" },
   { token: "dragon.sub", foreground: "4FC1FF" },
   { token: "selector", foreground: "DCDCAA" },
   { token: "variable.ref", foreground: "9CDCFE" },
@@ -104,84 +86,63 @@ export const ketherThemeRules: { token: string; foreground: string; fontStyle?: 
   { token: "operator", foreground: "D4D4D4" },
   { token: "bracket", foreground: "FFD700" },
   { token: "identifier", foreground: "D4D4D4" },
-]
-
-// 补全项的部分类型（range 在 provideCompletionItems 中动态注入）
-interface PartialCompletionItem {
-  label: string
-  kind: number
-  insertText: string
-  detail: string
-  insertTextRules?: number
-}
-
-export const ketherCompletionItems: PartialCompletionItem[] = [
-  // 动作补全
-  ...["damage", "launch", "flash", "sleep", "sync", "async", "dragon", "entity", "potion",
-    "flag", "cooldown", "mana", "spirit", "buff", "running", "ghost", "superBody", "superFoot",
-    "callDamage", "damageProcessor", "randomAction", "container", "removeIf", "merge",
-    "math", "calc", "inline", "lazy", "scaled", "player", "vector", "state",
-  ].map((label) => ({
-    label,
-    kind: 1, // Function
-    insertText: label,
-    detail: "Kether 动作",
-  })),
-
-  // 选择器补全
-  ...["@self", "@range ", "@obb ", "@sector ", "@floor ", "@offset ",
-    "@current", "@origin", "@joiner", "@their", "@target",
-    "@type ", "@team", "@pvp",
-  ].map((label) => ({
-    label: label.trim(),
-    kind: 9, // Value
-    insertText: label,
-    detail: "选择器",
-  })),
-
-  // 常用代码片段
-  ...[
-    { label: "if-then-else", insertText: "if ${1:condition} then {\n  ${2}\n} else {\n  ${3}\n}", detail: "条件分支" },
-    { label: "for-range", insertText: "for ${1:i} in range ${2:1} to ${3:5} then {\n  ${4}\n}", detail: "循环" },
-    { label: "damage-range", insertText: "damage lazy *${1:damage} false they \"@range ${2:4} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${3:MAGIC}", detail: "范围伤害" },
-    { label: "damage-obb", insertText: "damage lazy *${1:damage} false they \"@obb ${2:5} ${3:3} ${4:3} ${5:0} ${6:0} true !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${7:MAGIC}", detail: "OBB 碰撞箱伤害" },
-    { label: "damage-sector", insertText: "damage lazy *${1:damage} false they \"@sector ${2:4} ${3:120} ${4:2} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${5:PHYSICS}", detail: "扇形伤害" },
-    { label: "dragon-ani", insertText: "dragon ani to player ${1:动画名} ${2:1.0} they \"@self\"", detail: "播放龙核动画" },
-    { label: "dragon-sound", insertText: "dragon sound send ${1:名称} ${2:路径.ogg} PLAYERS they \"@range ${3:15} @self\"", detail: "播放音效" },
-    { label: "dragon-effect", insertText: "dragon effect send ${1:名称} \"${2:路径.particle}\" timeout ${3:20} they \"@self\"", detail: "播放粒子特效" },
-    { label: "sleep-ticks", insertText: "sleep ${1:20}", detail: "等待 tick" },
-    { label: "flag-set", insertText: "flag ${1:名称} to true timeout ${2:40}", detail: "设置标记" },
-    { label: "flag-check", insertText: "if flag ${1:名称} then {\n  ${2}\n}", detail: "检查标记" },
-    { label: "cooldown-set", insertText: "cooldown set ${1:0}", detail: "设置冷却" },
-    { label: "buff-send", insertText: "buff send ${1:名称} ${2:200}", detail: "发送 Buff" },
-    { label: "launch-forward", insertText: "launch ${1:1} ${2:0.1} ${3:0} ${4:true}", detail: "发射/位移" },
-    { label: "entity-ady", insertText: "entity ady ${1:模型名} ARMOR_STAND gravity false timeout ${2:20} viewer \"@range 50\" they \"@self\"", detail: "生成实体动画" },
-    { label: "case-state", insertText: "case state ${1:move} [\n  when ${2:FRONT} -> {\n    ${3}\n  }\n]", detail: "状态分支" },
-  ].map((item) => ({
-    ...item,
-    kind: 27, // Snippet
-    insertTextRules: 4, // InsertAsSnippet
-  })),
+  { token: "param.enum", foreground: "4FC1FF" },
 ]
 
 export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
-  // 注册语言
   monaco.languages.register({ id: KETHER_LANGUAGE_ID })
 
-  // 设置 Monarch tokenizer
-  monaco.languages.setMonarchTokensProvider(KETHER_LANGUAGE_ID, ketherLanguageDef)
+  // Monarch tokenizer — 动态 actions 列表
+  const languageDef: languages.IMonarchLanguage = {
+    defaultToken: "",
+    ignoreCase: false,
+    keywords: BUILTIN_KEYWORDS,
+    actions: allActionKeywords,
+    selectors: SELECTORS,
+    operators: [">=", "<=", "==", "!=", ">", "<", "->"],
+    symbols: /[=><!~?:&|+\-*/^%]+/,
+    tokenizer: {
+      root: [
+        [/@[a-zA-Z_]\w*/, "selector"],
+        [/&[a-zA-Z_]\w*(\[[^\]]*\])?/, "variable.ref"],
+        [/\{\{/, { token: "template.bracket", next: "@template" }],
+        [/"([^"\\]|\\.)*"/, "string"],
+        [/'([^'\\]|\\.)*'/, "string"],
+        [/#.*$/, "comment"],
+        [/\b\d+(\.\d+)?\b/, "number"],
+        [/[a-zA-Z_\u4e00-\u9fff]\w*/, {
+          cases: {
+            "@keywords": "keyword",
+            "@actions": "action",
+            "@default": "identifier",
+          },
+        }],
+        [/[{}()\[\]]/, "bracket"],
+        [/@symbols/, {
+          cases: {
+            "@operators": "operator",
+            "@default": "",
+          },
+        }],
+        [/\s+/, "white"],
+      ],
+      template: [
+        [/\}\}/, { token: "template.bracket", next: "@pop" }],
+        [/[^}]+/, "template.content"],
+      ],
+    },
+  }
 
-  // 定义主题
+  monaco.languages.setMonarchTokensProvider(KETHER_LANGUAGE_ID, languageDef)
+
   monaco.editor.defineTheme("kether-dark", {
     base: "vs-dark",
     inherit: true,
     rules: ketherThemeRules,
-    colors: {
-      "editor.background": "#0a0e14",
-    },
+    colors: { "editor.background": "#0a0e14" },
   })
 
-  // 注册补全提供器
+  // ---- 补全 ----
   monaco.languages.registerCompletionItemProvider(KETHER_LANGUAGE_ID, {
     provideCompletionItems: (model, position) => {
       const word = model.getWordUntilPosition(position)
@@ -192,21 +153,172 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
         endColumn: word.endColumn,
       }
 
-      // 检查是否在 @ 后面
       const lineContent = model.getLineContent(position.lineNumber)
       const charBefore = lineContent[position.column - 2]
+      const textBefore = lineContent.substring(0, position.column - 1).trim()
 
-      let items = ketherCompletionItems.map((item) => ({
-        ...item,
-        range,
-      } as languages.CompletionItem))
+      const items: languages.CompletionItem[] = []
 
+      // Schema 驱动的 action 补全
+      if (cachedSchema) {
+        for (const action of cachedSchema.actions) {
+          const syntaxFirst = action.syntax.split(/\s+/)[0]
+          items.push({
+            label: syntaxFirst,
+            kind: monaco.languages.CompletionItemKind.Function,
+            insertText: syntaxFirst,
+            detail: `[${action.category}] ${action.description}`,
+            documentation: buildDoc(action),
+            range,
+            tags: action.deprecated ? [monaco.languages.CompletionItemTag.Deprecated] : [],
+          } as languages.CompletionItem)
+
+          // 别名
+          for (const alias of action.aliases || []) {
+            items.push({
+              label: alias,
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: alias,
+              detail: `→ ${syntaxFirst}`,
+              documentation: buildDoc(action),
+              range,
+            } as languages.CompletionItem)
+          }
+        }
+
+        // 上下文感知：如果前面是某个 action，补全它的 enum 参数
+        const contextAction = findContextAction(textBefore)
+        if (contextAction) {
+          for (const param of contextAction.params || []) {
+            if (param.type === "enum" && param.options) {
+              for (const opt of param.options) {
+                items.push({
+                  label: opt,
+                  kind: monaco.languages.CompletionItemKind.EnumMember,
+                  insertText: opt,
+                  detail: `${param.name}: ${param.description || ""}`,
+                  range,
+                } as languages.CompletionItem)
+              }
+            }
+          }
+        }
+      }
+
+      // 选择器补全
       if (charBefore === "@") {
-        items = items.filter((item) => (item.label as string).startsWith("@"))
+        for (const sel of SELECTORS) {
+          items.push({
+            label: sel,
+            kind: monaco.languages.CompletionItemKind.Value,
+            insertText: sel.substring(1) + " ",
+            detail: "选择器",
+            range,
+          } as languages.CompletionItem)
+        }
+      }
+
+      // 关键字补全
+      for (const kw of BUILTIN_KEYWORDS) {
+        items.push({
+          label: kw,
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          insertText: kw,
+          detail: "关键字",
+          range,
+        } as languages.CompletionItem)
+      }
+
+      // 代码片段
+      for (const snippet of SNIPPETS) {
+        items.push({
+          label: snippet.label,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: snippet.insertText,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          detail: snippet.detail,
+          range,
+        } as languages.CompletionItem)
       }
 
       return { suggestions: items }
     },
     triggerCharacters: ["@", " "],
   })
+
+  // ---- 悬浮文档 ----
+  monaco.languages.registerHoverProvider(KETHER_LANGUAGE_ID, {
+    provideHover: (model, position) => {
+      if (!cachedSchema) return null
+      const word = model.getWordAtPosition(position)
+      if (!word) return null
+
+      const action = cachedSchema.actions.find(a => {
+        const first = a.syntax.split(/\s+/)[0]
+        if (first === word.word) return true
+        if (first.includes("/") && first.split("/").includes(word.word)) return true
+        return a.aliases?.includes(word.word)
+      })
+
+      if (!action) return null
+
+      return {
+        range: {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        },
+        contents: [
+          { value: `**${action.name}**` },
+          { value: `\`${action.syntax}\`` },
+          { value: action.description },
+          ...(action.params?.length ? [{
+            value: "参数:\n" + action.params.map(p =>
+              `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${p.description ? ": " + p.description : ""}${p.default ? " = " + p.default : ""}`
+            ).join("\n")
+          }] : []),
+          ...(action.examples?.length ? [{
+            value: "示例:\n```kether\n" + action.examples.join("\n") + "\n```"
+          }] : []),
+        ],
+      }
+    },
+  })
 }
+
+// ---- 辅助函数 ----
+
+function buildDoc(action: ActionDef): string {
+  let doc = `**${action.name}**\n\n\`${action.syntax}\`\n\n${action.description}`
+  if (action.params?.length) {
+    doc += "\n\n参数:\n" + action.params.map(p =>
+      `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${p.default ? " = " + p.default : ""}`
+    ).join("\n")
+  }
+  if (action.examples?.length) {
+    doc += "\n\n示例:\n```\n" + action.examples.join("\n") + "\n```"
+  }
+  return doc
+}
+
+function findContextAction(textBefore: string): ActionDef | null {
+  if (!cachedSchema) return null
+  const words = textBefore.split(/\s+/)
+  for (const action of cachedSchema.actions) {
+    const first = action.syntax.split(/\s+/)[0]
+    const candidates = [first, ...(first.includes("/") ? first.split("/") : []), ...(action.aliases || [])]
+    if (words.some(w => candidates.includes(w))) return action
+  }
+  return null
+}
+
+const SNIPPETS = [
+  { label: "if-then-else", insertText: "if ${1:condition} then {\n  ${2}\n} else {\n  ${3}\n}", detail: "条件分支" },
+  { label: "for-range", insertText: "for ${1:i} in range ${2:1} to ${3:5} then {\n  ${4}\n}", detail: "循环" },
+  { label: "damage-range", insertText: "damage lazy *${1:damage} false they \"@range ${2:4} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${3:MAGIC}", detail: "范围伤害" },
+  { label: "damage-obb", insertText: "damage lazy *${1:damage} false they \"@obb ${2:5} ${3:3} ${4:3} ${5:0} ${6:0} true !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${7:MAGIC}", detail: "OBB 碰撞箱伤害" },
+  { label: "damage-sector", insertText: "damage lazy *${1:damage} false they \"@sector ${2:4} ${3:120} ${4:2} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${5:PHYSICS}", detail: "扇形伤害" },
+  { label: "sleep-ticks", insertText: "sleep ${1:20}", detail: "等待 tick" },
+  { label: "flag-set", insertText: "flag ${1:名称} to true timeout ${2:40}", detail: "设置标记" },
+]

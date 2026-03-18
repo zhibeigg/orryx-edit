@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react"
 import Editor, { type OnMount } from "@monaco-editor/react"
-import { registerKetherLanguage, KETHER_LANGUAGE_ID } from "@/lib/kether-language"
+import { registerKetherLanguage, loadActionsSchema, KETHER_LANGUAGE_ID } from "@/lib/kether-language"
 
 interface ActionsEditorProps {
   value: string
@@ -13,15 +13,16 @@ let ketherRegistered = false
 export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEditorProps) {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
 
-  const handleMount: OnMount = (editor, monaco) => {
+  const handleMount: OnMount = async (editor, monaco) => {
     editorRef.current = editor
 
     if (!ketherRegistered) {
+      // 先加载 schema，再注册语言（这样高亮和补全都能用到 schema 数据）
+      await loadActionsSchema()
       registerKetherLanguage(monaco)
       ketherRegistered = true
     }
 
-    // 切换到 kether 语言和主题
     monaco.editor.setTheme("kether-dark")
     const model = editor.getModel()
     if (model) {
