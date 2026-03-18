@@ -2,6 +2,7 @@ import { useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import Editor from "@monaco-editor/react"
 
 interface ConfigEditorProps {
@@ -79,19 +80,21 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
             </Section>
 
             <Section title="UI 框架">
-              <select className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
-                value={(ui.use as string) ?? "bukkit"}
-                onChange={(e) => save({ UI: { ...ui, use: e.target.value } })}>
-                {["bukkit", "dragoncore", "germplugin", "arcartx"].map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <Select value={(ui.use as string) ?? "bukkit"} onValueChange={(v) => save({ UI: { ...ui, use: v } })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["bukkit", "dragoncore", "germplugin", "arcartx"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </Section>
 
             <Section title="缓存管理">
-              <select className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
-                value={(config.CacheManager as string) ?? "disable"}
-                onChange={(e) => save({ CacheManager: e.target.value })}>
-                {["disable", "redis", "broker"].map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <Select value={(config.CacheManager as string) ?? "disable"} onValueChange={(v) => save({ CacheManager: v })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["disable", "redis", "broker"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </Section>
           </div>
       </TabsContent>
@@ -99,11 +102,12 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
       <TabsContent value="database" className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-4 max-w-2xl">
             <Section title="数据库类型">
-              <select className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
-                value={(db.use as string) ?? "SQLLITE"}
-                onChange={(e) => save({ Database: { ...db, use: e.target.value } })}>
-                {["SQLLITE", "MYSQL", "H2"].map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <Select value={(db.use as string) ?? "SQLLITE"} onValueChange={(v) => save({ Database: { ...db, use: v } })}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["SQLLITE", "MYSQL", "H2"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </Section>
 
             {((db.use as string) ?? "SQLLITE") === "MYSQL" && (

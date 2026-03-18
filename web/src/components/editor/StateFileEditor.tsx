@@ -3,6 +3,7 @@ import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parse
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import Editor from "@monaco-editor/react"
 
 // 复用 StatusEditor 的类型（GlobalStates 和 States 结构一致）
@@ -112,9 +113,12 @@ function GlobalStatePanel({ name, state, onChange }: { name: string; state: Stat
 
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">类型 (Type)</label>
-        <select className="input-base" value={state.Type} onChange={(e) => update({ Type: e.target.value })}>
-          {STATE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
+        <Select value={state.Type} onValueChange={(v) => update({ Type: v })}>
+          <SelectTrigger className="input-base"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {STATE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-3">

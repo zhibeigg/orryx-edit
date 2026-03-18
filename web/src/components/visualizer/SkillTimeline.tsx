@@ -2,6 +2,7 @@ import { useMemo, useState, Suspense, lazy } from "react"
 import { parseTimeline, type TimelineEvent } from "@/lib/skill-timeline"
 import { Box } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 const ColliderPreview = lazy(() =>
   import("./ColliderPreview").then(m => ({ default: m.ColliderPreview }))
@@ -94,26 +95,24 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                 <div className="absolute top-1/2 left-0 right-0 h-px bg-border" />
                 {/* 关键帧菱形标记 */}
                 {colliderEvents.map((event, i) => (
-                  <button
-                    key={i}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 cursor-pointer group z-10"
-                    style={{ left: `${event.tick * tickWidth}px` }}
-                    onClick={() => setPreviewCollider({
-                      type: event.collider!.type,
-                      params: event.collider!.params,
-                      offset: event.collider!.offset,
-                      label: event.label,
-                      tick: event.tick,
-                    })}
-                    title={`${event.label}\n时间: ${event.tick}t\n点击查看 3D 预览`}
-                  >
-                    {/* 菱形 */}
-                    <div className="w-3.5 h-3.5 mx-auto rotate-45 bg-amber-400 group-hover:bg-amber-300 group-hover:scale-125 transition-all border border-amber-600 shadow-sm shadow-amber-400/30" />
-                    {/* 悬浮标签 */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover:block bg-[#252526] text-[#cccccc] text-[10px] px-1.5 py-0.5 shadow-lg whitespace-nowrap border border-[#3c3c3c] z-50 pointer-events-none">
-                      {event.label} @{event.tick}t
-                    </div>
-                  </button>
+                  <Tooltip key={i}>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 cursor-pointer group z-10"
+                        style={{ left: `${event.tick * tickWidth}px` }}
+                        onClick={() => setPreviewCollider({
+                          type: event.collider!.type,
+                          params: event.collider!.params,
+                          offset: event.collider!.offset,
+                          label: event.label,
+                          tick: event.tick,
+                        })}
+                      >
+                        <div className="w-3.5 h-3.5 mx-auto rotate-45 bg-amber-400 group-hover:bg-amber-300 group-hover:scale-125 transition-all border border-amber-600 shadow-sm shadow-amber-400/30" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{event.label} @{event.tick}t</TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             </div>

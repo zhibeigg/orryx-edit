@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react"
 import type { StationData, StationOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { getActionsSchema } from "@/lib/kether-language"
 import { ActionsEditor } from "./ActionsEditor"
 import { VariablesEditor } from "./VariablesEditor"
@@ -182,10 +183,12 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">事件优先级</label>
-        <select className="bg-muted border border-border rounded px-3 py-1.5 text-sm"
-          value={(options.Priority ?? "NORMAL").toUpperCase()} onChange={(e) => onChange({ Priority: e.target.value })}>
-          {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <Select value={(options.Priority ?? "NORMAL").toUpperCase()} onValueChange={(v) => onChange({ Priority: v })}>
+          <SelectTrigger className="bg-muted border border-border rounded"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PRIORITIES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <label className="flex items-center gap-2 cursor-pointer">
         <Switch checked={options.IgnoreCancelled ?? false}

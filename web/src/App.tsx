@@ -7,6 +7,7 @@ import { useConnectionStore } from "@/store/connection-store"
 import { useDraftSync } from "@/lib/use-draft-sync"
 import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts"
 import { useCrossRefLoader } from "@/lib/use-cross-ref-loader"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 export default function App() {
   const authenticated = useConnectionStore((s) => s.authenticated)
@@ -19,8 +20,10 @@ export default function App() {
   if (path === "/portal") return <PortalPage />
 
   return (
-    <AppLayout>
-      {authenticated ? <EditorPage /> : <ConnectPage />}
-    </AppLayout>
+    <TooltipProvider delayDuration={200}>
+      <AppLayout>
+        {authenticated ? <EditorPage /> : <ConnectPage />}
+      </AppLayout>
+    </TooltipProvider>
   )
 }

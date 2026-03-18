@@ -5,6 +5,7 @@ import { useEditorStore } from "@/store/editor-store"
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import Editor from "@monaco-editor/react"
 
 interface JobEditorProps {
@@ -125,15 +126,14 @@ function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p
       </Field>
 
       <Field label="经验配置">
-        <select
-          className="w-full bg-muted border border-border rounded px-3 py-1.5 text-sm"
-          value={options.Experience ?? "default"}
-          onChange={(e) => onChange({ Experience: e.target.value })}
-        >
-          {expOptions.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+        <Select value={options.Experience ?? "default"} onValueChange={(v) => onChange({ Experience: v })}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {expOptions.map(name => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
     </div>
   )

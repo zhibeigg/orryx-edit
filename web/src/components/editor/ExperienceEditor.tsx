@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { ExperienceData, ExperienceOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { evaluateKether, formatKetherScript } from "@/lib/kether-eval"
 import { ActionsEditor } from "./ActionsEditor"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -191,19 +192,17 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
                 {curveData.map((point) => {
                   const height = maxExp > 0 ? (point.exp / maxExp) * 100 : 0
                   return (
-                    <div
-                      key={point.level}
-                      className="flex-1 flex flex-col items-center justify-end group relative h-full"
-                    >
-                      <div
-                        className="w-full bg-[#007acc] hover:bg-[#0098ff] rounded-t-sm transition-colors min-h-[2px]"
-                        style={{ height: `${height}%` }}
-                      />
-                      {/* 悬浮提示 */}
-                      <div className="absolute bottom-full mb-1 hidden group-hover:block bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10 border border-border">
-                        Lv.{point.level}: {formatNumber(point.exp)} exp
-                      </div>
-                    </div>
+                    <Tooltip key={point.level}>
+                      <TooltipTrigger asChild>
+                        <div className="flex-1 flex flex-col items-center justify-end h-full cursor-default">
+                          <div
+                            className="w-full bg-[#007acc] hover:bg-[#0098ff] rounded-t-sm transition-colors min-h-[2px]"
+                            style={{ height: `${height}%` }}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Lv.{point.level}: {formatNumber(point.exp)} exp</TooltipContent>
+                    </Tooltip>
                   )
                 })}
               </div>

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -249,9 +250,12 @@ function StatePanel({ name, state, onChange }: { name: string; state: StateEntry
       <Section title="基础属性">
         <div className="grid grid-cols-2 gap-3">
           <Field label="类型 (Type)">
-            <select className="input-base" value={state.Type} onChange={(e) => update({ Type: e.target.value })}>
-              {STATE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            <Select value={state.Type} onValueChange={(v) => update({ Type: v })}>
+              <SelectTrigger className="input-base"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STATE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
 
           {hasConnection && (
@@ -269,9 +273,12 @@ function StatePanel({ name, state, onChange }: { name: string; state: StateEntry
                 <input className="input-base" type="number" value={state.Invincible ?? 0} onChange={(e) => update({ Invincible: e.target.value })} />
               </Field>
               <Field label="可格挡伤害类型 (DamageType)">
-                <select className="input-base" value={state.DamageType ?? "PHYSICS"} onChange={(e) => update({ DamageType: e.target.value })}>
-                  {DAMAGE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <Select value={state.DamageType ?? "PHYSICS"} onValueChange={(v) => update({ DamageType: v })}>
+                  <SelectTrigger className="input-base"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DAMAGE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </Field>
             </>
           )}

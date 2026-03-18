@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react"
-import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw } from "lucide-react"
+import { useState, useCallback } from "react"
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react"
 import type { FileTreeNode } from "@/types"
 import { getConfigType } from "@/types"
 import { getFileIconInfo, getFolderColor } from "@/lib/file-icons"
@@ -8,132 +8,16 @@ import { useEditorStore } from "@/store/editor-store"
 import { wsClient } from "@/lib/ws-client"
 import { tryRestoreDraft } from "@/lib/use-draft-sync"
 import { cn } from "@/lib/utils"
-
-// ---- 右键菜单 ----
-
-interface ContextMenuState {
-  x: number
-  y: number
-  node: FileTreeNode
-}
-
-function ContextMenu({ state, onClose }: { state: ContextMenuState; onClose: () => void }) {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const { setFileTree, setLoading } = useFileStore()
-  const [renaming, setRenaming] = useState(false)
-  const [newName, setNewName] = useState(state.node.name)
-  const [creating, setCreating] = useState<"file" | "folder" | null>(null)
-  const [createName, setCreateName] = useState("")
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [onClose])
-
-  const refreshTree = async () => {
-    setLoading(true)
-    const res = await wsClient.fileList()
-    setFileTree(res.files)
-  }
-
-  const handleDelete = async () => {
-    if (!confirm(`确定删除 ${state.node.name}？`)) return
-    try {
-      await wsClient.fileDelete(state.node.path)
-      // 如果文件已打开，关闭它
-      useEditorStore.getState().closeFile(state.node.path)
-      await refreshTree()
-    } catch (err) {
-      console.error("删除失败:", err)
-    }
-    onClose()
-  }
-
-  const handleRename = async () => {
-    if (!newName.trim() || newName === state.node.name) {
-      setRenaming(false)
-      return
-    }
-    const parentPath = state.node.path.includes("/")
-      ? state.node.path.substring(0, state.node.path.lastIndexOf("/"))
-      : ""
-    const newPath = parentPath ? `${parentPath}/${newName}` : newName
-    try {
-      await wsClient.fileRename(state.node.path, newPath)
-      await refreshTree()
-    } catch (err) {
-      console.error("重命名失败:", err)
-    }
-    onClose()
-  }
-
-  const handleCreate = async () => {
-    if (!createName.trim()) {
-      setCreating(null)
-      return
-    }
-    const basePath = state.node.isDirectory ? state.node.path : (
-      state.node.path.includes("/")
-        ? state.node.path.substring(0, state.node.path.lastIndexOf("/"))
-        : ""
-    )
-    const newPath = basePath ? `${basePath}/${createName}` : createName
-    try {
-      await wsClient.fileCreate(newPath, creating === "folder")
-      await refreshTree()
-    } catch (err) {
-      console.error("创建失败:", err)
-    }
-    onClose()
-  }
-
-  if (renaming) {
-    return (
-      <div ref={menuRef} className="fixed z-50 bg-popover border border-border rounded-md shadow-lg p-2" style={{ left: state.x, top: state.y }}>
-        <input
-          autoFocus
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") onClose() }}
-          className="px-2 py-1 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring w-48"
-        />
-      </div>
-    )
-  }
-
-  if (creating) {
-    return (
-      <div ref={menuRef} className="fixed z-50 bg-popover border border-border rounded-md shadow-lg p-2" style={{ left: state.x, top: state.y }}>
-        <p className="text-xs text-muted-foreground mb-1">新建{creating === "file" ? "文件" : "文件夹"}</p>
-        <input
-          autoFocus
-          value={createName}
-          onChange={(e) => setCreateName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onClose() }}
-          placeholder={creating === "file" ? "文件名.yml" : "文件夹名"}
-          className="px-2 py-1 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring w-48"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div ref={menuRef} className="fixed z-50 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[140px]" style={{ left: state.x, top: state.y }}>
-      <button onClick={() => setCreating("file")} className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent">新建文件</button>
-      <button onClick={() => setCreating("folder")} className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent">新建文件夹</button>
-      <div className="border-t border-border my-1" />
-      <button onClick={() => { setRenaming(true); setNewName(state.node.name) }} className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent">重命名</button>
-      <button onClick={handleDelete} className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent text-red-400">删除</button>
-    </div>
-  )
-}
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // ---- 树节点 ----
 
-function TreeNode({ node, depth = 0, onContextMenu }: { node: FileTreeNode; depth?: number; onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void }) {
+function TreeNode({ node, depth = 0, onAction }: {
+  node: FileTreeNode
+  depth?: number
+  onAction: (action: "newFile" | "newFolder" | "rename" | "delete", node: FileTreeNode) => void
+}) {
   const [expanded, setExpanded] = useState(depth < 1)
   const openFile = useEditorStore((s) => s.openFile)
   const activeFilePath = useEditorStore((s) => s.activeFilePath)
@@ -162,36 +46,54 @@ function TreeNode({ node, depth = 0, onContextMenu }: { node: FileTreeNode; dept
 
   return (
     <div>
-      <button
-        onClick={handleClick}
-        onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, node) }}
-        className={cn(
-          "flex items-center w-full px-2 py-[3px] text-[13px] hover:bg-[#2a2d2e] gap-1 text-left cursor-pointer",
-          isActive && !node.isDirectory && "bg-[#37373d]"
-        )}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
-      >
-        {node.isDirectory ? (
-          <>
-            {expanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-            {expanded
-              ? <FolderOpen className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
-              : <Folder className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
-            }
-          </>
-        ) : (() => {
-          const { icon: Icon, color } = getFileIconInfo(node.path)
-          return (
-            <>
-              <span className="w-4" />
-              <Icon className={cn("w-4 h-4 shrink-0", color)} />
-            </>
-          )
-        })()}
-        <span className="truncate">{node.name}</span>
-      </button>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            onClick={handleClick}
+            className={cn(
+              "flex items-center w-full px-2 py-[3px] text-[13px] hover:bg-[#2a2d2e] gap-1 text-left cursor-pointer",
+              isActive && !node.isDirectory && "bg-[#37373d]"
+            )}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          >
+            {node.isDirectory ? (
+              <>
+                {expanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+                {expanded
+                  ? <FolderOpen className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
+                  : <Folder className={cn("w-4 h-4 shrink-0", getFolderColor(node.name))} />
+                }
+              </>
+            ) : (() => {
+              const { icon: Icon, color } = getFileIconInfo(node.path)
+              return (
+                <>
+                  <span className="w-4" />
+                  <Icon className={cn("w-4 h-4 shrink-0", color)} />
+                </>
+              )
+            })()}
+            <span className="truncate">{node.name}</span>
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => onAction("newFile", node)}>
+            <FilePlus className="w-3.5 h-3.5 mr-2" />新建文件
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onAction("newFolder", node)}>
+            <FolderPlus className="w-3.5 h-3.5 mr-2" />新建文件夹
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => onAction("rename", node)}>
+            <Pencil className="w-3.5 h-3.5 mr-2" />重命名
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onAction("delete", node)} className="text-[#f44747] focus:text-white">
+            <Trash2 className="w-3.5 h-3.5 mr-2" />删除
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       {node.isDirectory && expanded && node.children?.map((child) => (
-        <TreeNode key={child.path} node={child} depth={depth + 1} onContextMenu={onContextMenu} />
+        <TreeNode key={child.path} node={child} depth={depth + 1} onAction={onAction} />
       ))}
     </div>
   )
@@ -201,15 +103,13 @@ function TreeNode({ node, depth = 0, onContextMenu }: { node: FileTreeNode; dept
 
 export function Sidebar() {
   const { fileTree, loading, setFileTree, setLoading } = useFileStore()
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [dialogState, setDialogState] = useState<{
+    type: "rename" | "newFile" | "newFolder"
+    node: FileTreeNode
+  } | null>(null)
+  const [inputValue, setInputValue] = useState("")
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileTreeNode) => {
-    const x = Math.min(e.clientX, window.innerWidth - 160)
-    const y = Math.min(e.clientY, window.innerHeight - 200)
-    setContextMenu({ x, y, node })
-  }, [])
-
-  const handleRefresh = async () => {
+  const refreshTree = useCallback(async () => {
     setLoading(true)
     try {
       const res = await wsClient.fileList()
@@ -218,13 +118,61 @@ export function Sidebar() {
       console.error("刷新文件树失败:", err)
       setLoading(false)
     }
+  }, [setLoading, setFileTree])
+
+  const handleAction = useCallback((action: "newFile" | "newFolder" | "rename" | "delete", node: FileTreeNode) => {
+    if (action === "delete") {
+      if (!confirm(`确定删除 ${node.name}？`)) return
+      wsClient.fileDelete(node.path).then(() => {
+        useEditorStore.getState().closeFile(node.path)
+        refreshTree()
+      }).catch((err) => console.error("删除失败:", err))
+      return
+    }
+    setInputValue(action === "rename" ? node.name : "")
+    setDialogState({ type: action, node })
+  }, [refreshTree])
+
+  const handleDialogSubmit = async () => {
+    if (!dialogState || !inputValue.trim()) return
+    const { type, node } = dialogState
+
+    if (type === "rename") {
+      const parentPath = node.path.includes("/")
+        ? node.path.substring(0, node.path.lastIndexOf("/"))
+        : ""
+      const newPath = parentPath ? `${parentPath}/${inputValue}` : inputValue
+      try {
+        await wsClient.fileRename(node.path, newPath)
+        await refreshTree()
+      } catch (err) {
+        console.error("重命名失败:", err)
+      }
+    } else {
+      const basePath = node.isDirectory ? node.path : (
+        node.path.includes("/")
+          ? node.path.substring(0, node.path.lastIndexOf("/"))
+          : ""
+      )
+      const newPath = basePath ? `${basePath}/${inputValue}` : inputValue
+      try {
+        await wsClient.fileCreate(newPath, type === "newFolder")
+        await refreshTree()
+      } catch (err) {
+        console.error("创建失败:", err)
+      }
+    }
+    setDialogState(null)
   }
+
+  const dialogTitle = dialogState?.type === "rename" ? "重命名" : dialogState?.type === "newFile" ? "新建文件" : "新建文件夹"
+  const dialogPlaceholder = dialogState?.type === "rename" ? "新名称" : dialogState?.type === "newFile" ? "文件名.yml" : "文件夹名"
 
   return (
     <aside className="w-64 border-r border-border bg-sidebar-background flex flex-col shrink-0">
       <div className="px-2 py-1 border-b border-border flex items-center justify-between">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground">文件浏览器</h2>
-        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground p-0.5 hover:bg-[#2a2d2e]" title="刷新">
+        <button onClick={refreshTree} className="text-muted-foreground hover:text-foreground p-0.5 hover:bg-[#2a2d2e]" title="刷新">
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -234,10 +182,31 @@ export function Sidebar() {
         ) : fileTree.length === 0 ? (
           <div className="px-3 py-4 text-sm text-muted-foreground">暂无文件</div>
         ) : (
-          fileTree.map((node) => <TreeNode key={node.path} node={node} onContextMenu={handleContextMenu} />)
+          fileTree.map((node) => <TreeNode key={node.path} node={node} onAction={handleAction} />)
         )}
       </div>
-      {contextMenu && <ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />}
+
+      <Dialog open={!!dialogState} onOpenChange={(open) => { if (!open) setDialogState(null) }}>
+        <DialogContent className="w-80 p-0">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="p-4">
+            <input
+              autoFocus
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleDialogSubmit(); if (e.key === "Escape") setDialogState(null) }}
+              placeholder={dialogPlaceholder}
+              className="w-full px-2 py-1.5 text-[13px] bg-[#3c3c3c] border border-[#3c3c3c] text-[#cccccc] focus:outline-none focus:border-[#007acc]"
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button onClick={() => setDialogState(null)} className="px-3 py-1 text-[13px] text-[#858585] hover:text-[#cccccc]">取消</button>
+              <button onClick={handleDialogSubmit} disabled={!inputValue.trim()} className="px-3 py-1 text-[13px] bg-[#007acc] text-white hover:bg-[#0098ff] disabled:opacity-40">确认</button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }
