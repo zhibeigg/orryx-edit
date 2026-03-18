@@ -174,7 +174,9 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
     const names: string[] = []
     for (const key of cache.keys()) {
       if (key.startsWith("skills/") && key.endsWith(".yml")) {
-        names.push(key.replace("skills/", "").replace(".yml", ""))
+        // 只取文件名（去掉路径和扩展名）
+        const fileName = key.substring(key.lastIndexOf("/") + 1).replace(".yml", "")
+        if (!names.includes(fileName)) names.push(fileName)
       }
     }
     return names.sort()
