@@ -31,14 +31,14 @@ export function stringifyYaml(data: unknown): string {
  */
 export function updateYamlField(originalYaml: string, path: string[], value: unknown): string {
   const doc = parseDocument(originalYaml)
-  if (typeof value === "string" && value.includes("\n")) {
+  if (typeof value === "string" && (value.includes("\n") || value.includes("#"))) {
     const scalar = new Scalar(value)
-    scalar.type = Scalar.BLOCK_LITERAL
+    scalar.type = value.includes("\n") ? Scalar.BLOCK_LITERAL : Scalar.QUOTE_DOUBLE
     doc.setIn(path, scalar)
   } else {
     doc.setIn(path, value)
   }
-  return doc.toString()
+  return doc.toString({ lineWidth: 0 })
 }
 
 /**
@@ -70,10 +70,10 @@ export function updateYamlFromObject(originalYaml: string, newData: Record<strin
       ) {
         deepUpdate(doc, currentPath, oldVal as Record<string, unknown>, newVal as Record<string, unknown>)
       } else {
-        // 多行字符串使用块标量格式（|），避免转义
-        if (typeof newVal === "string" && newVal.includes("\n")) {
+        // 多行字符串或含 # 的字符串使用块标量/引号格式，避免 # 被当作 YAML 注释截断
+        if (typeof newVal === "string" && (newVal.includes("\n") || newVal.includes("#"))) {
           const scalar = new Scalar(newVal)
-          scalar.type = Scalar.BLOCK_LITERAL
+          scalar.type = newVal.includes("\n") ? Scalar.BLOCK_LITERAL : Scalar.QUOTE_DOUBLE
           doc.setIn(currentPath, scalar)
         } else {
           doc.setIn(currentPath, newVal)
@@ -90,7 +90,7 @@ export function updateYamlFromObject(originalYaml: string, newData: Record<strin
   }
 
   deepUpdate(doc, [], original, newData)
-  return doc.toString()
+  return doc.toString({ lineWidth: 0 })
 }
 
 export function parseSkillYaml(content: string): SkillData {
