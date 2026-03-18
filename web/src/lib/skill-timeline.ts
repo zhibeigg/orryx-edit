@@ -1,11 +1,13 @@
+import type { SelectorType } from "./selector-parser"
+
 export interface TimelineEvent {
   tick: number
   duration: number
-  type: "sleep" | "damage" | "animation" | "launch" | "flash" | "sound" | "effect" | "potion" | "entity" | "collider" | "other"
+  type: "sleep" | "damage" | "animation" | "launch" | "flash" | "sound" | "effect" | "potion" | "entity" | "selector" | "other"
   label: string
   raw: string
-  /** 碰撞箱事件附带的碰撞箱数据 */
-  collider?: { type: "range" | "obb" | "sector"; params: number[]; offset?: [number, number, number] }
+  /** 选择器事件附带的选择器数据 */
+  selector?: { type: SelectorType; params: number[]; offset?: [number, number, number] }
 }
 
 /**
@@ -73,31 +75,31 @@ export function parseTimeline(script: string): TimelineEvent[] {
 
     const currentOffset: [number, number, number] = [offsetX, offsetY, offsetZ]
 
-    // damage（同时检测碰撞箱）
+    // damage（同时检测选择器）
     if (line.startsWith("damage ")) {
-      const collider = extractCollider(line, currentOffset)
+      const selector = extractSelector(line, currentOffset)
       events.push({
         tick: currentTick,
         duration: 1,
         type: "damage",
-        label: collider ? `伤害 (${collider.label})` : "伤害",
+        label: selector ? `伤害 (${selector.label})` : "伤害",
         raw: line,
-        collider: collider ?? undefined,
+        selector: selector ?? undefined,
       })
       continue
     }
 
-    // 独立碰撞箱检测（非 damage 行中的选择器）
+    // 独立选择器检测（非 damage 行中的选择器）
     if (!line.startsWith("damage ")) {
-      const collider = extractCollider(line, currentOffset)
-      if (collider) {
+      const selector = extractSelector(line, currentOffset)
+      if (selector) {
         events.push({
           tick: currentTick,
           duration: 1,
-          type: "collider",
-          label: collider.label,
+          type: "selector",
+          label: selector.label,
           raw: line,
-          collider,
+          selector,
         })
         // 不 continue，让后续匹配也能处理这行
       }
@@ -197,9 +199,10 @@ export function parseTimeline(script: string): TimelineEvent[] {
   return events
 }
 
-/** 从一行脚本中提取碰撞箱信息 */
-function extractCollider(line: string, offset?: [number, number, number]): { type: "range" | "obb" | "sector"; params: number[]; offset?: [number, number, number]; label: string } | null {
+/** 从一行脚本中提取选择器信息 */
+function extractSelector(line: string, offset?: [number, number, number]): { type: SelectorType; params: number[]; offset?: [number, number, number]; label: string } | null {
   const hasOffset = offset && (offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0)
+
   const obbMatch = line.match(/@obb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.-]+)\s+([\d.-]+)/)
   if (obbMatch) {
     return {
@@ -227,6 +230,96 @@ function extractCollider(line: string, offset?: [number, number, number]): { typ
       params: [parseFloat(rangeMatch[1])],
       offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
       label: `球形 R=${rangeMatch[1]}`,
+    }
+  }
+
+  const lineMatch = line.match(/@line\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/)
+  if (lineMatch) {
+    return {
+      type: "line",
+      params: [parseFloat(lineMatch[1]), parseFloat(lineMatch[2]), parseFloat(lineMatch[3])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `线形 ${lineMatch[1]}×${lineMatch[2]}×${lineMatch[3]}`,
+    }
+  }
+
+  const coneMatch = line.match(/@cone\s+([\d.]+)\s+([\d.]+)/)
+  if (coneMatch) {
+    return {
+      type: "cone",
+      params: [parseFloat(coneMatch[1]), parseFloat(coneMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `锥形 R=${coneMatch[1]} L=${coneMatch[2]}`,
+    }
+  }
+
+  const cylinderMatch = line.match(/@cylinder\s+([\d.]+)\s+([\d.]+)/)
+  if (cylinderMatch) {
+    return {
+      type: "cylinder",
+      params: [parseFloat(cylinderMatch[1]), parseFloat(cylinderMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `圆柱 R=${cylinderMatch[1]} H=${cylinderMatch[2]}`,
+    }
+  }
+
+  const frustumMatch = line.match(/@frustum\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/)
+  if (frustumMatch) {
+    return {
+      type: "frustum",
+      params: [parseFloat(frustumMatch[1]), parseFloat(frustumMatch[2]), parseFloat(frustumMatch[3])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `截锥 ${frustumMatch[1]}→${frustumMatch[2]} L=${frustumMatch[3]}`,
+    }
+  }
+
+  const annularMatch = line.match(/@annular\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/)
+  if (annularMatch) {
+    return {
+      type: "annular",
+      params: [parseFloat(annularMatch[1]), parseFloat(annularMatch[2]), parseFloat(annularMatch[3])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `环形 ${annularMatch[1]}~${annularMatch[2]} H=${annularMatch[3]}`,
+    }
+  }
+
+  const nearestMatch = line.match(/@nearest\s+([\d.]+)\s+([\d.]+)/)
+  if (nearestMatch) {
+    return {
+      type: "nearest",
+      params: [parseFloat(nearestMatch[1]), parseFloat(nearestMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `最近 N=${nearestMatch[1]} R=${nearestMatch[2]}`,
+    }
+  }
+
+  const lookatMatch = line.match(/@lookat\s+([\d.]+)\s+([\d.]+)/)
+  if (lookatMatch) {
+    return {
+      type: "lookat",
+      params: [parseFloat(lookatMatch[1]), parseFloat(lookatMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `注视 D=${lookatMatch[1]} ${lookatMatch[2]}°`,
+    }
+  }
+
+  const scatterMatch = line.match(/@scatter\s+([\d.]+)\s+([\d.]+)/)
+  if (scatterMatch) {
+    return {
+      type: "scatter",
+      params: [parseFloat(scatterMatch[1]), parseFloat(scatterMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `散射 N=${scatterMatch[1]} R=${scatterMatch[2]}`,
+    }
+  }
+
+  const ringMatch = line.match(/@ring\s+([\d.]+)\s+([\d.]+)/)
+  if (ringMatch) {
+    return {
+      type: "ring",
+      params: [parseFloat(ringMatch[1]), parseFloat(ringMatch[2])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
+      label: `环阵 R=${ringMatch[1]} N=${ringMatch[2]}`,
     }
   }
 
