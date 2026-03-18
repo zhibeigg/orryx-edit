@@ -111,7 +111,7 @@ export function EditorPage() {
   return (
     <div className="h-full flex flex-col">
       {/* 标签栏 */}
-      <div className="flex border-b border-border bg-background shrink-0">
+      <div className="flex border-b border-[#252526] bg-[#252526] shrink-0">
         <div className="flex-1 flex overflow-x-auto">
           {openFiles.map((file) => {
               const { icon: FileIcon, color: iconColor } = getFileIconInfo(file.path)
@@ -119,20 +119,22 @@ export function EditorPage() {
             <div
               key={file.path}
               className={cn(
-                "flex items-center gap-1 px-3 py-2 text-sm border-r border-border cursor-pointer hover:bg-accent group min-w-0",
-                file.path === activeFilePath && "bg-accent text-accent-foreground"
+                "flex items-center gap-1.5 px-3 py-[6px] text-[13px] border-r border-[#252526] cursor-pointer group min-w-0",
+                file.path === activeFilePath
+                  ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
+                  : "bg-[#2d2d2d] text-[#969696] hover:bg-[#2d2d2d]/80"
               )}
               onClick={() => setActiveFile(file.path)}
             >
               <FileIcon className={cn("w-3.5 h-3.5 shrink-0", iconColor)} />
               <span className="truncate max-w-[150px]">{file.name}</span>
-              {file.dirty && <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0" />}
+              {file.dirty && <span className="w-2 h-2 rounded-full bg-white/80 shrink-0" />}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   closeFile(file.path)
                 }}
-                className="ml-1 opacity-0 group-hover:opacity-100 hover:bg-secondary rounded p-0.5"
+                className="ml-1 opacity-0 group-hover:opacity-100 hover:bg-[#3c3c3c] p-0.5"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -144,13 +146,13 @@ export function EditorPage() {
         <div className="relative shrink-0" ref={tabMenuRef}>
           <button
             onClick={() => setShowTabMenu(!showTabMenu)}
-            className="flex items-center px-2 py-2 text-sm border-l border-border hover:bg-accent"
+            className="flex items-center px-2 py-[6px] text-[13px] border-l border-[#3c3c3c] hover:bg-[#2a2d2e] text-[#969696]"
             title="标签操作"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
           {showTabMenu && (
-            <div className="absolute right-0 top-full mt-1 z-30 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[180px]">
+            <div className="absolute right-0 top-full mt-0 z-30 bg-[#252526] border border-[#3c3c3c] shadow-lg py-1 min-w-[180px]">
               <button
                 onClick={() => { closeSavedFiles(); setShowTabMenu(false) }}
                 className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center justify-between"
@@ -192,15 +194,15 @@ export function EditorPage() {
         <button
           onClick={() => setShowPublish(!showPublish)}
           className={cn(
-            "flex items-center gap-1.5 px-3 py-2 text-sm border-l border-border hover:bg-accent shrink-0",
-            showPublish && "bg-accent",
+            "flex items-center gap-1.5 px-3 py-[6px] text-[13px] border-l border-[#3c3c3c] hover:bg-[#2a2d2e] shrink-0 text-[#969696]",
+            showPublish && "bg-[#37373d] text-white",
             !connected && "opacity-50"
           )}
         >
-          <Upload className="w-4 h-4" />
+          <Upload className="w-3.5 h-3.5" />
           {connected ? "发布" : "离线"}
           {dirtyCount > 0 && (
-            <span className="px-1.5 py-0.5 text-xs bg-yellow-500 text-black rounded-full">{dirtyCount}</span>
+            <span className="px-1.5 py-0.5 text-[10px] bg-[#007acc] text-white rounded-sm">{dirtyCount}</span>
           )}
         </button>
       </div>
@@ -241,18 +243,18 @@ export function EditorPage() {
         )}
       </div>
 
-      {/* 底部状态栏 */}
-      <div className="h-6 border-t border-border bg-background flex items-center px-3 text-xs text-muted-foreground shrink-0">
+      {/* 底部状态栏 — VSCode 蓝色 */}
+      <div className="h-[22px] bg-[#007acc] flex items-center px-2 text-[11px] text-white shrink-0 select-none">
         <button
           onClick={() => setBottomPanel(bottomPanel === "log" ? null : "log")}
-          className="flex items-center gap-1 hover:text-foreground"
+          className="flex items-center gap-1 hover:bg-white/10 px-1"
         >
           <Terminal className="w-3 h-3" />
           日志
           {bottomPanel === null ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         <div className="flex-1" />
-        {activeFile && <span>{activeFile.path}</span>}
+        {activeFile && <span className="opacity-80">{activeFile.path}</span>}
       </div>
     </div>
   )

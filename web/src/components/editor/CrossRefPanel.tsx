@@ -66,7 +66,7 @@ export function CrossRefPanel({ currentFile }: CrossRefPanelProps) {
       {Array.from(typeGroups.entries()).map(([typeName, refGroups]) => (
         <div key={typeName}>
           <h3 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary" />
+            <span className="w-2 h-2 rounded-sm bg-primary" />
             {typeName}
           </h3>
 

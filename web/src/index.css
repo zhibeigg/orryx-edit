@@ -3,38 +3,39 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-background: hsl(224 71% 4%);
-  --color-foreground: hsl(213 31% 91%);
-  --color-card: hsl(224 71% 4%);
-  --color-card-foreground: hsl(213 31% 91%);
-  --color-popover: hsl(224 71% 4%);
-  --color-popover-foreground: hsl(213 31% 91%);
-  --color-primary: hsl(210 40% 98%);
-  --color-primary-foreground: hsl(222.2 47.4% 1.2%);
-  --color-secondary: hsl(222.2 47.4% 11.2%);
-  --color-secondary-foreground: hsl(210 40% 98%);
-  --color-muted: hsl(223 47% 11%);
-  --color-muted-foreground: hsl(215.4 16.3% 56.9%);
-  --color-accent: hsl(216 34% 17%);
-  --color-accent-foreground: hsl(210 40% 98%);
-  --color-destructive: hsl(0 63% 31%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(216 34% 17%);
-  --color-input: hsl(216 34% 17%);
-  --color-ring: hsl(216 34% 50%);
-  --color-sidebar-background: hsl(224 71% 4%);
-  --color-sidebar-foreground: hsl(213 31% 91%);
-  --color-sidebar-primary: hsl(210 40% 98%);
-  --color-sidebar-primary-foreground: hsl(222.2 47.4% 1.2%);
-  --color-sidebar-accent: hsl(216 34% 17%);
-  --color-sidebar-accent-foreground: hsl(210 40% 98%);
-  --color-sidebar-border: hsl(216 34% 17%);
-  --color-sidebar-ring: hsl(216 34% 50%);
-  --radius-lg: 0.5rem;
-  --radius-md: calc(var(--radius-lg) - 2px);
-  --radius-sm: calc(var(--radius-lg) - 4px);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  /* VSCode Dark+ 色板 */
+  --color-background: #1e1e1e;
+  --color-foreground: #cccccc;
+  --color-card: #252526;
+  --color-card-foreground: #cccccc;
+  --color-popover: #252526;
+  --color-popover-foreground: #cccccc;
+  --color-primary: #007acc;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #2d2d2d;
+  --color-secondary-foreground: #cccccc;
+  --color-muted: #252526;
+  --color-muted-foreground: #858585;
+  --color-accent: #37373d;
+  --color-accent-foreground: #cccccc;
+  --color-destructive: #f44747;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #3c3c3c;
+  --color-input: #3c3c3c;
+  --color-ring: #007acc;
+  --color-sidebar-background: #252526;
+  --color-sidebar-foreground: #cccccc;
+  --color-sidebar-primary: #007acc;
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: #37373d;
+  --color-sidebar-accent-foreground: #cccccc;
+  --color-sidebar-border: #3c3c3c;
+  --color-sidebar-ring: #007acc;
+  --radius-lg: 2px;
+  --radius-md: 2px;
+  --radius-sm: 1px;
+  --font-sans: "Segoe WPC", "Segoe UI", "Inter", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", "Courier New", monospace;
 }
 
 body {
@@ -45,15 +46,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 自定义滚动条 */
+/* VSCode 风格滚动条 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(216 34% 22%) transparent;
+  scrollbar-color: #424242 transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 
 *::-webkit-scrollbar-track {
@@ -61,12 +62,12 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: hsl(216 34% 22%);
-  border-radius: 3px;
+  background: #424242;
+  border-radius: 0;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: hsl(216 34% 32%);
+  background: #4f4f4f;
 }
 
 *::-webkit-scrollbar-corner {
@@ -78,6 +79,17 @@ body {
 }
 
 .input-base {
-  @apply w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md;
+  @apply w-full px-2 py-1 text-sm bg-[#3c3c3c] border border-[#3c3c3c] text-foreground;
   @apply focus:outline-none focus:ring-1 focus:ring-ring;
+}
+
+/* VSCode 风格选择框 */
+select {
+  background-color: #3c3c3c;
+  border-color: #3c3c3c;
+  color: #cccccc;
+}
+
+select:focus {
+  outline: 1px solid #007acc;
 }

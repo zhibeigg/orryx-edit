@@ -88,18 +88,18 @@ export function AdminPage() {
 
   if (!authed) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#0a0e14]">
+      <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
         <div className="w-full max-w-sm p-8 space-y-6">
           <div className="text-center space-y-2">
-            <Shield className="w-10 h-10 mx-auto text-zinc-400" />
-            <h1 className="text-2xl font-bold text-zinc-100">Orryx Admin</h1>
+            <Shield className="w-10 h-10 mx-auto text-[#858585]" />
+            <h1 className="text-2xl font-bold text-white">Orryx Admin</h1>
           </div>
           <div className="space-y-3">
             <input type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="Admin Key"
-              className="w-full px-4 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-600" />
+              className="w-full px-4 py-3 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-600" />
             {error && <p className="text-sm text-red-400">{error}</p>}
-            <button onClick={handleLogin} className="w-full py-3 rounded-lg bg-zinc-100 text-zinc-900 font-medium hover:bg-zinc-200">登录</button>
+            <button onClick={handleLogin} className="w-full py-3 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff]">登录</button>
           </div>
         </div>
       </div>
@@ -107,13 +107,13 @@ export function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e14] text-zinc-100">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#1e1e1e] text-white">
+      <header className="border-b border-[#3c3c3c] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-zinc-400" />
+          <Shield className="w-5 h-5 text-[#858585]" />
           <span className="font-bold text-lg">Orryx Admin</span>
         </div>
-        <button onClick={() => { setAuthed(false); sessionStorage.removeItem("adminKey") }} className="text-sm text-zinc-500 hover:text-zinc-300">退出</button>
+        <button onClick={() => { setAuthed(false); sessionStorage.removeItem("adminKey") }} className="text-sm text-[#858585] hover:text-[#cccccc]">退出</button>
       </header>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -130,9 +130,9 @@ export function AdminPage() {
         <div className="flex gap-3">
           <input type="text" value={newOwner} onChange={(e) => setNewOwner(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()} placeholder="用户名 / 备注"
-            className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600" />
+            className="flex-1 px-4 py-2.5 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600" />
           <select value={newDays} onChange={(e) => setNewDays(Number(e.target.value))}
-            className="px-3 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-600">
+            className="px-3 py-2.5 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white focus:outline-none focus:ring-1 focus:ring-zinc-600">
             <option value={7}>7 天</option>
             <option value={30}>30 天</option>
             <option value={90}>90 天</option>
@@ -141,7 +141,7 @@ export function AdminPage() {
             <option value={0}>永久</option>
           </select>
           <button onClick={handleCreate} disabled={creating || !newOwner.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-100 text-zinc-900 font-medium hover:bg-zinc-200 disabled:opacity-40">
+            className="flex items-center gap-2 px-5 py-2.5 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff] disabled:opacity-40">
             <Plus className="w-4 h-4" />创建
           </button>
         </div>
@@ -149,29 +149,29 @@ export function AdminPage() {
         {/* 续费弹窗 */}
         {renewTarget && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setRenewTarget(null)}>
-            <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#252526] border border-zinc-700 rounded-sm p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
               <h3 className="font-bold">续费 License</h3>
-              <p className="text-xs text-zinc-400 font-mono">{renewTarget}</p>
+              <p className="text-xs text-[#858585] font-mono">{renewTarget}</p>
               <div className="flex gap-2">
                 <select value={renewDays} onChange={(e) => setRenewDays(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100">
+                  className="flex-1 px-3 py-2 rounded-sm bg-[#2d2d2d] border border-zinc-700 text-white">
                   <option value={7}>+7 天</option>
                   <option value={30}>+30 天</option>
                   <option value={90}>+90 天</option>
                   <option value={180}>+180 天</option>
                   <option value={365}>+365 天</option>
                 </select>
-                <button onClick={handleRenew} className="px-4 py-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium hover:bg-zinc-200">确认</button>
+                <button onClick={handleRenew} className="px-4 py-2 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff]">确认</button>
               </div>
             </div>
           </div>
         )}
 
         {/* License 表格 */}
-        <div className="rounded-lg border border-zinc-800 overflow-hidden">
+        <div className="rounded-sm border border-[#3c3c3c] overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-zinc-900/50 text-zinc-400 text-left">
+              <tr className="bg-[#252526] text-[#858585] text-left">
                 <th className="px-4 py-3 font-medium">License</th>
                 <th className="px-4 py-3 font-medium">用户</th>
                 <th className="px-4 py-3 font-medium">状态</th>
@@ -185,20 +185,20 @@ export function AdminPage() {
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-600">暂无 License</td></tr>
               )}
               {licenses.map((lic) => (
-                <tr key={lic.license} className="border-t border-zinc-800/50 hover:bg-zinc-900/30">
+                <tr key={lic.license} className="border-t border-[#3c3c3c]/50 hover:bg-[#252526]/30">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <code className="text-xs bg-zinc-900 px-2 py-1 rounded font-mono">{lic.license}</code>
-                      <button onClick={() => handleCopy(lic.license)} className="text-zinc-600 hover:text-zinc-300">
+                      <code className="text-xs bg-[#252526] px-2 py-1 rounded font-mono">{lic.license}</code>
+                      <button onClick={() => handleCopy(lic.license)} className="text-zinc-600 hover:text-[#cccccc]">
                         {copied === lic.license ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-300">{lic.owner}</td>
+                  <td className="px-4 py-3 text-[#cccccc]">{lic.owner}</td>
                   <td className="px-4 py-3">
                     {lic.enabled ? (
                       <span className="flex items-center gap-1.5 text-xs">
-                        <span className={`w-2 h-2 rounded-full ${lic.online ? "bg-green-400" : "bg-zinc-600"}`} />
+                        <span className={`w-2 h-2 rounded-sm ${lic.online ? "bg-green-400" : "bg-zinc-600"}`} />
                         {lic.online ? "在线" : "离线"}
                       </span>
                     ) : (
@@ -208,7 +208,7 @@ export function AdminPage() {
                   <td className="px-4 py-3 text-xs">
                     <ExpiryBadge expiresAt={lic.expiresAt} remainingDays={lic.remainingDays} />
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400 font-mono">
+                  <td className="px-4 py-3 text-xs text-[#858585] font-mono">
                     {lic.boundIps.length > 0 ? lic.boundIps.join(", ") : <span className="text-zinc-600">未绑定</span>}
                   </td>
                   <td className="px-4 py-3 text-right space-x-1">
@@ -234,9 +234,9 @@ export function AdminPage() {
 // helper components
 
 function ExpiryBadge({ expiresAt, remainingDays }: { expiresAt: number; remainingDays: number }) {
-  if (expiresAt === 0) return <span className="text-zinc-400">永久</span>
+  if (expiresAt === 0) return <span className="text-[#858585]">永久</span>
   if (remainingDays <= 0) return <span className="text-red-400">已过期</span>
-  const color = remainingDays <= 7 ? "text-red-400" : remainingDays <= 30 ? "text-yellow-400" : "text-zinc-400"
+  const color = remainingDays <= 7 ? "text-red-400" : remainingDays <= 30 ? "text-yellow-400" : "text-[#858585]"
   return (
     <span className={`flex items-center gap-1 ${color}`}>
       <Clock className="w-3 h-3" />
@@ -247,8 +247,8 @@ function ExpiryBadge({ expiresAt, remainingDays }: { expiresAt: number; remainin
 
 function StatCard({ icon: Icon, label, value }: { icon: typeof Server; label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-      <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1"><Icon className="w-3.5 h-3.5" />{label}</div>
+    <div className="rounded-sm border border-[#3c3c3c] bg-[#252526]/30 p-4">
+      <div className="flex items-center gap-2 text-[#858585] text-xs mb-1"><Icon className="w-3.5 h-3.5" />{label}</div>
       <div className="text-2xl font-bold">{value}</div>
     </div>
   )

@@ -166,8 +166,8 @@ function TreeNode({ node, depth = 0, onContextMenu }: { node: FileTreeNode; dept
         onClick={handleClick}
         onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, node) }}
         className={cn(
-          "flex items-center w-full px-2 py-1 text-sm hover:bg-accent rounded-sm gap-1 text-left",
-          isActive && !node.isDirectory && "bg-accent text-accent-foreground"
+          "flex items-center w-full px-2 py-[3px] text-[13px] hover:bg-[#2a2d2e] gap-1 text-left cursor-pointer",
+          isActive && !node.isDirectory && "bg-[#37373d]"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -222,9 +222,9 @@ export function Sidebar() {
 
   return (
     <aside className="w-64 border-r border-border bg-sidebar-background flex flex-col shrink-0">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-sidebar-foreground">文件浏览器</h2>
-        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent" title="刷新">
+      <div className="px-2 py-1 border-b border-border flex items-center justify-between">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground">文件浏览器</h2>
+        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground p-0.5 hover:bg-[#2a2d2e]" title="刷新">
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>

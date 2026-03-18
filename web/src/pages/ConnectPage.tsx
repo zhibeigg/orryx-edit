@@ -76,32 +76,32 @@ export function ConnectPage() {
   }, [handleConnect])
 
   return (
-    <div className="h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Orryx Editor</h1>
-          <p className="text-muted-foreground">输入 Token 连接到游戏服务器</p>
+    <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
+      <div className="w-full max-w-sm p-6 space-y-5">
+        <div className="text-center space-y-1">
+          <h1 className="text-xl font-medium text-[#cccccc]">Orryx Editor</h1>
+          <p className="text-[13px] text-[#858585]">输入 Token 连接到游戏服务器</p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <input
             type="text"
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleConnect()}
             placeholder="输入一次性 Token..."
-            className="w-full px-4 py-3 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full px-3 py-2 bg-[#3c3c3c] border border-[#3c3c3c] text-[#cccccc] placeholder:text-[#858585] focus:outline-none focus:border-[#007acc] text-[13px]"
             disabled={connecting}
           />
 
           {error && (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-[13px] text-[#f44747]">{error}</p>
           )}
 
           <button
             onClick={() => handleConnect()}
             disabled={connecting || !tokenInput.trim()}
-            className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            className="w-full py-2 bg-[#007acc] text-white text-[13px] font-medium hover:bg-[#0098ff] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {connecting ? "连接中..." : "连接"}
           </button>

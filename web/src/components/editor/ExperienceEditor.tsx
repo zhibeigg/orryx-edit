@@ -263,8 +263,8 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
                         <td className="px-3 py-1 text-right font-mono">{formatNumber(point.exp)}</td>
                         <td className="px-3 py-1 text-right font-mono text-muted-foreground">{formatNumber(cumulative)}</td>
                         <td className="px-3 py-1">
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary/60 rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-2 bg-muted rounded-sm overflow-hidden">
+                            <div className="h-full bg-primary/60 rounded-sm" style={{ width: `${pct}%` }} />
                           </div>
                         </td>
                       </tr>
