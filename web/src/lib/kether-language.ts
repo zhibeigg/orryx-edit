@@ -457,6 +457,22 @@ function registerDiagnostics(monaco: typeof import("monaco-editor")) {
 
 // ---- 辅助函数 ----
 
+/** 找到行中注释开始位置（排除字符串内的 #） */
+function findCommentStart(line: string): number {
+  let inString = false
+  let stringChar = ""
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inString) {
+      if (ch === stringChar && line[i - 1] !== "\\") inString = false
+    } else {
+      if (ch === '"' || ch === "'") { inString = true; stringChar = ch }
+      else if (ch === "#") return i
+    }
+  }
+  return -1
+}
+
 function buildDoc(action: ActionDef): string {
   let doc = `**${action.name}**\n\n\`${action.syntax}\`\n\n${action.description}`
   if (action.params?.length) {
@@ -510,92 +526,3 @@ const SNIPPETS = [
   { label: "set-variable", insertText: "set ${1:a} to ${2:expression}", detail: "设置变量" },
   { label: "tell-message", insertText: "tell colored \"${1:&c消息}\"", detail: "发送消息" },
 ]
-
-/**
- * 语法检测 — 检测括号不匹配、未闭合字符串等
- */
-export function validateKetherScript(
-  monaco: typeof import("monaco-editor"),
-  model: import("monaco-editor").editor.ITextModel
-) {
-  const markers: import("monaco-editor").editor.IMarkerData[] = []
-  const lineCount = model.getLineCount()
-
-  let totalOpen = 0
-  let totalClose = 0
-  let totalBracketOpen = 0
-  let totalBracketClose = 0
-
-  for (let i = 1; i <= lineCount; i++) {
-    const line = model.getLineContent(i)
-    const commentStart = findCommentStart(line)
-    const code = commentStart >= 0 ? line.substring(0, commentStart) : line
-
-    let inDouble = false
-    let inSingle = false
-    for (let j = 0; j < code.length; j++) {
-      const ch = code[j]
-      if (ch === '\\') { j++; continue }
-      if (ch === '"' && !inSingle) inDouble = !inDouble
-      else if (ch === "'" && !inDouble) inSingle = !inSingle
-      else if (!inDouble && !inSingle) {
-        if (ch === '{') totalOpen++
-        else if (ch === '}') totalClose++
-        else if (ch === '[') totalBracketOpen++
-        else if (ch === ']') totalBracketClose++
-      }
-    }
-
-    if (inDouble || inSingle) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: "未闭合的字符串",
-        startLineNumber: i, startColumn: 1,
-        endLineNumber: i, endColumn: line.length + 1,
-      })
-    }
-
-    if (/\{\s*\}/.test(code)) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Warning,
-        message: "空代码块",
-        startLineNumber: i, startColumn: code.indexOf("{") + 1,
-        endLineNumber: i, endColumn: code.indexOf("}") + 2,
-      })
-    }
-  }
-
-  if (totalOpen !== totalClose) {
-    markers.push({
-      severity: monaco.MarkerSeverity.Error,
-      message: `花括号不匹配: ${totalOpen} 个 { 但 ${totalClose} 个 }`,
-      startLineNumber: lineCount, startColumn: 1,
-      endLineNumber: lineCount, endColumn: model.getLineContent(lineCount).length + 1,
-    })
-  }
-
-  if (totalBracketOpen !== totalBracketClose) {
-    markers.push({
-      severity: monaco.MarkerSeverity.Warning,
-      message: `方括号不匹配: ${totalBracketOpen} 个 [ 但 ${totalBracketClose} 个 ]`,
-      startLineNumber: lineCount, startColumn: 1,
-      endLineNumber: lineCount, endColumn: model.getLineContent(lineCount).length + 1,
-    })
-  }
-
-  monaco.editor.setModelMarkers(model, "kether", markers)
-}
-
-/** 找到行中注释开始位置（排除字符串内的 #） */
-function findCommentStart(text: string): number {
-  let inDouble = false
-  let inSingle = false
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (ch === "\\") { i++; continue }
-    if (ch === '"' && !inSingle) inDouble = !inDouble
-    else if (ch === "'" && !inDouble) inSingle = !inSingle
-    else if (ch === "#" && !inDouble && !inSingle) return i
-  }
-  return -1
-}
