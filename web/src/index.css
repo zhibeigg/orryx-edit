@@ -45,6 +45,34 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 自定义滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(216 34% 22%) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsl(216 34% 22%);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(216 34% 32%);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 #root {
   min-height: 100vh;
 }
