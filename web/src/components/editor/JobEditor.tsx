@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { JobData, JobOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { useEditorStore } from "@/store/editor-store"
@@ -164,13 +164,32 @@ function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p
 
 // ---- 技能列表面板 ----
 function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: string[]) => void }) {
-  const [newSkill, setNewSkill] = useState("")
+  const [search, setSearch] = useState("")
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const addSkill = () => {
-    const name = newSkill.trim()
-    if (!name || skills.includes(name)) return
+  // 从文件缓存中提取所有技能名
+  const availableSkills = useMemo(() => {
+    const cache = useEditorStore.getState().fileContents
+    const names: string[] = []
+    for (const key of cache.keys()) {
+      if (key.startsWith("skills/") && key.endsWith(".yml")) {
+        names.push(key.replace("skills/", "").replace(".yml", ""))
+      }
+    }
+    return names.sort()
+  }, [])
+
+  // 过滤：排除已添加的 + 搜索匹配
+  const filtered = availableSkills.filter(
+    (name) => !skills.includes(name) && (!search || name.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const addSkill = (name: string) => {
+    if (!name.trim() || skills.includes(name)) return
     onChange([...skills, name])
-    setNewSkill("")
+    setSearch("")
+    setShowDropdown(false)
   }
 
   const removeSkill = (index: number) => {
@@ -185,23 +204,62 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
     onChange(arr)
   }
 
+  // 点击外部关闭下拉
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
   return (
     <div className="p-4 space-y-3 max-w-2xl">
-      <div className="flex gap-2">
-        <input
-          className="flex-1 bg-muted border border-border rounded px-3 py-1.5 text-sm"
-          value={newSkill}
-          onChange={(e) => setNewSkill(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addSkill()}
-          placeholder="输入技能名称"
-        />
-        <button
-          onClick={addSkill}
-          disabled={!newSkill.trim()}
-          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
-        >
-          添加
-        </button>
+      <div className="relative" ref={dropdownRef}>
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-muted border border-border rounded px-3 py-1.5 text-sm"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setShowDropdown(true) }}
+            onFocus={() => setShowDropdown(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && search.trim()) {
+                // 精确匹配或手动输入
+                const exact = availableSkills.find(s => s.toLowerCase() === search.toLowerCase())
+                addSkill(exact ?? search.trim())
+              }
+            }}
+            placeholder="搜索或输入技能名称..."
+          />
+          <button
+            onClick={() => {
+              if (search.trim()) {
+                const exact = availableSkills.find(s => s.toLowerCase() === search.toLowerCase())
+                addSkill(exact ?? search.trim())
+              }
+            }}
+            disabled={!search.trim()}
+            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
+          >
+            添加
+          </button>
+        </div>
+        {showDropdown && filtered.length > 0 && (
+          <div className="absolute z-20 top-full left-0 right-12 mt-1 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg">
+            {filtered.slice(0, 30).map((name) => (
+              <button
+                key={name}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent font-mono"
+                onMouseDown={(e) => { e.preventDefault(); addSkill(name) }}
+              >
+                {name}
+              </button>
+            ))}
+            {filtered.length > 30 && (
+              <div className="px-3 py-1 text-xs text-muted-foreground">还有 {filtered.length - 30} 项...</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -232,7 +290,7 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
           </div>
         ))}
         {skills.length === 0 && (
-          <div className="text-sm text-muted-foreground py-4 text-center">暂无技能，输入名称添加</div>
+          <div className="text-sm text-muted-foreground py-4 text-center">暂无技能，搜索或输入名称添加</div>
         )}
       </div>
     </div>
