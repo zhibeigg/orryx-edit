@@ -526,3 +526,17 @@ const SNIPPETS = [
   { label: "set-variable", insertText: "set ${1:a} to ${2:expression}", detail: "设置变量" },
   { label: "tell-message", insertText: "tell colored \"${1:&c消息}\"", detail: "发送消息" },
 ]
+
+/** 找到行中注释开始位置（排除字符串内的 #） */
+function findCommentStart(text: string): number {
+  let inDouble = false
+  let inSingle = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === "\\" && (inDouble || inSingle)) { i++; continue }
+    if (ch === '"' && !inSingle) inDouble = !inDouble
+    else if (ch === "'" && !inDouble) inSingle = !inSingle
+    else if (ch === "#" && !inDouble && !inSingle) return i
+  }
+  return -1
+}

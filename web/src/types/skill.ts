@@ -38,6 +38,23 @@ export interface SkillData {
   ExtendActions?: Record<string, string>
 }
 
+// Station 数据类型
+export type StationPriority = "LOWEST" | "LOW" | "NORMAL" | "HIGH" | "HIGHEST" | "MONITOR"
+
+export interface StationOptions {
+  Event: string
+  Weight?: number
+  Priority?: StationPriority | string
+  IgnoreCancelled?: boolean
+  BaffleAction?: string
+  Variables?: Record<string, string | number>
+}
+
+export interface StationData {
+  Options: StationOptions
+  Actions?: string
+}
+
 // 职业数据类型
 export interface JobOptions {
   Name: string
