@@ -1,0 +1,325 @@
+import { useState, useMemo, useCallback, useRef } from "react"
+import type { JobData, JobOptions } from "@/types"
+import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { ActionsEditor } from "./ActionsEditor"
+import { CrossRefPanel } from "./CrossRefPanel"
+import { cn } from "@/lib/utils"
+import Editor from "@monaco-editor/react"
+
+interface JobEditorProps {
+  content: string
+  onChange: (yamlContent: string) => void
+  filePath?: string
+}
+
+type Tab = "general" | "skills" | "attributes" | "scripts" | "refs" | "yaml"
+
+export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("general")
+  const rawYamlRef = useRef(content)
+  rawYamlRef.current = content
+
+  const job = useMemo<JobData>(() => {
+    try {
+      return parseYaml<JobData>(content)
+    } catch {
+      return { Options: { Name: "", Skills: [] } }
+    }
+  }, [content])
+
+  const updateJob = useCallback((updater: (j: JobData) => JobData) => {
+    const updated = updater(job)
+    try {
+      const newYaml = updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)
+      onChange(newYaml)
+    } catch {
+      onChange(stringifyYaml(updated))
+    }
+  }, [job, onChange])
+
+  const updateOptions = useCallback((patch: Partial<JobOptions>) => {
+    updateJob((j) => ({ ...j, Options: { ...j.Options, ...patch } }))
+  }, [updateJob])
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "general", label: "基础信息" },
+    { id: "skills", label: "技能列表" },
+    { id: "attributes", label: "属性" },
+    { id: "scripts", label: "脚本" },
+    { id: "refs", label: "引用" },
+    { id: "yaml", label: "YAML 源码" },
+  ]
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex border-b border-border bg-background shrink-0">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "px-4 py-2 text-sm border-b-2 transition-colors",
+              activeTab === tab.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === "general" && (
+          <GeneralPanel options={job.Options} onChange={updateOptions} />
+        )}
+
+        {activeTab === "skills" && (
+          <SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} />
+        )}
+
+        {activeTab === "attributes" && (
+          <AttributesPanel
+            attributes={job.Options.Attributes ?? []}
+            onChange={(attrs) => updateOptions({ Attributes: attrs })}
+          />
+        )}
+
+        {activeTab === "scripts" && (
+          <ScriptsPanel options={job.Options} onChange={updateOptions} />
+        )}
+
+        {activeTab === "refs" && filePath && <CrossRefPanel currentFile={filePath} />}
+        {activeTab === "refs" && !filePath && (
+          <div className="p-4 text-sm text-muted-foreground">无法分析引用：未知文件路径。</div>
+        )}
+
+        {activeTab === "yaml" && (
+          <div className="h-full">
+            <Editor
+              height="100%"
+              defaultLanguage="yaml"
+              value={content}
+              onChange={(v) => onChange(v ?? "")}
+              theme="vs-dark"
+              options={{
+                fontSize: 13,
+                fontFamily: "var(--font-mono)",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: "on",
+                tabSize: 2,
+                insertSpaces: true,
+                automaticLayout: true,
+                padding: { top: 4 },
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---- 基础信息面板 ----
+function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p: Partial<JobOptions>) => void }) {
+  return (
+    <div className="p-4 space-y-4 max-w-2xl">
+      <Field label="职业名称">
+        <input
+          className="w-full bg-muted border border-border rounded px-3 py-1.5 text-sm"
+          value={options.Name ?? ""}
+          onChange={(e) => onChange({ Name: e.target.value })}
+        />
+      </Field>
+
+      <Field label="经验配置">
+        <input
+          className="w-full bg-muted border border-border rounded px-3 py-1.5 text-sm"
+          value={options.Experience ?? "default"}
+          onChange={(e) => onChange({ Experience: e.target.value })}
+          placeholder="default"
+        />
+      </Field>
+    </div>
+  )
+}
+
+// ---- 技能列表面板 ----
+function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: string[]) => void }) {
+  const [newSkill, setNewSkill] = useState("")
+
+  const addSkill = () => {
+    const name = newSkill.trim()
+    if (!name || skills.includes(name)) return
+    onChange([...skills, name])
+    setNewSkill("")
+  }
+
+  const removeSkill = (index: number) => {
+    onChange(skills.filter((_, i) => i !== index))
+  }
+
+  const moveSkill = (index: number, dir: -1 | 1) => {
+    const target = index + dir
+    if (target < 0 || target >= skills.length) return
+    const arr = [...skills]
+    ;[arr[index], arr[target]] = [arr[target], arr[index]]
+    onChange(arr)
+  }
+
+  return (
+    <div className="p-4 space-y-3 max-w-2xl">
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-muted border border-border rounded px-3 py-1.5 text-sm"
+          value={newSkill}
+          onChange={(e) => setNewSkill(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addSkill()}
+          placeholder="输入技能名称"
+        />
+        <button
+          onClick={addSkill}
+          disabled={!newSkill.trim()}
+          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
+        >
+          添加
+        </button>
+      </div>
+
+      <div className="space-y-1">
+        {skills.map((skill, i) => (
+          <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded border border-border group">
+            <span className="text-xs text-muted-foreground w-6">{i + 1}</span>
+            <span className="flex-1 text-sm font-mono">{skill}</span>
+            <button
+              onClick={() => moveSkill(i, -1)}
+              disabled={i === 0}
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 opacity-0 group-hover:opacity-100"
+            >
+              ↑
+            </button>
+            <button
+              onClick={() => moveSkill(i, 1)}
+              disabled={i === skills.length - 1}
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 opacity-0 group-hover:opacity-100"
+            >
+              ↓
+            </button>
+            <button
+              onClick={() => removeSkill(i)}
+              className="text-xs text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100"
+            >
+              删除
+            </button>
+          </div>
+        ))}
+        {skills.length === 0 && (
+          <div className="text-sm text-muted-foreground py-4 text-center">暂无技能，输入名称添加</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---- 属性面板 ----
+function AttributesPanel({ attributes, onChange }: { attributes: string[]; onChange: (a: string[]) => void }) {
+  const [newAttr, setNewAttr] = useState("")
+
+  const addAttr = () => {
+    const val = newAttr.trim()
+    if (!val) return
+    onChange([...attributes, val])
+    setNewAttr("")
+  }
+
+  const removeAttr = (index: number) => {
+    onChange(attributes.filter((_, i) => i !== index))
+  }
+
+  const updateAttr = (index: number, value: string) => {
+    onChange(attributes.map((a, i) => (i === index ? value : a)))
+  }
+
+  return (
+    <div className="p-4 space-y-3 max-w-2xl">
+      <div className="text-xs text-muted-foreground mb-1">
+        支持 Kether 模板语法，如：物理攻击: +{"{{ orryx level }}"}
+      </div>
+
+      <div className="space-y-1">
+        {attributes.map((attr, i) => (
+          <div key={i} className="flex items-center gap-2 group">
+            <input
+              className="flex-1 bg-muted border border-border rounded px-3 py-1.5 text-sm font-mono"
+              value={attr}
+              onChange={(e) => updateAttr(i, e.target.value)}
+            />
+            <button
+              onClick={() => removeAttr(i)}
+              className="text-xs text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 shrink-0"
+            >
+              删除
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-muted border border-border rounded px-3 py-1.5 text-sm"
+          value={newAttr}
+          onChange={(e) => setNewAttr(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addAttr()}
+          placeholder="属性名: +值"
+        />
+        <button
+          onClick={addAttr}
+          disabled={!newAttr.trim()}
+          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded disabled:opacity-50"
+        >
+          添加
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---- 脚本面板 ----
+function ScriptsPanel({ options, onChange }: { options: JobOptions; onChange: (p: Partial<JobOptions>) => void }) {
+  const scripts: { key: keyof JobOptions; label: string; desc: string }[] = [
+    { key: "RegainManaActions", label: "法力回复", desc: "每次回复的法力值（Kether 脚本，返回数值）" },
+    { key: "MaxManaActions", label: "最大法力", desc: "法力上限（Kether 脚本，返回数值）" },
+    { key: "RegainSpiritActions", label: "精力回复", desc: "每次回复的精力值（Kether 脚本，返回数值）" },
+    { key: "MaxSpiritActions", label: "最大精力", desc: "精力上限（Kether 脚本，返回数值）" },
+    { key: "UpgradePointActions", label: "升级技能点", desc: "每次升级获得的技能点（Kether 脚本，返回数值）" },
+  ]
+
+  return (
+    <div className="p-4 space-y-6 max-w-4xl">
+      {scripts.map(({ key, label, desc }) => (
+        <div key={key}>
+          <div className="mb-1">
+            <span className="text-sm font-medium text-foreground">{label}</span>
+            <span className="text-xs text-muted-foreground ml-2">{desc}</span>
+          </div>
+          <ActionsEditor
+            value={(options[key] as string) ?? ""}
+            onChange={(v) => onChange({ [key]: v })}
+            height="80px"
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---- 通用字段组件 ----
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}

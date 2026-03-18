@@ -26,10 +26,16 @@ fun main() {
     println("  管理API: POST /api/admin/license (Authorization: Bearer $adminKey)")
     println("===========================")
 
-    embeddedServer(Netty, port = port) {
+    val server = embeddedServer(Netty, port = port) {
         val relayHandler = RelayHandler(registry)
         val serverEndpoint = ServerEndpoint(registry, licenseManager)
         configureRouting(licenseManager, registry, adminKey)
         configureWebSockets(relayHandler, serverEndpoint)
-    }.start(wait = true)
+    }
+
+    Runtime.getRuntime().addShutdownHook(Thread {
+        server.stop(1000, 2000)
+    })
+
+    server.start(wait = true)
 }

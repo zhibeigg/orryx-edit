@@ -4,6 +4,7 @@ import { useEditorStore } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
 import { YamlEditor } from "@/components/editor/YamlEditor"
 import { SkillEditor } from "@/components/editor/SkillEditor"
+import { JobEditor } from "@/components/editor/JobEditor"
 import { PublishPanel } from "@/components/publish/PublishPanel"
 import { LogConsole } from "@/components/visualizer/LogConsole"
 import { cn } from "@/lib/utils"
@@ -37,6 +38,10 @@ export function EditorPage() {
 
     if (activeFile.configType === "skill" || activeFile.configType === "station") {
       return <SkillEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
+    }
+
+    if (activeFile.configType === "job") {
+      return <JobEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
     }
 
     return <YamlEditor key={activeFile.path} content={content} onChange={handleChange} />
