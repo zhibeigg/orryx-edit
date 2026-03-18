@@ -12,16 +12,47 @@ export interface SkillOptions {
   IsLocked?: boolean
   MinLevel?: number
   MaxLevel?: number
-  UpgradePointAction?: number
+  UpgradePointAction?: number | string
   UpLevelCheckAction?: string
+  DownLevelCheckAction?: string
+  UpLevelSuccessAction?: string
+  DownLevelSuccessAction?: string
   CastCheckAction?: string | boolean
+  IgnoreSilence?: boolean
   Variables?: Record<string, string | number>
+  // AIM 类型专属
+  AimRadiusAction?: number
+  AimSizeAction?: number
+  AimMinAction?: number
+  AimMaxAction?: number
+  // PRESSING 类型专属
+  Period?: number
+  PressPeriodAction?: string
+  MaxPressTickAction?: number
+  PressBrockTriggers?: string[]
 }
 
 export interface SkillData {
   Options: SkillOptions
   Actions?: string
   ExtendActions?: Record<string, string>
+}
+
+// Station 数据类型
+export type StationPriority = "LOWEST" | "LOW" | "NORMAL" | "HIGH" | "HIGHEST" | "MONITOR"
+
+export interface StationOptions {
+  Event: string
+  Weight?: number
+  Priority?: StationPriority | string
+  IgnoreCancelled?: boolean
+  BaffleAction?: string
+  Variables?: Record<string, string | number>
+}
+
+export interface StationData {
+  Options: StationOptions
+  Actions?: string
 }
 
 // 职业数据类型
