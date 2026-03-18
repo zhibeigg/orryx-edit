@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Shield, Plus, Copy, Check, Ban, RotateCcw, Server, Users, Key, Globe, Clock, RefreshCw } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 interface License {
   license: string
@@ -131,15 +133,17 @@ export function AdminPage() {
           <input type="text" value={newOwner} onChange={(e) => setNewOwner(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()} placeholder="用户名 / 备注"
             className="flex-1 px-4 py-2.5 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600" />
-          <select value={newDays} onChange={(e) => setNewDays(Number(e.target.value))}
-            className="px-3 py-2.5 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white focus:outline-none focus:ring-1 focus:ring-zinc-600">
-            <option value={7}>7 天</option>
-            <option value={30}>30 天</option>
-            <option value={90}>90 天</option>
-            <option value={180}>180 天</option>
-            <option value={365}>365 天</option>
-            <option value={0}>永久</option>
-          </select>
+          <Select value={String(newDays)} onValueChange={(v) => setNewDays(Number(v))}>
+            <SelectTrigger className="w-[100px] py-2.5"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7 天</SelectItem>
+              <SelectItem value="30">30 天</SelectItem>
+              <SelectItem value="90">90 天</SelectItem>
+              <SelectItem value="180">180 天</SelectItem>
+              <SelectItem value="365">365 天</SelectItem>
+              <SelectItem value="0">永久</SelectItem>
+            </SelectContent>
+          </Select>
           <button onClick={handleCreate} disabled={creating || !newOwner.trim()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff] disabled:opacity-40">
             <Plus className="w-4 h-4" />创建
@@ -147,25 +151,29 @@ export function AdminPage() {
         </div>
 
         {/* 续费弹窗 */}
-        {renewTarget && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setRenewTarget(null)}>
-            <div className="bg-[#252526] border border-zinc-700 rounded-sm p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
-              <h3 className="font-bold">续费 License</h3>
-              <p className="text-xs text-[#858585] font-mono">{renewTarget}</p>
+        <Dialog open={!!renewTarget} onOpenChange={(open) => { if (!open) setRenewTarget(null) }}>
+          <DialogContent className="w-80 p-0">
+            <DialogHeader>
+              <DialogTitle>续费 License</DialogTitle>
+            </DialogHeader>
+            <div className="p-4 space-y-3">
+              <p className="text-[11px] text-[#858585] font-mono">{renewTarget}</p>
               <div className="flex gap-2">
-                <select value={renewDays} onChange={(e) => setRenewDays(Number(e.target.value))}
-                  className="flex-1 px-3 py-2 rounded-sm bg-[#2d2d2d] border border-zinc-700 text-white">
-                  <option value={7}>+7 天</option>
-                  <option value={30}>+30 天</option>
-                  <option value={90}>+90 天</option>
-                  <option value={180}>+180 天</option>
-                  <option value={365}>+365 天</option>
-                </select>
-                <button onClick={handleRenew} className="px-4 py-2 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff]">确认</button>
+                <Select value={String(renewDays)} onValueChange={(v) => setRenewDays(Number(v))}>
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">+7 天</SelectItem>
+                    <SelectItem value="30">+30 天</SelectItem>
+                    <SelectItem value="90">+90 天</SelectItem>
+                    <SelectItem value="180">+180 天</SelectItem>
+                    <SelectItem value="365">+365 天</SelectItem>
+                  </SelectContent>
+                </Select>
+                <button onClick={handleRenew} className="px-4 py-1.5 bg-[#007acc] text-white text-[13px] hover:bg-[#0098ff]">确认</button>
               </div>
             </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
         {/* License 表格 */}
         <div className="rounded-sm border border-[#3c3c3c] overflow-hidden">

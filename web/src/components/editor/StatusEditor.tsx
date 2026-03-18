@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
+import { Switch } from "@/components/ui/switch"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -371,7 +372,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   return <div className="space-y-1"><label className="text-xs text-muted-foreground">{label}{hint && <span className="ml-1 text-zinc-600">{hint}</span>}</label>{children}</div>
 }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="rounded" /><span>{label}</span></label>
+  return <label className="flex items-center gap-2 text-[13px] cursor-pointer"><Switch checked={checked} onCheckedChange={onChange} /><span>{label}</span></label>
 }
 function TypeBadge({ type }: { type: string }) {
   const t = type?.toUpperCase()

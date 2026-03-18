@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useRef } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import Editor from "@monaco-editor/react"
 
 interface ConfigEditorProps {
@@ -172,5 +173,5 @@ function NumInput({ value, onChange }: { value?: number; onChange: (v: number) =
   return <input type="number" className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded" value={value ?? 0} onChange={(e) => onChange(parseInt(e.target.value) || 0)} />
 }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="rounded" />{label}</label>
+  return <label className="flex items-center gap-2 text-[13px] cursor-pointer"><Switch checked={checked} onCheckedChange={onChange} />{label}</label>
 }

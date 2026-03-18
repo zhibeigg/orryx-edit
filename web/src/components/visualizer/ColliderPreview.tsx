@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from "react"
 import * as THREE from "three"
+import { Slider } from "@/components/ui/slider"
 
 interface ColliderPreviewProps {
   type: "range" | "obb" | "sector"
@@ -206,24 +207,24 @@ export function ColliderPreview({ type, params, offset }: ColliderPreviewProps) 
     <div className="space-y-4 p-4">
       <h3 className="text-sm font-semibold">碰撞箱 3D 预览</h3>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-4">
         {paramLabels.map((label, i) => (
-          <div key={i} className="space-y-1">
-            <label className="text-xs text-muted-foreground">{label}</label>
-            <input
-              type="range"
+          <div key={i} className="space-y-1 min-w-[120px]">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] text-[#858585]">{label}</label>
+              <span className="text-[11px] text-[#007acc] font-mono">{localParams[i] ?? 0}</span>
+            </div>
+            <Slider
               min={type === "sector" && i === 1 ? 10 : 0.5}
               max={type === "sector" && i === 1 ? 360 : 20}
               step={type === "sector" && i === 1 ? 5 : 0.5}
-              value={localParams[i] ?? 0}
-              onChange={(e) => {
+              value={[localParams[i] ?? 0]}
+              onValueChange={(v) => {
                 const newParams = [...localParams]
-                newParams[i] = parseFloat(e.target.value)
+                newParams[i] = v[0]
                 setLocalParams(newParams)
               }}
-              className="w-24"
             />
-            <span className="text-xs text-muted-foreground ml-1">{localParams[i] ?? 0}</span>
           </div>
         ))}
       </div>

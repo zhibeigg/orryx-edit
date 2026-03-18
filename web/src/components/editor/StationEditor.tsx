@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { StationData, StationOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { Switch } from "@/components/ui/switch"
 import { getActionsSchema } from "@/lib/kether-language"
 import { ActionsEditor } from "./ActionsEditor"
 import { VariablesEditor } from "./VariablesEditor"
@@ -186,11 +187,11 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
           {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
-      <div className="flex items-center gap-2">
-        <input type="checkbox" id="ignoreCancelled" checked={options.IgnoreCancelled ?? false}
-          onChange={(e) => onChange({ IgnoreCancelled: e.target.checked })} className="rounded" />
-        <label htmlFor="ignoreCancelled" className="text-sm text-foreground">跳过已取消的事件</label>
-      </div>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <Switch checked={options.IgnoreCancelled ?? false}
+          onCheckedChange={(v) => onChange({ IgnoreCancelled: v })} />
+        <span className="text-[13px] text-foreground">跳过已取消的事件</span>
+      </label>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
           冷却间隔 <span className="text-xs text-muted-foreground ml-2">Kether 脚本，返回 Tick 数</span>

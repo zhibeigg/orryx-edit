@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import type { SkillOptions, SkillType } from "@/types"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 interface OptionsPanelProps {
   options: SkillOptions
@@ -107,8 +109,8 @@ function Input({ value, onChange, type = "text", placeholder }: {
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center gap-2 text-sm cursor-pointer">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="rounded" />
+    <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+      <Switch checked={checked} onCheckedChange={onChange} />
       <span>{label}</span>
     </label>
   )
@@ -238,13 +240,12 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
       <Section title="基础信息">
         <div className="grid grid-cols-2 gap-3">
           <Field label="类型 (Type)">
-            <select
-              value={options.Type}
-              onChange={(e) => update({ Type: e.target.value as SkillType })}
-              className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {SKILL_TYPES.map((t) => <option key={t} value={t}>{SKILL_TYPE_LABELS[t]} ({t})</option>)}
-            </select>
+            <Select value={options.Type} onValueChange={(v) => update({ Type: v as SkillType })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SKILL_TYPES.map((t) => <SelectItem key={t} value={t}>{SKILL_TYPE_LABELS[t]} ({t})</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="名称 (Name)">
             <Input value={options.Name} onChange={(v) => update({ Name: v })} placeholder="技能名称" />
@@ -304,19 +305,21 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
 
         <Field label="释放检查 (CastCheckAction)">
           <div className="flex gap-2">
-            <select
+            <Select
               value={options.CastCheckAction === true ? "true" : options.CastCheckAction === false ? "false" : "custom"}
-              onChange={(e) => {
-                if (e.target.value === "true") update({ CastCheckAction: true })
-                else if (e.target.value === "false") update({ CastCheckAction: false })
+              onValueChange={(v) => {
+                if (v === "true") update({ CastCheckAction: true })
+                else if (v === "false") update({ CastCheckAction: false })
                 else update({ CastCheckAction: "" })
               }}
-              className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md"
             >
-              <option value="true">启用默认检查</option>
-              <option value="false">禁用</option>
-              <option value="custom">自定义表达式</option>
-            </select>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">启用默认检查</SelectItem>
+                <SelectItem value="false">禁用</SelectItem>
+                <SelectItem value="custom">自定义表达式</SelectItem>
+              </SelectContent>
+            </Select>
             {typeof options.CastCheckAction === "string" && (
               <Input value={options.CastCheckAction} onChange={(v) => update({ CastCheckAction: v })} placeholder="Kether 表达式..." />
             )}
