@@ -3,7 +3,7 @@ set -e
 
 # ======== 配置（按需修改） ========
 PORT="9090"
-ADMIN_KEY="change-me"
+ADMIN_KEY="change-me"  # ⚠️ 部署前务必修改此密钥！
 DATA_DIR="data"
 JAVA_HOME=""  # 留空则使用系统默认 java，示例: /usr/lib/jvm/java-21
 # ==================================

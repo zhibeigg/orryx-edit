@@ -15,6 +15,10 @@ fun main() {
     val adminKey = System.getenv("ADMIN_KEY") ?: "change-me"
     val dataDir = File(System.getenv("DATA_DIR") ?: "data")
 
+    if (adminKey == "change-me") {
+        println("⚠️  警告: ADMIN_KEY 使用默认值，请设置环境变量 ADMIN_KEY 以保护管理接口！")
+    }
+
     val licenseManager = LicenseManager(dataDir)
     val registry = SessionRegistry()
 

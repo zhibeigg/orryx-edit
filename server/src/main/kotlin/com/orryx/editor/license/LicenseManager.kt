@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 @Serializable
 data class LicenseEntry(
@@ -34,6 +35,7 @@ class LicenseManager(private val dataDir: File) {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
     private val licenses = ConcurrentHashMap<String, LicenseEntry>()
     private val file = File(dataDir, "licenses.json")
+    private val ioExecutor = Executors.newSingleThreadExecutor()
 
     init {
         dataDir.mkdirs()
@@ -51,13 +53,15 @@ class LicenseManager(private val dataDir: File) {
     }
 
     private fun save() {
-        try {
-            file.writeText(json.encodeToString(
-                kotlinx.serialization.builtins.ListSerializer(LicenseEntry.serializer()),
-                licenses.values.toList()
-            ))
-        } catch (e: Exception) {
-            println("保存 licenses.json 失败: ${e.message}")
+        ioExecutor.submit {
+            try {
+                file.writeText(json.encodeToString(
+                    kotlinx.serialization.builtins.ListSerializer(LicenseEntry.serializer()),
+                    licenses.values.toList()
+                ))
+            } catch (e: Exception) {
+                println("保存 licenses.json 失败: ${e.message}")
+            }
         }
     }
 

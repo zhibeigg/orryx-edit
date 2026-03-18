@@ -29,7 +29,12 @@ fun Application.configureRouting(
     }
 
     install(CORS) {
-        anyHost()
+        val corsHost = System.getenv("CORS_HOST")
+        if (corsHost != null) {
+            allowHost(corsHost)
+        } else {
+            anyHost()
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowMethod(HttpMethod.Get)

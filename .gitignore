@@ -25,3 +25,6 @@ Orryx/
 
 # Runtime data
 data/
+*.jar
+plan.md
+wiki.md

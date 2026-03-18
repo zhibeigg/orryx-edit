@@ -99,7 +99,8 @@ export function connect(url: string): Promise<void> {
         const msg: WsMessage = JSON.parse(event.data)
 
         if (msg.id && pendingRequests.has(msg.id)) {
-          const pending = pendingRequests.get(msg.id)!
+          const pending = pendingRequests.get(msg.id)
+          if (!pending) return
           pendingRequests.delete(msg.id)
           pending.resolve(msg.data)
           return
