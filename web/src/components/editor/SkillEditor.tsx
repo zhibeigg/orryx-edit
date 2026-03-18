@@ -93,6 +93,9 @@ export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
           {activeTab === "description" && (
             <DescriptionEditor
               descriptions={skill.Options.Description ?? []}
+              variables={skill.Options.Variables ?? {}}
+              minLevel={skill.Options.MinLevel ?? 1}
+              maxLevel={skill.Options.MaxLevel ?? 5}
               onChange={(descriptions) =>
                 updateSkill((s) => ({ ...s, Options: { ...s.Options, Description: descriptions } }))
               }
