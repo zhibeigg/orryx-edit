@@ -24,5 +24,4 @@ Thumbs.db
 Orryx/
 
 # Runtime data
-data/config.yml
-Orryx/datasource.yml
+data/

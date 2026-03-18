@@ -5,11 +5,12 @@ export type SkillType = "DIRECT" | "DIRECT AIM" | "PASSIVE" | "PRESSING" | "PRES
 export interface SkillOptions {
   Type: SkillType
   Name?: string
-  Sort?: number
+  Sort?: number | string
   Icon?: string
   XMaterial?: string
   Description?: string[]
   IsLocked?: boolean
+  IgnoreSilence?: boolean
   MinLevel?: number
   MaxLevel?: number
   UpgradePointAction?: number | string
@@ -18,7 +19,6 @@ export interface SkillOptions {
   UpLevelSuccessAction?: string
   DownLevelSuccessAction?: string
   CastCheckAction?: string | boolean
-  IgnoreSilence?: boolean
   Variables?: Record<string, string | number>
   // AIM 类型专属
   AimRadiusAction?: number
@@ -36,23 +36,6 @@ export interface SkillData {
   Options: SkillOptions
   Actions?: string
   ExtendActions?: Record<string, string>
-}
-
-// Station 数据类型
-export type StationPriority = "LOWEST" | "LOW" | "NORMAL" | "HIGH" | "HIGHEST" | "MONITOR"
-
-export interface StationOptions {
-  Event: string
-  Weight?: number
-  Priority?: StationPriority | string
-  IgnoreCancelled?: boolean
-  BaffleAction?: string
-  Variables?: Record<string, string | number>
-}
-
-export interface StationData {
-  Options: StationOptions
-  Actions?: string
 }
 
 // 职业数据类型

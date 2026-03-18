@@ -191,8 +191,8 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
       const textBeforeCursor = lineContent.substring(0, position.column - 1)
 
       // 注释内不提供补全
-      const commentIdx = findCommentStart(textBeforeCursor)
-      if (commentIdx >= 0) {
+      const commentIdx = findCommentStart(lineContent)
+      if (commentIdx >= 0 && position.column - 1 > commentIdx) {
         return { suggestions: [] }
       }
 
@@ -204,9 +204,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
         endColumn: word.endColumn,
       }
 
-      const charBefore = lineContent[position.column - 2]
-      const textBefore = textBeforeCursor.trim()
-
+      const charBefore = textBeforeCursor[textBeforeCursor.length - 1]
       const items: languages.CompletionItem[] = []
 
       // Schema 驱动的 action 补全
@@ -218,9 +216,10 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
             kind: monaco.languages.CompletionItemKind.Function,
             insertText: syntaxFirst,
             detail: `[${action.category}] ${action.description}`,
-            documentation: buildDoc(action),
+            documentation: { value: buildDoc(action) },
             range,
             tags: action.deprecated ? [monaco.languages.CompletionItemTag.Deprecated] : [],
+            sortText: action.deprecated ? "z" + syntaxFirst : "a" + syntaxFirst,
           } as languages.CompletionItem)
 
           for (const alias of action.aliases || []) {
@@ -229,14 +228,15 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
               kind: monaco.languages.CompletionItemKind.Function,
               insertText: alias,
               detail: `→ ${syntaxFirst}`,
-              documentation: buildDoc(action),
+              documentation: { value: buildDoc(action) },
               range,
+              sortText: "b" + alias,
             } as languages.CompletionItem)
           }
         }
 
-        // 上下文感知：光标前最近的 action 的 enum 参数
-        const contextAction = findContextAction(textBefore)
+        // 上下文 enum 参数补全
+        const contextAction = findContextAction(textBeforeCursor)
         if (contextAction) {
           for (const param of contextAction.params || []) {
             if (param.type === "enum" && param.options) {
@@ -247,6 +247,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
                   insertText: opt,
                   detail: `${param.name}: ${param.description || ""}`,
                   range,
+                  sortText: "0" + opt,
                 } as languages.CompletionItem)
               }
             }
@@ -263,6 +264,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
             insertText: sel.substring(1) + " ",
             detail: "选择器",
             range,
+            sortText: "0" + sel,
           } as languages.CompletionItem)
         }
       }
@@ -275,6 +277,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
           insertText: kw,
           detail: "关键字",
           range,
+          sortText: "c" + kw,
         } as languages.CompletionItem)
       }
 
@@ -287,13 +290,14 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
           detail: snippet.detail,
           range,
+          sortText: "d" + snippet.label,
         } as languages.CompletionItem)
       }
 
       return { suggestions: items }
     },
     // 中文字符也触发补全
-    triggerCharacters: ["@", " ", ".", "*", "&"],
+    triggerCharacters: ["@", " ", "*", "&"],
   })
 
   // ---- 悬浮文档 ----
