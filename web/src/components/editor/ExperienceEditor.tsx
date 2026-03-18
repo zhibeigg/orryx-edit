@@ -215,10 +215,10 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
                   return (
                     <div
                       key={point.level}
-                      className="flex-1 flex flex-col items-center justify-end group relative"
+                      className="flex-1 flex flex-col items-center justify-end group relative h-full"
                     >
                       <div
-                        className="w-full bg-primary/60 hover:bg-primary rounded-t-sm transition-colors min-h-[2px]"
+                        className="w-full bg-[#007acc] hover:bg-[#0098ff] rounded-t-sm transition-colors min-h-[2px]"
                         style={{ height: `${height}%` }}
                       />
                       {/* 悬浮提示 */}
@@ -264,7 +264,7 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
                         <td className="px-3 py-1 text-right font-mono text-muted-foreground">{formatNumber(cumulative)}</td>
                         <td className="px-3 py-1">
                           <div className="h-2 bg-muted rounded-sm overflow-hidden">
-                            <div className="h-full bg-primary/60 rounded-sm" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-[#007acc] rounded-sm" style={{ width: `${pct}%` }} />
                           </div>
                         </td>
                       </tr>
