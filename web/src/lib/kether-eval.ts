@@ -33,9 +33,16 @@ export function evaluateKether(script: string, vars: Record<string, number> = {}
   return result
 }
 
-/** 将脚本拆分为语句（处理多行 case 块） */
+/** 将脚本拆分为语句（处理多行 case 块和单行折叠格式） */
 function splitStatements(script: string): string[] {
-  const lines = script.split("\n")
+  // 预处理：如果是单行（YAML 折叠格式），在关键字前插入换行
+  let normalized = script
+  if (!script.includes("\n")) {
+    // 在 case 前断行（但不在字符串内）
+    normalized = splitBeforeKeywords(script)
+  }
+
+  const lines = normalized.split("\n")
   const statements: string[] = []
   let buffer = ""
   let bracketDepth = 0
@@ -238,6 +245,103 @@ function splitArgs(argsStr: string): string[] {
 
   if (current.trim()) args.push(current.trim())
   return args
+}
+
+/** 在单行脚本中，在 case/set 等语句关键字前插入换行（排除字符串内的） */
+function splitBeforeKeywords(line: string): string {
+  let result = ""
+  let inString = false
+  let stringChar = ""
+  let i = 0
+
+  while (i < line.length) {
+    const ch = line[i]
+
+    if (inString) {
+      result += ch
+      if (ch === stringChar) inString = false
+      i++
+      continue
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true
+      stringChar = ch
+      result += ch
+      i++
+      continue
+    }
+
+    // 在 "case " 前断行（如果前面有内容）
+    if (i > 0 && line.substring(i).startsWith("case ") && result.trim()) {
+      result += "\n"
+    }
+
+    result += ch
+    i++
+  }
+
+  return result
+}
+
+/** 格式化单行 Kether 脚本为多行（用于编辑器显示） */
+export function formatKetherScript(script: string): string {
+  if (script.includes("\n")) return script
+
+  let result = ""
+  let inString = false
+  let stringChar = ""
+  let depth = 0
+
+  for (let i = 0; i < script.length; i++) {
+    const ch = script[i]
+
+    if (inString) {
+      result += ch
+      if (ch === stringChar) inString = false
+      continue
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true
+      stringChar = ch
+      result += ch
+      continue
+    }
+
+    if (ch === "[") {
+      depth++
+      result += "[\n" + "  ".repeat(depth)
+      // 跳过 [ 后面的空格
+      while (i + 1 < script.length && script[i + 1] === " ") i++
+      continue
+    }
+
+    if (ch === "]") {
+      depth--
+      // 去掉 ] 前的尾部空格
+      result = result.trimEnd()
+      result += "\n" + "  ".repeat(depth) + "]"
+      continue
+    }
+
+    // 在 case/set 前断行
+    const rest = script.substring(i)
+    if (i > 0 && (rest.startsWith("case ") || rest.startsWith("set ")) && result.trim() && !result.endsWith("\n")) {
+      result += "\n"
+    }
+
+    // when/else 前断行
+    if (rest.startsWith("when ") || rest.startsWith("else ")) {
+      if (!result.endsWith("\n") && !result.endsWith("  ")) {
+        result = result.trimEnd() + "\n" + "  ".repeat(depth)
+      }
+    }
+
+    result += ch
+  }
+
+  return result
 }
 
 function escapeRegex(s: string): string {

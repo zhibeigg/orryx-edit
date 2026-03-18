@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { ExperienceData, ExperienceOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
-import { evaluateKether } from "@/lib/kether-eval"
+import { evaluateKether, formatKetherScript } from "@/lib/kether-eval"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
 import Editor from "@monaco-editor/react"
@@ -137,9 +137,9 @@ function ConfigPanel({ options, onChange }: { options: ExperienceOptions; onChan
           <p>可用变量: <code className="text-blue-400">&level</code> — 当前等级</p>
         </div>
         <ActionsEditor
-          value={options.ExperienceOfLevel ?? ""}
+          value={formatKetherScript(options.ExperienceOfLevel ?? "")}
           onChange={(v) => onChange({ ExperienceOfLevel: v })}
-          height="200px"
+          height="250px"
         />
       </div>
     </div>
