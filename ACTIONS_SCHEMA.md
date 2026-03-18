@@ -65,6 +65,7 @@
 | `version` | string | 是 | 规范版本，当前 `"1.0"` |
 | `pluginVersion` | string | 是 | 插件版本号 |
 | `actions` | Action[] | 是 | 语句列表 |
+| `triggers` | Trigger[] | 否 | 可监听事件列表（Station 编辑器用） |
 
 ### Action
 
@@ -122,6 +123,115 @@
 | `math` | 数学运算 |
 | `selector` | 目标选择器 |
 | `misc` | 其他 |
+
+### Trigger（监听事件）
+
+Station 编辑器使用 `triggers` 列表来提供事件选择下拉和变量提示。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 事件名称，如 `"Player Damaged Post"` |
+| `category` | string | 是 | 分类，用于下拉列表分组 |
+| `description` | string | 否 | 事件说明 |
+| `variables` | Variable[] | 否 | 事件提供的变量列表 |
+
+### Trigger Variable
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 变量名，在脚本中通过 `&event[name]` 访问 |
+| `type` | string | 是 | 变量类型（`number` / `string` / `boolean` / `entity` / `location` / `itemstack`） |
+| `description` | string | 否 | 变量说明 |
+
+### Trigger Category 建议值
+
+| 值 | 说明 |
+|----|------|
+| `bukkit-player` | Bukkit 玩家事件 |
+| `bukkit-entity` | Bukkit 实体事件 |
+| `bukkit-block` | Bukkit 方块事件 |
+| `orryx-skill` | Orryx 技能相关事件 |
+| `orryx-player` | Orryx 玩家属性事件（法力、精力、等级等） |
+| `orryx-flag` | Orryx Flag 变更事件 |
+| `orryx-job` | Orryx 职业事件 |
+| `third-party` | 第三方插件事件（DragonCore、GermPlugin 等） |
+
+### Trigger 示例
+
+```json
+{
+  "triggers": [
+    {
+      "name": "Player Damaged Post",
+      "category": "bukkit-player",
+      "description": "玩家受到伤害后触发",
+      "variables": [
+        { "name": "damage", "type": "number", "description": "最终伤害值" },
+        { "name": "cause", "type": "string", "description": "伤害原因（ENTITY_ATTACK, FALL 等）" },
+        { "name": "damager", "type": "entity", "description": "攻击者实体（可能为空）" }
+      ]
+    },
+    {
+      "name": "Orryx Player Skill Cast",
+      "category": "orryx-skill",
+      "description": "玩家释放技能后触发",
+      "variables": [
+        { "name": "skill", "type": "string", "description": "技能 ID" },
+        { "name": "level", "type": "number", "description": "技能等级" }
+      ]
+    },
+    {
+      "name": "Orryx Player Flag Change Post",
+      "category": "orryx-flag",
+      "description": "Flag 值变更后触发",
+      "variables": [
+        { "name": "flag", "type": "string", "description": "Flag 名称" },
+        { "name": "oldValue", "type": "number", "description": "旧值" },
+        { "name": "newValue", "type": "number", "description": "新值" }
+      ]
+    },
+    {
+      "name": "Dragon Key Press",
+      "category": "third-party",
+      "description": "DragonCore 按键按下",
+      "variables": [
+        { "name": "key", "type": "string", "description": "按键名称" }
+      ]
+    }
+  ]
+}
+```
+
+### 插件端生成 Trigger 参考
+
+```kotlin
+fun generateTriggers(): List<Map<String, Any?>> {
+    return TriggerRegistry.getAll().map { trigger ->
+        mapOf(
+            "name" to trigger.eventKey,
+            "category" to trigger.category,
+            "description" to trigger.description,
+            "variables" to trigger.variables.map { v ->
+                mapOf(
+                    "name" to v.name,
+                    "type" to v.type.simpleName?.lowercase(),
+                    "description" to v.description
+                )
+            }
+        )
+    }
+}
+
+// 在 generateActionsSchema() 中加入 triggers
+fun generateActionsSchema(): String {
+    return Json.encodeToString(mapOf(
+        "version" to "1.0",
+        "pluginVersion" to plugin.description.version,
+        "actions" to generateActions(),
+        "triggers" to generateTriggers()
+    ))
+}
+```
 
 ## 完整示例
 
@@ -259,3 +369,5 @@ fun generateActionsSchema(): String {
 4. **枚举补全**：`enum` 类型参数自动补全 `options`
 5. **悬浮文档**：鼠标悬停显示 `syntax` + `description` + `examples`
 6. **废弃提示**：`deprecated: true` 的语句显示删除线
+7. **Station 事件选择**：`triggers` 列表按 `category` 分组显示在下拉菜单中
+8. **事件变量提示**：选中事件后显示该事件提供的 `variables`，提示 `&event[变量名]` 用法

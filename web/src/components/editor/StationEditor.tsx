@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { StationData, StationOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { getActionsSchema } from "@/lib/kether-language"
 import { ActionsEditor } from "./ActionsEditor"
 import { VariablesEditor } from "./VariablesEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
@@ -15,7 +16,8 @@ interface StationEditorProps {
 
 type Tab = "options" | "variables" | "actions" | "refs" | "yaml"
 
-const EVENTS = [
+// 硬编码 fallback（schema 未加载时使用）
+const FALLBACK_EVENTS = [
   "Player Damage Post", "Player Damaged Pre", "Player Damaged Post",
   "Player Death", "Player Kill", "Player Respawn",
   "Player Join", "Player Quit", "Player Interact",
@@ -99,7 +101,36 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
 function StationOptionsPanel({ options, onChange }: { options: StationOptions; onChange: (p: Partial<StationOptions>) => void }) {
   const [eventFilter, setEventFilter] = useState("")
   const [showEventList, setShowEventList] = useState(false)
-  const filteredEvents = EVENTS.filter((e) => e.toLowerCase().includes(eventFilter.toLowerCase()))
+
+  // 从 schema 加载 triggers，按 category 分组
+  const { triggerGroups, allTriggerNames } = useMemo(() => {
+    const schema = getActionsSchema()
+    type TriggerItem = { name: string; description?: string; variables?: { name: string; type: string; description?: string }[] }
+    if (schema?.triggers && schema.triggers.length > 0) {
+      const groups: Record<string, TriggerItem[]> = {}
+      for (const t of schema.triggers) {
+        const cat = t.category || "其他"
+        if (!groups[cat]) groups[cat] = []
+        groups[cat].push(t)
+      }
+      const names = schema.triggers.map(t => t.name)
+      return { triggerGroups: groups, allTriggerNames: names }
+    }
+    return {
+      triggerGroups: { "默认": FALLBACK_EVENTS.map(name => ({ name }) as TriggerItem) } as Record<string, TriggerItem[]>,
+      allTriggerNames: FALLBACK_EVENTS,
+    }
+  }, [])
+
+  const filteredTriggers = eventFilter
+    ? allTriggerNames.filter(e => e.toLowerCase().includes(eventFilter.toLowerCase()))
+    : allTriggerNames
+
+  // 当前选中事件的变量信息
+  const selectedTrigger = useMemo(() => {
+    const schema = getActionsSchema()
+    return schema?.triggers?.find(t => t.name === options.Event)
+  }, [options.Event])
 
   return (
     <div className="p-4 space-y-4 max-w-2xl">
@@ -112,18 +143,42 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
             onFocus={() => { setEventFilter(options.Event ?? ""); setShowEventList(true) }}
             onBlur={() => setTimeout(() => setShowEventList(false), 200)}
             placeholder="选择或输入事件名" />
-          {showEventList && filteredEvents.length > 0 && (
-            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-popover border border-border rounded shadow-lg max-h-48 overflow-y-auto">
-              {filteredEvents.map((event) => (
-                <button key={event}
-                  className={cn("w-full text-left px-3 py-1.5 text-sm hover:bg-accent font-mono", event === options.Event && "bg-accent text-accent-foreground")}
-                  onMouseDown={(e) => { e.preventDefault(); onChange({ Event: event }); setShowEventList(false) }}
-                >{event}</button>
-              ))}
+          {showEventList && filteredTriggers.length > 0 && (
+            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-popover border border-border rounded shadow-lg max-h-64 overflow-y-auto">
+              {Object.entries(triggerGroups).map(([category, triggers]) => {
+                const visible = triggers.filter(t => filteredTriggers.includes(t.name))
+                if (visible.length === 0) return null
+                return (
+                  <div key={category}>
+                    <div className="px-3 py-1 text-xs font-medium text-muted-foreground bg-muted/50 sticky top-0">{category}</div>
+                    {visible.map((trigger) => (
+                      <button key={trigger.name}
+                        className={cn("w-full text-left px-3 py-1.5 text-sm hover:bg-accent font-mono", trigger.name === options.Event && "bg-accent text-accent-foreground")}
+                        onMouseDown={(e) => { e.preventDefault(); onChange({ Event: trigger.name }); setShowEventList(false) }}
+                      >
+                        <span>{trigger.name}</span>
+                        {trigger.description && <span className="ml-2 text-xs text-muted-foreground font-sans">{trigger.description}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">可用事件变量通过 &event[字段名] 访问</p>
+        {selectedTrigger?.variables && selectedTrigger.variables.length > 0 && (
+          <div className="mt-2 text-xs space-y-0.5">
+            <p className="text-muted-foreground font-medium">事件变量：</p>
+            {selectedTrigger.variables.map((v) => (
+              <div key={v.name} className="flex items-center gap-2 pl-2">
+                <code className="text-blue-400">&event[{v.name}]</code>
+                <span className="text-zinc-500">{v.type}</span>
+                {v.description && <span className="text-muted-foreground">— {v.description}</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">执行权重</label>

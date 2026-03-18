@@ -28,6 +28,16 @@ interface ActionsSchema {
   version: string
   pluginVersion: string
   actions: ActionDef[]
+  /** 可用的监听事件（Station 用） */
+  triggers?: TriggerDef[]
+}
+
+interface TriggerDef {
+  name: string
+  category: string
+  description?: string
+  /** 事件提供的变量（可通过 &event[字段名] 访问） */
+  variables?: { name: string; type: string; description?: string }[]
 }
 
 // ---- 全局 schema 缓存 ----
@@ -47,6 +57,11 @@ export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema
     console.warn("加载 actions-schema 失败:", e)
   }
   return cachedSchema || { version: "1.0", pluginVersion: "unknown", actions: [] }
+}
+
+/** 获取已加载的 schema（供其他组件使用） */
+export function getActionsSchema(): ActionsSchema | null {
+  return cachedSchema
 }
 
 function rebuildFromSchema() {
