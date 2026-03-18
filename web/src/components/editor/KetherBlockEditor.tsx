@@ -211,7 +211,7 @@ function BlockPalette({ schema, onInsert }: { schema?: ActionsSchema; onInsert: 
         actionCats.get(cat)!.push({
           label: action.name,
           template: action.name,
-          detail: action.params.slice(0, 3).map(p => p.name).join(", "),
+          detail: (action.params ?? []).slice(0, 3).map(p => p.name).join(", "),
         })
       }
       for (const [cat, items] of actionCats) {

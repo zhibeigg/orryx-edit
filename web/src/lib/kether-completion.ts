@@ -152,7 +152,7 @@ export function getCompletions(ctx: CompletionContext, schema: ActionsSchema, sk
   // 3. @ 选择器
   if (ctx.charBefore === "@" || ctx.wordBefore.startsWith("@")) {
     for (const sel of schema.selectors ?? []) {
-      const paramHint = sel.params.map(p => `${p.name}: ${p.type}`).join(", ")
+      const paramHint = (sel.params ?? []).map(p => `${p.name}: ${p.type}`).join(", ")
       items.push({
         label: `@${sel.name}`,
         kind: "selector",
@@ -199,7 +199,7 @@ export function getCompletions(ctx: CompletionContext, schema: ActionsSchema, sk
   if (contextAction) {
     const paramIdx = getParamIndex(ctx.lineText, ctx.cursorOffset, contextAction.name)
     // keyword 参数提示
-    for (const p of contextAction.params.filter(p => p.keyword)) {
+    for (const p of (contextAction.params ?? []).filter(p => p.keyword)) {
       if (!ctx.lineText.toLowerCase().includes(p.keyword!.toLowerCase())) {
         items.push({
           label: p.keyword!,
@@ -210,7 +210,7 @@ export function getCompletions(ctx: CompletionContext, schema: ActionsSchema, sk
       }
     }
     // 当前位置参数的 enum 选项
-    const positionalParams = contextAction.params.filter(p => !p.keyword)
+    const positionalParams = (contextAction.params ?? []).filter(p => !p.keyword)
     if (paramIdx < positionalParams.length) {
       const param = positionalParams[paramIdx]
       if (param.options) {
@@ -243,12 +243,12 @@ export function getCompletions(ctx: CompletionContext, schema: ActionsSchema, sk
     if (seen.has(action.name)) continue
     seen.add(action.name)
     if (!word || action.name.toLowerCase().startsWith(word)) {
-      const paramHint = action.params.slice(0, 3).map(p => p.name).join(", ")
+      const paramHint = (action.params ?? []).slice(0, 3).map(p => p.name).join(", ")
       items.push({
         label: action.name,
         kind: "action",
         detail: `${action.category ?? "misc"} — ${paramHint}`,
-        documentation: action.params.map(p => `${p.name}: ${p.type}${p.keyword ? ` (${p.keyword})` : ""}`).join("\n"),
+        documentation: (action.params ?? []).map(p => `${p.name}: ${p.type}${p.keyword ? ` (${p.keyword})` : ""}`).join("\n"),
         sortOrder: 1,
       })
     }

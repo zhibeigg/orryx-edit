@@ -656,8 +656,8 @@ class KetherParser {
 
     if (schemaAction) {
       // 按 schema 定义消费参数
-      const positionalParams = schemaAction.params.filter(p => !p.keyword)
-      const keywordParams = new Map(schemaAction.params.filter(p => p.keyword).map(p => [p.keyword!.toLowerCase(), p]))
+      const positionalParams = (schemaAction.params ?? []).filter(p => !p.keyword)
+      const keywordParams = new Map((schemaAction.params ?? []).filter(p => p.keyword).map(p => [p.keyword!.toLowerCase(), p]))
       let posIdx = 0
 
       while (this.reader.hasNext()) {
