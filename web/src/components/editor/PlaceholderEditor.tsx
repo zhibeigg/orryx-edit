@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react"
+import { Copy, Check } from "lucide-react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
@@ -107,12 +108,12 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
 
             {entries.map((entry) => (
               <div key={entry.key} className="border border-border rounded-md overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b border-border">
-                  <span className="text-xs text-muted-foreground">%orryx_</span>
+                <div className="flex items-center gap-0 px-3 py-1.5 bg-muted/50 border-b border-border">
+                  <span className="text-xs text-muted-foreground font-mono">%orryx_</span>
                   {editingKey === entry.key ? (
                     <input
                       autoFocus
-                      className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
+                      className="bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono w-48"
                       defaultValue={entry.key}
                       onBlur={(e) => renameEntry(entry.key, e.target.value)}
                       onKeyDown={(e) => {
@@ -122,16 +123,18 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
                     />
                   ) : (
                     <span
-                      className="flex-1 text-sm font-mono text-foreground cursor-pointer hover:text-primary"
+                      className="text-sm font-mono text-foreground cursor-pointer hover:text-primary"
                       onClick={() => setEditingKey(entry.key)}
                     >
                       {entry.key}
                     </span>
                   )}
-                  <span className="text-xs text-muted-foreground">%</span>
+                  <span className="text-xs text-muted-foreground font-mono">%</span>
+                  <CopyButton text={`%orryx_${entry.key}%`} />
+                  <div className="flex-1" />
                   <button
                     onClick={() => removeEntry(entry.key)}
-                    className="text-xs text-red-400 hover:text-red-300 ml-2"
+                    className="text-xs text-red-400 hover:text-red-300"
                   >
                     删除
                   </button>
@@ -170,5 +173,28 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
         )}
       </div>
     </div>
+  )
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-1.5 p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+      title={`复制 ${text}`}
+    >
+      {copied
+        ? <Check className="w-3.5 h-3.5 text-green-400" />
+        : <Copy className="w-3.5 h-3.5" />
+      }
+    </button>
   )
 }
