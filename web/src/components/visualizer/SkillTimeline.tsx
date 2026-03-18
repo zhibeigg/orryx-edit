@@ -42,6 +42,7 @@ const TYPE_LABELS: Record<TimelineEvent["type"], string> = {
 interface ColliderPreviewState {
   type: "range" | "obb" | "sector"
   params: number[]
+  offset?: [number, number, number]
   label: string
   tick: number
 }
@@ -100,6 +101,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                     onClick={() => setPreviewCollider({
                       type: event.collider!.type,
                       params: event.collider!.params,
+                      offset: event.collider!.offset,
                       label: event.label,
                       tick: event.tick,
                     })}
@@ -150,6 +152,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                         setPreviewCollider({
                           type: event.collider.type,
                           params: event.collider.params,
+                          offset: event.collider.offset,
                           label: event.label,
                           tick: event.tick,
                         })
@@ -194,7 +197,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
             </div>
             <div className="h-[400px]">
               <Suspense fallback={<div className="flex items-center justify-center h-full text-[13px] text-[#858585]">加载 3D 预览...</div>}>
-                <ColliderPreview type={previewCollider.type} params={previewCollider.params} />
+                <ColliderPreview type={previewCollider.type} params={previewCollider.params} offset={previewCollider.offset} />
               </Suspense>
             </div>
             <div className="px-3 py-1.5 border-t border-[#3c3c3c] text-[11px] text-[#858585] shrink-0">

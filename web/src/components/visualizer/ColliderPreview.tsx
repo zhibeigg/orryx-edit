@@ -4,6 +4,8 @@ import * as THREE from "three"
 interface ColliderPreviewProps {
   type: "range" | "obb" | "sector"
   params: number[]
+  /** 原点偏移 [前方x, 上方y, 右方z] */
+  offset?: [number, number, number]
 }
 
 function createColliderMesh(type: string, params: number[]): THREE.Object3D {
@@ -47,7 +49,7 @@ function createColliderMesh(type: string, params: number[]): THREE.Object3D {
   return group
 }
 
-export function ColliderPreview({ type, params }: ColliderPreviewProps) {
+export function ColliderPreview({ type, params, offset }: ColliderPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     scene: THREE.Scene
@@ -55,6 +57,7 @@ export function ColliderPreview({ type, params }: ColliderPreviewProps) {
     renderer: THREE.WebGLRenderer
     animId: number
     collider: THREE.Object3D | null
+    trail: THREE.Object3D | null
   } | null>(null)
   const [localParams, setLocalParams] = useState(params)
 
@@ -66,10 +69,43 @@ export function ColliderPreview({ type, params }: ColliderPreviewProps) {
     if (sceneRef.current.collider) {
       scene.remove(sceneRef.current.collider)
     }
+    if (sceneRef.current.trail) {
+      scene.remove(sceneRef.current.trail)
+    }
     const collider = createColliderMesh(type, localParams)
+
+    // 应用原点偏移：flash/direct 的坐标系是 (前方=+Z, 上方=+Y, 右方=+X) 映射到 Three.js
+    const ox = offset?.[2] ?? 0  // 右方 → Three.js X
+    const oy = offset?.[1] ?? 0  // 上方 → Three.js Y
+    const oz = offset?.[0] ?? 0  // 前方 → Three.js Z
+    if (ox !== 0 || oy !== 0 || oz !== 0) {
+      collider.position.set(ox, oy, oz)
+
+      // 画位移轨迹虚线
+      const trailGroup = new THREE.Group()
+      const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(ox, oy, oz)]
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(points)
+      const lineMat = new THREE.LineDashedMaterial({ color: 0xffd700, dashSize: 0.3, gapSize: 0.15, linewidth: 1 })
+      const line = new THREE.Line(lineGeo, lineMat)
+      line.computeLineDistances()
+      trailGroup.add(line)
+
+      // 偏移位置标记球
+      const markerGeo = new THREE.SphereGeometry(0.15, 8, 8)
+      const markerMat = new THREE.MeshBasicMaterial({ color: 0xffd700 })
+      const marker = new THREE.Mesh(markerGeo, markerMat)
+      marker.position.set(ox, oy, oz)
+      trailGroup.add(marker)
+
+      scene.add(trailGroup)
+      sceneRef.current.trail = trailGroup
+    } else {
+      sceneRef.current.trail = null
+    }
+
     scene.add(collider)
     sceneRef.current.collider = collider
-  }, [type, localParams])
+  }, [type, localParams, offset])
 
   useEffect(() => {
     const container = containerRef.current
@@ -135,7 +171,7 @@ export function ColliderPreview({ type, params }: ColliderPreviewProps) {
       sceneRef.current!.animId = requestAnimationFrame(animate)
     }
 
-    sceneRef.current = { scene, camera, renderer, animId: 0, collider: null }
+    sceneRef.current = { scene, camera, renderer, animId: 0, collider: null, trail: null }
     animate()
 
     const onResize = () => {

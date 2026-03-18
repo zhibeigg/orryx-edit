@@ -5,7 +5,7 @@ export interface TimelineEvent {
   label: string
   raw: string
   /** 碰撞箱事件附带的碰撞箱数据 */
-  collider?: { type: "range" | "obb" | "sector"; params: number[] }
+  collider?: { type: "range" | "obb" | "sector"; params: number[]; offset?: [number, number, number] }
 }
 
 /**
@@ -15,6 +15,8 @@ export interface TimelineEvent {
 export function parseTimeline(script: string): TimelineEvent[] {
   const events: TimelineEvent[] = []
   let currentTick = 0
+  // 追踪原点偏移
+  let offsetX = 0, offsetY = 0, offsetZ = 0
 
   const lines = script.split("\n").map((l) => l.trim()).filter(Boolean)
 
@@ -49,9 +51,31 @@ export function parseTimeline(script: string): TimelineEvent[] {
       continue
     }
 
+    // 追踪位移语句
+    const flashMatch = line.match(/^flash\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/)
+    if (flashMatch) {
+      offsetX += parseFloat(flashMatch[1])
+      offsetY += parseFloat(flashMatch[2])
+      offsetZ += parseFloat(flashMatch[3])
+    }
+    const directMatch = line.match(/^direct\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/)
+    if (directMatch) {
+      offsetX += parseFloat(directMatch[1])
+      offsetY += parseFloat(directMatch[2])
+      offsetZ += parseFloat(directMatch[3])
+    }
+    const launchMatch = line.match(/^launch\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)/)
+    if (launchMatch) {
+      offsetX += parseFloat(launchMatch[1])
+      offsetY += parseFloat(launchMatch[2])
+      offsetZ += parseFloat(launchMatch[3])
+    }
+
+    const currentOffset: [number, number, number] = [offsetX, offsetY, offsetZ]
+
     // damage（同时检测碰撞箱）
     if (line.startsWith("damage ")) {
-      const collider = extractCollider(line)
+      const collider = extractCollider(line, currentOffset)
       events.push({
         tick: currentTick,
         duration: 1,
@@ -65,7 +89,7 @@ export function parseTimeline(script: string): TimelineEvent[] {
 
     // 独立碰撞箱检测（非 damage 行中的选择器）
     if (!line.startsWith("damage ")) {
-      const collider = extractCollider(line)
+      const collider = extractCollider(line, currentOffset)
       if (collider) {
         events.push({
           tick: currentTick,
@@ -174,12 +198,14 @@ export function parseTimeline(script: string): TimelineEvent[] {
 }
 
 /** 从一行脚本中提取碰撞箱信息 */
-function extractCollider(line: string): { type: "range" | "obb" | "sector"; params: number[]; label: string } | null {
+function extractCollider(line: string, offset?: [number, number, number]): { type: "range" | "obb" | "sector"; params: number[]; offset?: [number, number, number]; label: string } | null {
+  const hasOffset = offset && (offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0)
   const obbMatch = line.match(/@obb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.-]+)\s+([\d.-]+)/)
   if (obbMatch) {
     return {
       type: "obb",
       params: [parseFloat(obbMatch[1]), parseFloat(obbMatch[2]), parseFloat(obbMatch[3]), parseFloat(obbMatch[4]), parseFloat(obbMatch[5])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
       label: `矩形 ${obbMatch[1]}×${obbMatch[2]}×${obbMatch[3]}`,
     }
   }
@@ -189,6 +215,7 @@ function extractCollider(line: string): { type: "range" | "obb" | "sector"; para
     return {
       type: "sector",
       params: [parseFloat(sectorMatch[1]), parseFloat(sectorMatch[2]), parseFloat(sectorMatch[3])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
       label: `扇形 R=${sectorMatch[1]} ${sectorMatch[2]}°`,
     }
   }
@@ -198,6 +225,7 @@ function extractCollider(line: string): { type: "range" | "obb" | "sector"; para
     return {
       type: "range",
       params: [parseFloat(rangeMatch[1])],
+      offset: hasOffset ? [...offset!] as [number, number, number] : undefined,
       label: `球形 R=${rangeMatch[1]}`,
     }
   }
