@@ -37,23 +37,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (existing) {
       // 已打开：更新服务端内容，保留草稿
       set({
-        openFiles: openFiles.map((f) =>
-          f.path === file.path
-            ? {
-                ...f,
-                content: file.content,
-                // 如果传入了 draft（草稿恢复），使用它；否则保留现有草稿
-                draft: file.draft ?? f.draft,
-                dirty: (file.draft ?? f.draft ?? file.content) !== file.content,
-              }
-            : f
-        ),
+        openFiles: openFiles.map((f) => {
+          if (f.path !== file.path) return f
+          const effectiveDraft = file.draft ?? f.draft
+          const isDirty = effectiveDraft != null && effectiveDraft !== file.content
+          return {
+            ...f,
+            content: file.content,
+            draft: isDirty ? effectiveDraft : undefined,
+            dirty: isDirty,
+          }
+        }),
         activeFilePath: file.path,
       })
       return
     }
+    const isDirty = !!file.draft && file.draft !== file.content
     set({
-      openFiles: [...openFiles, { ...file, dirty: !!file.draft && file.draft !== file.content }],
+      openFiles: [...openFiles, { ...file, draft: isDirty ? file.draft : undefined, dirty: isDirty }],
       activeFilePath: file.path,
     })
   },
@@ -73,9 +74,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateDraft: (path, draft) => {
     set((state) => ({
-      openFiles: state.openFiles.map((f) =>
-        f.path === path ? { ...f, draft, dirty: draft !== f.content } : f
-      ),
+      openFiles: state.openFiles.map((f) => {
+        if (f.path !== path) return f
+        const isDirty = draft !== f.content
+        return isDirty
+          ? { ...f, draft, dirty: true }
+          : { ...f, draft: undefined, dirty: false }
+      }),
     }))
   },
 
