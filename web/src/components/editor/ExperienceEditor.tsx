@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react"
 import type { ExperienceData, ExperienceOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { evaluateKether } from "@/lib/kether-eval"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
 import Editor from "@monaco-editor/react"
@@ -156,8 +157,8 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
     const points: { level: number; exp: number }[] = []
 
     for (let level = min; level <= max; level++) {
-      const exp = evaluateSimpleFormula(formula, level)
-      points.push({ level, exp })
+      const exp = evaluateKether(formula, { level })
+      points.push({ level, exp: Math.max(0, Math.round(exp)) })
     }
 
     return points
@@ -179,9 +180,11 @@ function CurvePreview({ options }: { options: ExperienceOptions }) {
 
       {!hasValidData && (
         <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-4">
-          无法预览经验曲线：公式包含复杂 Kether 语法（case/when 等），仅支持简单的 <code>calc "表达式"</code> 格式预览。
+          无法预览经验曲线：公式可能包含不支持的 Kether 语法。
           <br />
-          <span className="text-xs">支持的格式: <code>calc "200*level"</code>、<code>calc "100+50*level"</code>、纯数字</span>
+          <span className="text-xs">
+            支持: <code>calc "表达式"</code>、<code>set 变量 to 表达式</code>、<code>pow</code>、<code>math add/sub/mul/div</code>、<code>case/when</code> 分支
+          </span>
         </div>
       )}
 
@@ -275,43 +278,4 @@ function formatNumber(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M"
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K"
   return Math.round(n).toString()
-}
-
-/** 简单公式求值：支持 calc "表达式" 和纯数字 */
-function evaluateSimpleFormula(formula: string, level: number): number {
-  const trimmed = formula.trim()
-
-  // 纯数字
-  if (/^\d+(\.\d+)?$/.test(trimmed)) return parseFloat(trimmed)
-
-  // calc "表达式" — 提取引号内的数学表达式
-  const calcMatch = trimmed.match(/calc\s+"([^"]+)"/)
-  if (calcMatch) {
-    return evalMathExpr(calcMatch[1], level)
-  }
-
-  // 单行 calc "表达式"（整个公式就是一行 calc）
-  const singleCalc = trimmed.match(/^calc\s+"([^"]+)"$/)
-  if (singleCalc) {
-    return evalMathExpr(singleCalc[1], level)
-  }
-
-  // 无法解析
-  return 0
-}
-
-function evalMathExpr(expr: string, level: number): number {
-  try {
-    // 替换 level 变量
-    const replaced = expr
-      .replace(/\blevel\b/g, String(level))
-      .replace(/\ba\b/g, String(level)) // 有些公式用 a 代替 level
-    // 安全求值：只允许数字和数学运算符
-    if (/^[\d\s+\-*/().%^]+$/.test(replaced)) {
-      // 替换 ^ 为 **（幂运算）
-      const jsExpr = replaced.replace(/\^/g, "**")
-      return Function(`"use strict"; return (${jsExpr})`)() as number
-    }
-  } catch { /* ignore */ }
-  return 0
 }

@@ -5,6 +5,7 @@ import { useConnectionStore } from "@/store/connection-store"
 import { YamlEditor } from "@/components/editor/YamlEditor"
 import { SkillEditor } from "@/components/editor/SkillEditor"
 import { JobEditor } from "@/components/editor/JobEditor"
+import { StationEditor } from "@/components/editor/StationEditor"
 import { ExperienceEditor } from "@/components/editor/ExperienceEditor"
 import { PlaceholderEditor } from "@/components/editor/PlaceholderEditor"
 import { PublishPanel } from "@/components/publish/PublishPanel"
@@ -38,8 +39,12 @@ export function EditorPage() {
     const content = activeFile.draft ?? activeFile.content
     const handleChange = (value: string) => useEditorStore.getState().updateDraft(activeFile.path, value)
 
-    if (activeFile.configType === "skill" || activeFile.configType === "station") {
+    if (activeFile.configType === "skill") {
       return <SkillEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
+    }
+
+    if (activeFile.configType === "station") {
+      return <StationEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
     }
 
     if (activeFile.configType === "job") {
