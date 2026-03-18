@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
+import type React from "react"
 import {
   ReactFlow, Background, Controls, MiniMap,
   useNodesState, useEdgesState, addEdge,
@@ -35,6 +36,48 @@ interface FlowEditorProps {
 export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
   const positionsRef = useRef(new Map<string, { x: number; y: number }>())
 
+  // 外部文本变更 → 同步到节点图（300ms 防抖）
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isInternalChange = useRef(false)
+
+  // AST 快照撤销栈
+  const undoStack = useRef<string[]>([])
+  const redoStack = useRef<string[]>([])
+
+  const pushUndo = useCallback((text: string) => {
+    undoStack.current.push(text)
+    if (undoStack.current.length > 50) undoStack.current.shift()
+    redoStack.current = []
+  }, [])
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.current.length === 0) return
+    redoStack.current.push(value)
+    const prev = undoStack.current.pop()!
+    isInternalChange.current = true
+    onChange(prev)
+  }, [value, onChange])
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.current.length === 0) return
+    undoStack.current.push(value)
+    const next = redoStack.current.pop()!
+    isInternalChange.current = true
+    onChange(next)
+  }, [value, onChange])
+
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+      e.preventDefault()
+      if (e.shiftKey) handleRedo()
+      else handleUndo()
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+      e.preventDefault()
+      handleRedo()
+    }
+  }, [handleUndo, handleRedo])
+
   // AST → Flow (initial only)
   const initialFlow = useMemo(() => {
     try {
@@ -47,10 +90,6 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<KetherNode>(initialFlow.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<KetherEdge>(initialFlow.edges)
-
-  // 外部文本变更 → 同步到节点图（300ms 防抖）
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isInternalChange = useRef(false)
 
   useEffect(() => {
     if (isInternalChange.current) {
@@ -85,10 +124,11 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
     try {
       const ast = flowToAst({ nodes, edges }, schema)
       const text = stringifyKether(ast)
+      pushUndo(value)
       isInternalChange.current = true
       onChange(text)
     } catch { /* 忽略转换错误 */ }
-  }, [nodes, edges, schema, onChange])
+  }, [nodes, edges, schema, onChange, pushUndo, value])
 
   // 拖放创建节点
   const onDrop = useCallback((event: React.DragEvent) => {
@@ -145,7 +185,7 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
   }, [])
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full" onKeyDown={onKeyDown} tabIndex={0}>
       <NodePalette schema={schema} onDragStart={() => {}} />
       <div className="flex-1">
         <ReactFlow
