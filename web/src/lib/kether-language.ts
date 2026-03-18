@@ -10,6 +10,7 @@ interface ActionParam {
   default?: string
   description?: string
   options?: string[]
+  keyword?: string
 }
 
 interface ActionDef {
@@ -243,30 +244,53 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
 
       // Schema 驱动的 action 补全
       if (cachedSchema) {
+        const seen = new Set<string>()
         for (const action of cachedSchema.actions) {
           const syntaxFirst = action.syntax.split(/\s+/)[0]
+          // 跳过已经作为别名处理过的
+          if (seen.has(syntaxFirst.toLowerCase())) continue
+
+          const allNames = [syntaxFirst, ...(action.aliases || [])].filter(Boolean)
+          seen.add(syntaxFirst.toLowerCase())
+          for (const a of action.aliases || []) seen.add(a.toLowerCase())
+
+          // 有别名时用 choice snippet: ${1|sleep,wait,delay|}
+          let insertText: string
+          let insertTextRules: number | undefined
+          if (allNames.length > 1) {
+            insertText = `\${1|${allNames.join(",")}|}`
+            insertTextRules = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+          } else {
+            insertText = syntaxFirst
+            insertTextRules = undefined
+          }
+
+          // 构建参数占位符
+          const params = action.params || []
+          if (params.length > 0) {
+            const paramSnippets = params.map((p, idx) => {
+              const tabIdx = allNames.length > 1 ? idx + 2 : idx + 1
+              if (p.type === "enum" && p.options?.length) {
+                return `\${${tabIdx}|${p.options.join(",")}|}`
+              }
+              return `\${${tabIdx}:${p.name}}`
+            })
+            insertText += " " + paramSnippets.join(" ")
+            insertTextRules = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+          }
+
           items.push({
-            label: syntaxFirst,
+            label: allNames.length > 1 ? `${syntaxFirst} (${allNames.slice(1).join("/")})` : syntaxFirst,
             kind: monaco.languages.CompletionItemKind.Function,
-            insertText: syntaxFirst,
+            insertText,
+            insertTextRules,
+            filterText: allNames.join(" "),
             detail: `[${action.category}] ${action.description}`,
             documentation: { value: buildDoc(action) },
             range,
             tags: action.deprecated ? [monaco.languages.CompletionItemTag.Deprecated] : [],
             sortText: action.deprecated ? "z" + syntaxFirst : "a" + syntaxFirst,
           } as languages.CompletionItem)
-
-          for (const alias of action.aliases || []) {
-            items.push({
-              label: alias,
-              kind: monaco.languages.CompletionItemKind.Function,
-              insertText: alias,
-              detail: `→ ${syntaxFirst}`,
-              documentation: { value: buildDoc(action) },
-              range,
-              sortText: "b" + alias,
-            } as languages.CompletionItem)
-          }
         }
 
         // 上下文 enum 参数补全
@@ -475,6 +499,11 @@ function registerDiagnostics(monaco: typeof import("monaco-editor")) {
       })
     }
 
+    // AST 类型检测
+    if (cachedSchema) {
+      validateActionParams(model, markers, monaco)
+    }
+
     monaco.editor.setModelMarkers(model, "kether", markers)
   }
 
@@ -557,4 +586,178 @@ function findCommentStart(text: string): number {
     else if (ch === "#" && !inDouble && !inSingle) return i
   }
   return -1
+}
+
+// 已知返回数字的内置表达式
+const NUMERIC_EXPRESSIONS = new Set([
+  "math", "calc", "flag", "cooldown", "level", "random",
+])
+
+// 判断一个 token 是否可以作为数字值
+function isNumericCompatible(token: string): boolean {
+  if (!token) return false
+  // 纯数字
+  if (/^-?\d+(\.\d+)?$/.test(token)) return true
+  // 变量引用（可能是数字）
+  if (token.startsWith("&") || token.startsWith("*")) return true
+  // 已知返回数字的表达式
+  if (NUMERIC_EXPRESSIONS.has(token.toLowerCase())) return true
+  // { } 块（可能返回数字）
+  if (token === "{") return true
+  // 引号字符串不是数字
+  if (token.startsWith('"') || token.startsWith("'")) return false
+  // 布尔值不是数字
+  if (token === "true" || token === "false") return false
+  // 已知 action 名（可能返回数字）
+  if (cachedSchema) {
+    const action = cachedSchema.actions.find(a => {
+      const first = a.syntax.split(/\s+/)[0].toLowerCase()
+      return first === token.toLowerCase() || (a.aliases ?? []).some(al => al.toLowerCase() === token.toLowerCase())
+    })
+    if (action) {
+      const rt = (action.returnType ?? "").toLowerCase()
+      return rt.includes("number") || rt.includes("int") || rt.includes("double") || rt.includes("any") || rt === ""
+    }
+  }
+  // 未知 token — 可能是拼写错误
+  return false
+}
+
+function isBooleanCompatible(token: string): boolean {
+  if (!token) return false
+  if (token === "true" || token === "false") return true
+  if (token.startsWith("&") || token.startsWith("*")) return true
+  if (token === "{") return true
+  if (token.toLowerCase() === "check" || token.toLowerCase() === "any" || token.toLowerCase() === "all") return true
+  if (token.toLowerCase() === "flag") return true
+  return false
+}
+
+/** 基于 schema 的 action 参数类型检测 */
+function validateActionParams(
+  model: import("monaco-editor").editor.ITextModel,
+  markers: import("monaco-editor").editor.IMarkerData[],
+  monaco: typeof import("monaco-editor")
+) {
+  if (!cachedSchema) return
+
+  // 构建 action 查找表
+  const actionLookup = new Map<string, ActionDef>()
+  for (const a of cachedSchema.actions) {
+    const first = a.syntax.split(/\s+/)[0].toLowerCase()
+    actionLookup.set(first, a)
+    for (const alias of a.aliases ?? []) {
+      actionLookup.set(alias.toLowerCase(), a)
+    }
+  }
+
+  const lineCount = model.getLineCount()
+
+  for (let i = 1; i <= lineCount; i++) {
+    const line = model.getLineContent(i)
+    const commentIdx = findCommentStart(line)
+    const code = (commentIdx >= 0 ? line.substring(0, commentIdx) : line).trim()
+    if (!code) continue
+
+    // 简单 tokenize（空白分隔，但保留引号字符串）
+    const tokens: { text: string; col: number }[] = []
+    let j = 0
+    while (j < code.length) {
+      if (code[j] === " " || code[j] === "\t") { j++; continue }
+      const start = j
+      if (code[j] === '"') {
+        j++
+        while (j < code.length && code[j] !== '"') {
+          if (code[j] === "\\") j++
+          j++
+        }
+        if (j < code.length) j++
+        tokens.push({ text: code.slice(start, j), col: start + 1 })
+      } else if (code[j] === "{" || code[j] === "}" || code[j] === "[" || code[j] === "]") {
+        tokens.push({ text: code[j], col: start + 1 })
+        j++
+      } else {
+        while (j < code.length && code[j] !== " " && code[j] !== "\t" && code[j] !== "{" && code[j] !== "}" && code[j] !== "[" && code[j] !== "]") j++
+        tokens.push({ text: code.slice(start, j), col: start + 1 })
+      }
+    }
+
+    if (tokens.length === 0) continue
+
+    // 查找行首 action
+    const firstToken = tokens[0].text.toLowerCase()
+    const action = actionLookup.get(firstToken)
+    if (!action || !action.params?.length) continue
+
+    // 按 schema 参数定义检查类型
+    const params = action.params
+    const positional = params.filter(p => !p.keyword)
+    let posIdx = 0
+    let tokenIdx = 1 // 跳过 action 名
+
+    while (tokenIdx < tokens.length && posIdx < positional.length) {
+      const tok = tokens[tokenIdx]
+      const param = positional[posIdx]
+
+      // 跳过 keyword 参数
+      const kwParam = params.find(p => p.keyword && p.keyword.toLowerCase() === tok.text.toLowerCase())
+      if (kwParam) {
+        tokenIdx += 2 // 跳过 keyword + value
+        continue
+      }
+
+      // 跳过块和嵌套结构
+      if (tok.text === "{" || tok.text === "[") {
+        // 跳到匹配的闭合括号
+        const open = tok.text
+        const close = open === "{" ? "}" : "]"
+        let depth = 1
+        tokenIdx++
+        while (tokenIdx < tokens.length && depth > 0) {
+          if (tokens[tokenIdx].text === open) depth++
+          else if (tokens[tokenIdx].text === close) depth--
+          tokenIdx++
+        }
+        posIdx++
+        continue
+      }
+
+      // 类型检查
+      const paramType = param.type.toLowerCase()
+      let typeError = false
+      let expectedType = ""
+
+      if (paramType === "number" || paramType === "int" || paramType === "double" || paramType === "long") {
+        if (!isNumericCompatible(tok.text)) {
+          typeError = true
+          expectedType = "数字"
+        }
+      } else if (paramType === "boolean") {
+        if (!isBooleanCompatible(tok.text)) {
+          typeError = true
+          expectedType = "布尔值"
+        }
+      } else if (paramType === "enum" && param.options?.length) {
+        const validOptions = param.options.map(o => o.toLowerCase())
+        if (!validOptions.includes(tok.text.toLowerCase()) && !tok.text.startsWith("&") && !tok.text.startsWith("*") && tok.text !== "{") {
+          typeError = true
+          expectedType = `${param.options.join(" | ")}`
+        }
+      }
+
+      if (typeError) {
+        markers.push({
+          severity: monaco.MarkerSeverity.Error,
+          message: `参数 "${param.name}" 期望 ${expectedType}，实际为 "${tok.text}"`,
+          startLineNumber: i,
+          startColumn: tok.col,
+          endLineNumber: i,
+          endColumn: tok.col + tok.text.length,
+        })
+      }
+
+      posIdx++
+      tokenIdx++
+    }
+  }
 }
