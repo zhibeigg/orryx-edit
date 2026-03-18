@@ -55,6 +55,17 @@ export interface JobData {
   Options: JobOptions
 }
 
+// 经验配置类型
+export interface ExperienceOptions {
+  Min: number
+  Max: number
+  ExperienceOfLevel: string
+}
+
+export interface ExperienceData {
+  Options: ExperienceOptions
+}
+
 // 配置文件类型
 export type ConfigType =
   | "skill"
@@ -62,6 +73,7 @@ export type ConfigType =
   | "controller"
   | "status"
   | "station"
+  | "experience"
   | "buff"
   | "state"
   | "config"
@@ -75,7 +87,7 @@ export function getConfigType(path: string): ConfigType {
   if (path.startsWith("stations/")) return "station"
   if (path === "buffs.yml") return "buff"
   if (path === "state.yml") return "state"
-  if (path.startsWith("experiences/")) return "config"
+  if (path.startsWith("experiences/")) return "experience"
   if (path.startsWith("placeholders/")) return "config"
   if (path.startsWith("lang/")) return "config"
   if (path.startsWith("ui/")) return "config"

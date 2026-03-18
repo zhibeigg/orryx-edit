@@ -48,3 +48,8 @@ body {
 #root {
   min-height: 100vh;
 }
+
+.input-base {
+  @apply w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md;
+  @apply focus:outline-none focus:ring-1 focus:ring-ring;
+}

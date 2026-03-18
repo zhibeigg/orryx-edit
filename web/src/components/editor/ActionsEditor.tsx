@@ -17,7 +17,6 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     editorRef.current = editor
 
     if (!ketherRegistered) {
-      // 先加载 schema，再注册语言（这样高亮和补全都能用到 schema 数据）
       await loadActionsSchema()
       registerKetherLanguage(monaco)
       ketherRegistered = true
@@ -57,6 +56,8 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
         padding: { top: 4 },
         bracketPairColorization: { enabled: true },
         guides: { bracketPairs: true },
+        unicodeHighlight: { ambiguousCharacters: false },
+        wordBasedSuggestions: "currentDocument",
       }}
     />
   )

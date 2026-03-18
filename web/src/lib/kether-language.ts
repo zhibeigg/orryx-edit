@@ -457,22 +457,6 @@ function registerDiagnostics(monaco: typeof import("monaco-editor")) {
 
 // ---- 辅助函数 ----
 
-/** 找到行中注释开始位置（排除字符串内的 #） */
-function findCommentStart(line: string): number {
-  let inString = false
-  let stringChar = ""
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (inString) {
-      if (ch === stringChar && line[i - 1] !== "\\") inString = false
-    } else {
-      if (ch === '"' || ch === "'") { inString = true; stringChar = ch }
-      else if (ch === "#") return i
-    }
-  }
-  return -1
-}
-
 function buildDoc(action: ActionDef): string {
   let doc = `**${action.name}**\n\n\`${action.syntax}\`\n\n${action.description}`
   if (action.params?.length) {
@@ -503,21 +487,115 @@ function findContextAction(textBefore: string): ActionDef | null {
 const SNIPPETS = [
   { label: "if-then-else", insertText: "if ${1:condition} then {\n  ${2}\n} else {\n  ${3}\n}", detail: "条件分支" },
   { label: "for-range", insertText: "for ${1:i} in range ${2:1} to ${3:5} then {\n  ${4}\n}", detail: "循环" },
+  { label: "while-loop", insertText: "while { ${1:condition} } then {\n  ${2}\n}", detail: "循环" },
   { label: "sync-block", insertText: "sync {\n  ${1}\n}", detail: "主线程同步块" },
   { label: "async-block", insertText: "async {\n  ${1}\n}", detail: "异步块" },
+  { label: "case-when", insertText: "case ${1:expression} [\n  when ${2:value} -> {\n    ${3}\n  }\n]", detail: "分支匹配" },
   { label: "damage-range", insertText: "damage lazy *${1:damage} false they \"@range ${2:4} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${3:MAGIC}", detail: "范围伤害" },
   { label: "damage-obb", insertText: "damage lazy *${1:damage} false they \"@obb ${2:5} ${3:3} ${4:3} ${5:0} ${6:0} true !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${7:MAGIC}", detail: "OBB 碰撞箱伤害" },
   { label: "damage-sector", insertText: "damage lazy *${1:damage} false they \"@sector ${2:4} ${3:120} ${4:2} !@self !@type ARMOR_STAND !@team\" source \"@self\" type ${5:PHYSICS}", detail: "扇形伤害" },
   { label: "sleep-ticks", insertText: "sleep ${1:20}", detail: "等待 tick" },
   { label: "flag-set", insertText: "flag ${1:名称} to true timeout ${2:40}", detail: "设置标记" },
   { label: "flag-check", insertText: "if flag ${1:名称} then {\n  ${2}\n}", detail: "检查标记" },
+  { label: "flag-remove", insertText: "flag ${1:名称} remove", detail: "移除标记" },
   { label: "cooldown-set", insertText: "cooldown set ${1:0}", detail: "设置冷却" },
   { label: "buff-send", insertText: "buff send ${1:名称} ${2:200}", detail: "发送 Buff" },
   { label: "dragon-ani", insertText: "dragon ani to player ${1:动画名} ${2:1.0} they \"@self\"", detail: "播放龙核动画" },
-  { label: "dragon-sound", insertText: "dragon sound send ${1:名称} ${2:路径.ogg} PLAYERS they \"@range ${3:10}\"", detail: "播放音效" },
+  { label: "dragon-sound", insertText: "dragon sound send ${1:名称} ${2:路径.ogg} PLAYERS they \"@range ${3:15}\"", detail: "播放音效" },
   { label: "dragon-effect", insertText: "dragon effect send ${1:名称} \"${2:路径.particle}\" timeout ${3:20} they \"@self\"", detail: "播放粒子特效" },
-  { label: "entity-ady", insertText: "entity ady ${1:模型名} ARMOR_STAND gravity false timeout ${2:20} viewer \"@range 50\" they \"@self\"", detail: "生成实体动画" },
-  { label: "case-state", insertText: "case state ${1:move} [\n  when ${2:FRONT} -> {\n    ${3}\n  }\n]", detail: "状态分支" },
-  { label: "potion-set", insertText: "potion set ${1:SLOW} ${2:20} level ${3:5}", detail: "施加药水效果" },
+  { label: "dragon-modelEffect", insertText: "dragon modelEffect create ${1:名称} ${2:模型} ${3:40} they \"@self\"", detail: "创建模型特效" },
   { label: "launch-forward", insertText: "launch ${1:1} ${2:0.1} ${3:0} ${4:true}", detail: "发射/位移" },
+  { label: "entity-ady", insertText: "entity ady ${1:模型名} ARMOR_STAND gravity false timeout ${2:20} viewer \"@range 50\" they \"@self\"", detail: "生成实体动画" },
+  { label: "potion-set", insertText: "potion set ${1:SLOW} ${2:20} level ${3:1}", detail: "施加药水效果" },
+  { label: "set-variable", insertText: "set ${1:a} to ${2:expression}", detail: "设置变量" },
+  { label: "tell-message", insertText: "tell colored \"${1:&c消息}\"", detail: "发送消息" },
 ]
+
+/**
+ * 语法检测 — 检测括号不匹配、未闭合字符串等
+ */
+export function validateKetherScript(
+  monaco: typeof import("monaco-editor"),
+  model: import("monaco-editor").editor.ITextModel
+) {
+  const markers: import("monaco-editor").editor.IMarkerData[] = []
+  const lineCount = model.getLineCount()
+
+  let totalOpen = 0
+  let totalClose = 0
+  let totalBracketOpen = 0
+  let totalBracketClose = 0
+
+  for (let i = 1; i <= lineCount; i++) {
+    const line = model.getLineContent(i)
+    const commentStart = findCommentStart(line)
+    const code = commentStart >= 0 ? line.substring(0, commentStart) : line
+
+    let inDouble = false
+    let inSingle = false
+    for (let j = 0; j < code.length; j++) {
+      const ch = code[j]
+      if (ch === '\\') { j++; continue }
+      if (ch === '"' && !inSingle) inDouble = !inDouble
+      else if (ch === "'" && !inDouble) inSingle = !inSingle
+      else if (!inDouble && !inSingle) {
+        if (ch === '{') totalOpen++
+        else if (ch === '}') totalClose++
+        else if (ch === '[') totalBracketOpen++
+        else if (ch === ']') totalBracketClose++
+      }
+    }
+
+    if (inDouble || inSingle) {
+      markers.push({
+        severity: monaco.MarkerSeverity.Error,
+        message: "未闭合的字符串",
+        startLineNumber: i, startColumn: 1,
+        endLineNumber: i, endColumn: line.length + 1,
+      })
+    }
+
+    if (/\{\s*\}/.test(code)) {
+      markers.push({
+        severity: monaco.MarkerSeverity.Warning,
+        message: "空代码块",
+        startLineNumber: i, startColumn: code.indexOf("{") + 1,
+        endLineNumber: i, endColumn: code.indexOf("}") + 2,
+      })
+    }
+  }
+
+  if (totalOpen !== totalClose) {
+    markers.push({
+      severity: monaco.MarkerSeverity.Error,
+      message: `花括号不匹配: ${totalOpen} 个 { 但 ${totalClose} 个 }`,
+      startLineNumber: lineCount, startColumn: 1,
+      endLineNumber: lineCount, endColumn: model.getLineContent(lineCount).length + 1,
+    })
+  }
+
+  if (totalBracketOpen !== totalBracketClose) {
+    markers.push({
+      severity: monaco.MarkerSeverity.Warning,
+      message: `方括号不匹配: ${totalBracketOpen} 个 [ 但 ${totalBracketClose} 个 ]`,
+      startLineNumber: lineCount, startColumn: 1,
+      endLineNumber: lineCount, endColumn: model.getLineContent(lineCount).length + 1,
+    })
+  }
+
+  monaco.editor.setModelMarkers(model, "kether", markers)
+}
+
+/** 找到行中注释开始位置（排除字符串内的 #） */
+function findCommentStart(text: string): number {
+  let inDouble = false
+  let inSingle = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === "\\") { i++; continue }
+    if (ch === '"' && !inSingle) inDouble = !inDouble
+    else if (ch === "'" && !inDouble) inSingle = !inSingle
+    else if (ch === "#" && !inDouble && !inSingle) return i
+  }
+  return -1
+}
