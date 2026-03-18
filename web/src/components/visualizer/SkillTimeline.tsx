@@ -110,7 +110,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                     {/* 菱形 */}
                     <div className="w-3.5 h-3.5 mx-auto rotate-45 bg-amber-400 group-hover:bg-amber-300 group-hover:scale-125 transition-all border border-amber-600 shadow-sm shadow-amber-400/30" />
                     {/* 悬浮标签 */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap border border-border">
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover:block bg-[#252526] text-[#cccccc] text-[10px] px-1.5 py-0.5 shadow-lg whitespace-nowrap border border-[#3c3c3c] z-50 pointer-events-none">
                       {event.label} @{event.tick}t
                     </div>
                   </button>
