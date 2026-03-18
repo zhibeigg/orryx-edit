@@ -8,6 +8,14 @@ interface OptionsPanelProps {
 
 const SKILL_TYPES: SkillType[] = ["DIRECT", "DIRECT AIM", "PASSIVE", "PRESSING", "PRESSING AIM"]
 
+const SKILL_TYPE_LABELS: Record<SkillType, string> = {
+  "DIRECT": "直接释放",
+  "DIRECT AIM": "指向性",
+  "PASSIVE": "被动",
+  "PRESSING": "蓄力",
+  "PRESSING AIM": "蓄力指向性",
+}
+
 // 常用 Minecraft 材质（可搜索）
 const COMMON_MATERIALS = [
   "DIAMOND_SWORD", "IRON_SWORD", "GOLDEN_SWORD", "STONE_SWORD", "WOODEN_SWORD", "NETHERITE_SWORD",
@@ -235,7 +243,7 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
               onChange={(e) => update({ Type: e.target.value as SkillType })}
               className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              {SKILL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {SKILL_TYPES.map((t) => <option key={t} value={t}>{SKILL_TYPE_LABELS[t]} ({t})</option>)}
             </select>
           </Field>
           <Field label="名称 (Name)">
