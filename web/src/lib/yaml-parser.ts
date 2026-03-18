@@ -31,10 +31,8 @@ export function stringifyYaml(data: unknown): string {
  */
 export function updateYamlField(originalYaml: string, path: string[], value: unknown): string {
   const doc = parseDocument(originalYaml)
-  if (typeof value === "string" && (value.includes("\n") || value.includes("#"))) {
-    const scalar = new Scalar(value)
-    scalar.type = value.includes("\n") ? Scalar.BLOCK_LITERAL : Scalar.QUOTE_DOUBLE
-    doc.setIn(path, scalar)
+  if (typeof value === "string" && needsScalarStyle(value)) {
+    doc.setIn(path, createStyledScalar(value))
   } else {
     doc.setIn(path, value)
   }
@@ -70,11 +68,9 @@ export function updateYamlFromObject(originalYaml: string, newData: Record<strin
       ) {
         deepUpdate(doc, currentPath, oldVal as Record<string, unknown>, newVal as Record<string, unknown>)
       } else {
-        // 多行字符串或含 # 的字符串使用块标量/引号格式，避免 # 被当作 YAML 注释截断
-        if (typeof newVal === "string" && (newVal.includes("\n") || newVal.includes("#"))) {
-          const scalar = new Scalar(newVal)
-          scalar.type = newVal.includes("\n") ? Scalar.BLOCK_LITERAL : Scalar.QUOTE_DOUBLE
-          doc.setIn(currentPath, scalar)
+        // 多行字符串、含 # 或含双引号的字符串需要特殊处理
+        if (typeof newVal === "string" && needsScalarStyle(newVal)) {
+          doc.setIn(currentPath, createStyledScalar(newVal))
         } else {
           doc.setIn(currentPath, newVal)
         }
@@ -99,4 +95,25 @@ export function parseSkillYaml(content: string): SkillData {
 
 export function stringifySkillYaml(skill: SkillData): string {
   return stringifyYaml(skill)
+}
+
+/** 判断字符串是否需要特殊的 YAML 标量格式 */
+function needsScalarStyle(value: string): boolean {
+  return value.includes("\n") || value.includes("#") || value.includes('"')
+}
+
+/** 创建带样式的 YAML 标量节点 */
+function createStyledScalar(value: string): Scalar {
+  const scalar = new Scalar(value)
+  if (value.includes("\n")) {
+    // 多行 → 块标量
+    scalar.type = Scalar.BLOCK_LITERAL
+  } else if (value.includes('"')) {
+    // 含双引号 → 单引号包裹
+    scalar.type = Scalar.QUOTE_SINGLE
+  } else {
+    // 含 # → 双引号包裹
+    scalar.type = Scalar.QUOTE_DOUBLE
+  }
+  return scalar
 }

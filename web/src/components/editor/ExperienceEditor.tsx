@@ -36,6 +36,16 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
     }
   }, [data, onChange])
 
+  // 格式化经验公式（仅首次挂载时，避免反复格式化导致 dirty）
+  const [formulaValue, setFormulaValue] = useState(() =>
+    formatKetherScript(data.Options?.ExperienceOfLevel ?? "")
+  )
+
+  const updateFormula = useCallback((v: string) => {
+    setFormulaValue(v)
+    updateOptions({ ExperienceOfLevel: v })
+  }, [updateOptions])
+
   const tabs: { id: Tab; label: string }[] = [
     { id: "editor", label: "经验配置" },
     { id: "curve", label: "经验曲线" },
@@ -63,11 +73,11 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === "editor" && (
-          <ConfigPanel options={data.Options} onChange={updateOptions} />
+          <ConfigPanel options={data.Options} onChange={updateOptions} formulaValue={formulaValue} onFormulaChange={updateFormula} />
         )}
 
         {activeTab === "curve" && (
-          <CurvePreview options={data.Options} />
+          <CurvePreview options={{ ...data.Options, ExperienceOfLevel: formulaValue }} />
         )}
 
         {activeTab === "yaml" && (
@@ -98,7 +108,12 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
 }
 
 // ---- 配置面板 ----
-function ConfigPanel({ options, onChange }: { options: ExperienceOptions; onChange: (p: Partial<ExperienceOptions>) => void }) {
+function ConfigPanel({ options, onChange, formulaValue, onFormulaChange }: {
+  options: ExperienceOptions
+  onChange: (p: Partial<ExperienceOptions>) => void
+  formulaValue: string
+  onFormulaChange: (v: string) => void
+}) {
   return (
     <div className="p-4 space-y-6 max-w-4xl">
       <div className="space-y-3">
@@ -137,8 +152,8 @@ function ConfigPanel({ options, onChange }: { options: ExperienceOptions; onChan
           <p>可用变量: <code className="text-blue-400">&level</code> — 当前等级</p>
         </div>
         <ActionsEditor
-          value={formatKetherScript(options.ExperienceOfLevel ?? "")}
-          onChange={(v) => onChange({ ExperienceOfLevel: v })}
+          value={formulaValue}
+          onChange={onFormulaChange}
           height="250px"
         />
       </div>
