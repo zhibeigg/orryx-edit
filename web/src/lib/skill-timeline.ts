@@ -1,9 +1,11 @@
 export interface TimelineEvent {
   tick: number
   duration: number
-  type: "sleep" | "damage" | "animation" | "launch" | "flash" | "sound" | "effect" | "potion" | "entity" | "other"
+  type: "sleep" | "damage" | "animation" | "launch" | "flash" | "sound" | "effect" | "potion" | "entity" | "collider" | "other"
   label: string
   raw: string
+  /** 碰撞箱事件附带的碰撞箱数据 */
+  collider?: { type: "range" | "obb" | "sector"; params: number[] }
 }
 
 /**
@@ -47,16 +49,34 @@ export function parseTimeline(script: string): TimelineEvent[] {
       continue
     }
 
-    // damage
+    // damage（同时检测碰撞箱）
     if (line.startsWith("damage ")) {
+      const collider = extractCollider(line)
       events.push({
         tick: currentTick,
         duration: 1,
         type: "damage",
-        label: "伤害",
+        label: collider ? `伤害 (${collider.label})` : "伤害",
         raw: line,
+        collider: collider ?? undefined,
       })
       continue
+    }
+
+    // 独立碰撞箱检测（非 damage 行中的选择器）
+    if (!line.startsWith("damage ")) {
+      const collider = extractCollider(line)
+      if (collider) {
+        events.push({
+          tick: currentTick,
+          duration: 1,
+          type: "collider",
+          label: collider.label,
+          raw: line,
+          collider,
+        })
+        // 不 continue，让后续匹配也能处理这行
+      }
     }
 
     // dragon ani
@@ -151,4 +171,36 @@ export function parseTimeline(script: string): TimelineEvent[] {
   }
 
   return events
+}
+
+/** 从一行脚本中提取碰撞箱信息 */
+function extractCollider(line: string): { type: "range" | "obb" | "sector"; params: number[]; label: string } | null {
+  const obbMatch = line.match(/@obb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.-]+)\s+([\d.-]+)/)
+  if (obbMatch) {
+    return {
+      type: "obb",
+      params: [parseFloat(obbMatch[1]), parseFloat(obbMatch[2]), parseFloat(obbMatch[3]), parseFloat(obbMatch[4]), parseFloat(obbMatch[5])],
+      label: `矩形 ${obbMatch[1]}×${obbMatch[2]}×${obbMatch[3]}`,
+    }
+  }
+
+  const sectorMatch = line.match(/@sector\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/)
+  if (sectorMatch) {
+    return {
+      type: "sector",
+      params: [parseFloat(sectorMatch[1]), parseFloat(sectorMatch[2]), parseFloat(sectorMatch[3])],
+      label: `扇形 R=${sectorMatch[1]} ${sectorMatch[2]}°`,
+    }
+  }
+
+  const rangeMatch = line.match(/@range\s+([\d.]+)/)
+  if (rangeMatch) {
+    return {
+      type: "range",
+      params: [parseFloat(rangeMatch[1])],
+      label: `球形 R=${rangeMatch[1]}`,
+    }
+  }
+
+  return null
 }

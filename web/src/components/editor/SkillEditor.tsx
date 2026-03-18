@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, lazy, Suspense } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import type { SkillData, SkillOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { OptionsPanel } from "./OptionsPanel"
@@ -8,12 +8,7 @@ import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { SkillTimeline } from "@/components/visualizer/SkillTimeline"
 import { cn } from "@/lib/utils"
-import { parseColliderFromScript } from "@/lib/collider-parser"
 import Editor from "@monaco-editor/react"
-
-const ColliderPreview = lazy(() =>
-  import("@/components/visualizer/ColliderPreview").then((m) => ({ default: m.ColliderPreview }))
-)
 
 interface SkillEditorProps {
   content: string
@@ -21,7 +16,7 @@ interface SkillEditorProps {
   filePath?: string
 }
 
-type Tab = "options" | "variables" | "description" | "actions" | "timeline" | "collider" | "refs" | "yaml"
+type Tab = "options" | "variables" | "description" | "actions" | "timeline" | "refs" | "yaml"
 
 export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("options")
@@ -48,15 +43,12 @@ export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
     }
   }, [skill, onChange])
 
-  const collider = useMemo(() => parseColliderFromScript(skill.Actions ?? ""), [skill.Actions])
-
   const tabs: { id: Tab; label: string }[] = [
     { id: "options", label: "基础选项" },
     { id: "variables", label: "变量" },
     { id: "description", label: "描述" },
     { id: "actions", label: "Actions 脚本" },
     { id: "timeline", label: "时间轴" },
-    { id: "collider", label: "碰撞箱" },
     { id: "refs", label: "引用" },
     { id: "yaml", label: "YAML 源码" },
   ]
@@ -142,18 +134,6 @@ export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
 
           {activeTab === "timeline" && (
             <SkillTimeline script={skill.Actions ?? ""} />
-          )}
-
-          {activeTab === "collider" && collider && (
-            <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">加载 3D 预览...</div>}>
-              <ColliderPreview type={collider.type} params={collider.params} />
-            </Suspense>
-          )}
-
-          {activeTab === "collider" && !collider && (
-            <div className="p-4 text-sm text-muted-foreground">
-              未在 Actions 脚本中检测到碰撞箱选择器（@range / @obb / @sector）。
-            </div>
           )}
 
           {activeTab === "refs" && filePath && (
