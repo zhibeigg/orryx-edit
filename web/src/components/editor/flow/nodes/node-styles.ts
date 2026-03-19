@@ -2,13 +2,13 @@ import type { SchemaAction, ActionsSchemaV2 } from "@/types/schema"
 
 // 根据 schema category 获取节点颜色
 export function getNodeColor(action: SchemaAction, schema: ActionsSchemaV2) {
-  const cat = schema.categories[action.category]
+  const cat = schema?.categories?.[action.category]
   return cat?.color ?? "#6b7280"
 }
 
 // 根据 schema type 获取端口颜色
 export function getPortColor(typeName: string, schema: ActionsSchemaV2) {
-  const t = schema.types[typeName]
+  const t = schema?.types?.[typeName]
   return t?.color ?? "#6b7280"
 }
 
