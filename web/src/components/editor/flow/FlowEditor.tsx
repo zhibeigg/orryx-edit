@@ -165,7 +165,7 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
     } else {
       const action = parsed as SchemaAction
       const inputs: Record<string, unknown> = {}
-      for (const p of action.inputs) {
+      for (const p of (action.inputs ?? [])) {
         if (p.default != null) inputs[p.key] = p.default
       }
       newNode = {

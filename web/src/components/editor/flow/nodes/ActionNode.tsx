@@ -48,7 +48,7 @@ export const ActionNode = memo(function ActionNode({ data }: NodeProps) {
       </div>
 
       <div className="bg-[#1e1e1e] px-2 py-1.5 space-y-1.5">
-        {schema?.inputs.map((input) => (
+        {(schema?.inputs ?? []).map((input) => (
           <div key={input.key} className="flex items-center gap-1.5 text-[11px]">
             <Handle type="target" position={Position.Left} id={input.key}
               style={{ background: getPortColor(input.type, {} as ActionsSchemaV2), width: 8, height: 8, left: -4 }} />

@@ -78,12 +78,12 @@ function convertActionCall(
   const inputs: Record<string, unknown> = {}
 
   if (schemaAction) {
-    const positional = schemaAction.inputs.filter(p => !p.keyword)
+    const positional = (schemaAction.inputs ?? []).filter(p => !p?.keyword)
     node.args.forEach((arg, i) => {
       if (i < positional.length) inputs[positional[i].key] = extractValue(arg)
     })
     for (const [kw, val] of Object.entries(node.keywordArgs)) {
-      const param = schemaAction.inputs.find(p => p.keyword?.toLowerCase() === kw.toLowerCase())
+      const param = (schemaAction.inputs ?? []).find(p => p?.keyword?.toLowerCase() === kw.toLowerCase())
       if (param) inputs[param.key] = extractValue(val)
     }
   }
@@ -275,11 +275,11 @@ function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>): ASTNode 
   switch (d.nodeKind) {
     case "action": {
       const args = d.schemaAction
-        ? d.schemaAction.inputs.filter(p => !p.keyword).map(p => valueToAst(d.inputs[p.key], pos))
+        ? (d.schemaAction.inputs ?? []).filter(p => !p?.keyword).map(p => valueToAst(d.inputs[p.key], pos))
         : []
       const keywordArgs: Record<string, ASTNode> = {}
       if (d.schemaAction) {
-        for (const p of d.schemaAction.inputs.filter(p => p.keyword)) {
+        for (const p of (d.schemaAction.inputs ?? []).filter(p => p?.keyword)) {
           if (d.inputs[p.key] != null) keywordArgs[p.keyword!] = valueToAst(d.inputs[p.key], pos)
         }
       }

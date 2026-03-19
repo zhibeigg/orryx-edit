@@ -17,13 +17,13 @@ export function findAction(name: string, schema: ActionsSchemaV2): SchemaAction 
 export function generateKetherText(action: SchemaAction, values: Record<string, unknown>): string {
   const parts: string[] = [action.name]
 
-  for (const input of action.inputs.filter(p => !p.keyword)) {
+  for (const input of (action.inputs ?? []).filter(p => !p?.keyword)) {
     const val = values[input.key]
     if (val == null && !input.required) continue
     parts.push(formatValue(val, input))
   }
 
-  for (const input of action.inputs.filter(p => p.keyword)) {
+  for (const input of (action.inputs ?? []).filter(p => p?.keyword)) {
     const val = values[input.key]
     if (val == null || val === input.default) continue
     parts.push(input.keyword!)
@@ -48,12 +48,12 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
   if (tokens.length === 0) return values
 
   tokens.shift() // skip action name
-  const positional = action.inputs.filter(p => !p.keyword)
+  const positional = (action.inputs ?? []).filter(p => !p?.keyword)
   let posIdx = 0
 
   let i = 0
   while (i < tokens.length) {
-    const kw = action.inputs.find(p => p.keyword?.toLowerCase() === tokens[i].toLowerCase())
+    const kw = (action.inputs ?? []).find(p => p?.keyword?.toLowerCase() === tokens[i].toLowerCase())
     if (kw) {
       i++
       if (i < tokens.length) { values[kw.key] = tokens[i]; i++ }
