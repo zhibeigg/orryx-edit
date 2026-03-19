@@ -1,4 +1,4 @@
-import * as dagre from "@dagrejs/dagre"
+import dagre from "@dagrejs/dagre"
 import type {
   ASTNode, ScriptNode, ActionCallNode, SetNode as ASTSetNode,
   IfNode, ForNode, CalcNode as ASTCalcNode, VarRefNode,
