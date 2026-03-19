@@ -2,10 +2,9 @@ package com.orryx.editor.relay
 
 import com.orryx.editor.protocol.MessageTypes
 import com.orryx.editor.protocol.WsMessage
+import com.orryx.editor.protocol.WsResponse
 import io.ktor.websocket.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.util.concurrent.ConcurrentHashMap
 
 class RelayHandler(private val registry: SessionRegistry) {
@@ -16,7 +15,7 @@ class RelayHandler(private val registry: SessionRegistry) {
         val msg = try {
             json.decodeFromString<WsMessage>(text)
         } catch (e: Exception) {
-            browserSession.send("""{"type":"error","id":"","data":{"message":"消息格式错误: ${e.message}"}}""")
+            browserSession.send(WsResponse.build("error", "", "message" to "消息格式错误: ${e.message}"))
             return
         }
 
@@ -26,20 +25,20 @@ class RelayHandler(private val registry: SessionRegistry) {
         }
 
         if (browserSession !in authenticatedBrowsers) {
-            browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"未认证，请先发送 auth 消息"}}""")
+            browserSession.send(WsResponse.build("error", msg.id, "message" to "未认证，请先发送 auth 消息"))
             return
         }
 
         // 透传给该 serverKey 下所有在线的插件端
         val serverKey = registry.getServerKeyForBrowser(browserSession)
         if (serverKey == null) {
-            browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"游戏服务器已断开连接"}}""")
+            browserSession.send(WsResponse.build("error", msg.id, "message" to "游戏服务器已断开连接"))
             return
         }
 
         val sessions = registry.getServerSessions(serverKey)
         if (sessions.isEmpty()) {
-            browserSession.send("""{"type":"error","id":"${msg.id}","data":{"message":"游戏服务器已断开连接"}}""")
+            browserSession.send(WsResponse.build("error", msg.id, "message" to "游戏服务器已断开连接"))
             return
         }
 
@@ -53,7 +52,7 @@ class RelayHandler(private val registry: SessionRegistry) {
 
         val server = registry.validateToken(token)
         if (server == null) {
-            browserSession.send("""{"type":"auth.result","id":"${msg.id}","data":{"success":false,"message":"Token 无效或已过期"}}""")
+            browserSession.send(WsResponse.build("auth.result", msg.id, "success" to false, "message" to "Token 无效或已过期"))
             return
         }
 
@@ -67,7 +66,14 @@ class RelayHandler(private val registry: SessionRegistry) {
         }
 
         val onlineCount = registry.onlineSessionCount(server.serverKey)
-        browserSession.send("""{"type":"auth.result","id":"${msg.id}","data":{"success":true,"serverName":"${server.serverName}","onlineCount":$onlineCount,"permissions":["*"]}}""")
+        val permissions = buildJsonArray { add("*") }
+        browserSession.send(WsResponse.build(
+            "auth.result", msg.id,
+            "success" to true,
+            "serverName" to server.serverName,
+            "onlineCount" to onlineCount,
+            "permissions" to permissions
+        ))
     }
 
     fun onBrowserDisconnect(browserSession: WebSocketSession) {

@@ -131,5 +131,9 @@ class LicenseManager(private val dataDir: File) {
 
     fun get(license: String): LicenseEntry? = licenses[license]
 
+    fun shutdown() {
+        ioExecutor.shutdown()
+    }
+
     fun list(): List<LicenseEntry> = licenses.values.toList()
 }

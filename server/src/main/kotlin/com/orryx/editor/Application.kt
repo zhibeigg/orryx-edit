@@ -9,6 +9,8 @@ import com.orryx.editor.relay.SessionRegistry
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 9090
@@ -22,12 +24,17 @@ fun main() {
     val licenseManager = LicenseManager(dataDir)
     val registry = SessionRegistry()
 
+    // 定期清理过期 Token（每 5 分钟）
+    val scheduler = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "token-cleanup").apply { isDaemon = true } }
+    scheduler.scheduleAtFixedRate({ registry.cleanupExpiredTokens() }, 5, 5, TimeUnit.MINUTES)
+
+    val maskedKey = if (adminKey.length > 4) adminKey.take(4) + "*".repeat(adminKey.length - 4) else "****"
     println("=== Orryx Editor Server ===")
     println("  端口: $port")
     println("  数据目录: ${dataDir.absolutePath}")
     println("  访问: http://localhost:$port")
     println("  插件端: ws://localhost:$port/ws/server")
-    println("  管理API: POST /api/admin/license (Authorization: Bearer $adminKey)")
+    println("  管理API: POST /api/admin/license (Authorization: Bearer $maskedKey)")
     println("===========================")
 
     val server = embeddedServer(Netty, port = port) {
@@ -39,6 +46,8 @@ fun main() {
 
     Runtime.getRuntime().addShutdownHook(Thread {
         println("正在关闭服务器...")
+        scheduler.shutdown()
+        licenseManager.shutdown()
         server.stop(500, 3000)
     })
 

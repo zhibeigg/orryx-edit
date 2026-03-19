@@ -1,7 +1,7 @@
 package com.orryx.editor.protocol
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.*
 
 @Serializable
 data class WsMessage(
@@ -9,6 +9,31 @@ data class WsMessage(
     val id: String,
     val data: JsonElement
 )
+
+/** 安全构建 WebSocket JSON 响应（避免字符串拼接导致的 JSON 注入） */
+object WsResponse {
+    private val json = Json { encodeDefaults = true }
+
+    fun build(type: String, id: String, vararg pairs: Pair<String, Any?>): String {
+        return json.encodeToString(JsonObject.serializer(), buildJsonObject {
+            put("type", type)
+            put("id", id)
+            putJsonObject("data") {
+                for ((key, value) in pairs) {
+                    when (value) {
+                        is String -> put(key, value)
+                        is Boolean -> put(key, value)
+                        is Int -> put(key, value)
+                        is Long -> put(key, value)
+                        is JsonElement -> put(key, value)
+                        null -> put(key, JsonNull)
+                        else -> put(key, value.toString())
+                    }
+                }
+            }
+        })
+    }
+}
 
 object MessageTypes {
     // 前端 → 服务器

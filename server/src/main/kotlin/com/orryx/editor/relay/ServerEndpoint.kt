@@ -2,6 +2,7 @@ package com.orryx.editor.relay
 
 import com.orryx.editor.license.LicenseManager
 import com.orryx.editor.protocol.WsMessage
+import com.orryx.editor.protocol.WsResponse
 import io.ktor.websocket.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -24,7 +25,7 @@ class ServerEndpoint(
         val msg = try {
             json.decodeFromString<WsMessage>(text)
         } catch (e: Exception) {
-            serverSession.send("""{"type":"error","id":"","data":{"message":"消息格式错误: ${e.message}"}}""")
+            serverSession.send(WsResponse.build("error", "", "message" to "消息格式错误: ${e.message}"))
             return
         }
 
@@ -42,7 +43,7 @@ class ServerEndpoint(
         val name = data["serverName"]?.jsonPrimitive?.content ?: "Unknown"
 
         if (license.isEmpty()) {
-            session.send("""{"type":"server.register.result","id":"${msg.id}","data":{"success":false,"message":"缺少 license"}}""")
+            session.send(WsResponse.build("server.register.result", msg.id, "success" to false, "message" to "缺少 license"))
             return
         }
 
@@ -57,7 +58,7 @@ class ServerEndpoint(
                 !raw.isIpAllowed(connectIp) -> "IP 不在允许列表 (当前: $connectIp)"
                 else -> "license 无效"
             }
-            session.send("""{"type":"server.register.result","id":"${msg.id}","data":{"success":false,"message":"$reason"}}""")
+            session.send(WsResponse.build("server.register.result", msg.id, "success" to false, "message" to reason))
             return
         }
 
@@ -67,13 +68,13 @@ class ServerEndpoint(
         }
 
         registry.registerServer(entry.serverKey, name, session)
-        session.send("""{"type":"server.register.result","id":"${msg.id}","data":{"success":true,"serverKey":"${entry.serverKey}","message":"已注册: $name"}}""")
+        session.send(WsResponse.build("server.register.result", msg.id, "success" to true, "serverKey" to entry.serverKey, "message" to "已注册: $name"))
     }
 
     private suspend fun handleTokenRegister(session: WebSocketSession, msg: WsMessage) {
         val server = registry.getServerBySession(session)
         if (server == null) {
-            session.send("""{"type":"error","id":"${msg.id}","data":{"message":"请先发送 server.register"}}""")
+            session.send(WsResponse.build("error", msg.id, "message" to "请先发送 server.register"))
             return
         }
 
@@ -83,18 +84,18 @@ class ServerEndpoint(
         val expiresIn = data["expiresIn"]?.jsonPrimitive?.long ?: 300_000L
 
         if (token.isEmpty()) {
-            session.send("""{"type":"error","id":"${msg.id}","data":{"message":"token 不能为空"}}""")
+            session.send(WsResponse.build("error", msg.id, "message" to "token 不能为空"))
             return
         }
 
         registry.registerToken(token, server.serverKey, playerName, expiresIn)
-        session.send("""{"type":"token.register.result","id":"${msg.id}","data":{"success":true,"token":"$token"}}""")
+        session.send(WsResponse.build("token.register.result", msg.id, "success" to true, "token" to token))
     }
 
     private suspend fun handleTokenRevoke(session: WebSocketSession, msg: WsMessage) {
         val token = msg.data.jsonObject["token"]?.jsonPrimitive?.content ?: ""
         registry.revokeToken(token)
-        session.send("""{"type":"token.revoke.result","id":"${msg.id}","data":{"success":true}}""")
+        session.send(WsResponse.build("token.revoke.result", msg.id, "success" to true))
     }
 
     private suspend fun relayToBoundBrowsers(serverSession: WebSocketSession, text: String) {

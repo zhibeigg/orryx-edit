@@ -19,6 +19,20 @@ data class CreateLicenseRequest(val owner: String, val days: Int = 30)
 @Serializable
 data class RenewRequest(val days: Int)
 
+@Serializable
+data class LicenseResponse(
+    val license: String,
+    val owner: String,
+    val serverKey: String,
+    val enabled: Boolean,
+    val online: Boolean,
+    val onlineCount: Int = 0,
+    val createdAt: Long,
+    val expiresAt: Long,
+    val boundIps: List<String>,
+    val remainingDays: Long
+)
+
 fun Application.configureRouting(
     licenseManager: LicenseManager,
     registry: SessionRegistry,
@@ -141,9 +155,21 @@ fun Application.configureRouting(
     }
 }
 
+private val responseJson = kotlinx.serialization.json.Json { encodeDefaults = true }
+
 private fun licenseToJson(entry: com.orryx.editor.license.LicenseEntry, online: Boolean, onlineCount: Int = 0): String {
-    val ipsJson = entry.boundIps.joinToString(",") { "\"$it\"" }
-    return """{"license":"${entry.license}","owner":"${entry.owner}","serverKey":"${entry.serverKey}","enabled":${entry.enabled},"online":$online,"onlineCount":$onlineCount,"createdAt":${entry.createdAt},"expiresAt":${entry.expiresAt},"boundIps":[$ipsJson],"remainingDays":${entry.remainingDays()}}"""
+    return responseJson.encodeToString(LicenseResponse.serializer(), LicenseResponse(
+        license = entry.license,
+        owner = entry.owner,
+        serverKey = entry.serverKey,
+        enabled = entry.enabled,
+        online = online,
+        onlineCount = onlineCount,
+        createdAt = entry.createdAt,
+        expiresAt = entry.expiresAt,
+        boundIps = entry.boundIps,
+        remainingDays = entry.remainingDays()
+    ))
 }
 
 private suspend fun checkAdmin(call: ApplicationCall, adminKey: String): Boolean {

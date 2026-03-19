@@ -22,7 +22,38 @@ import { LogConsole } from "@/components/visualizer/LogConsole"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
+import type { OpenFile } from "@/store/editor-store"
+
 type BottomPanel = "log" | null
+
+// 编辑器注册表 —— 新增编辑器只需在此添加映射
+const configTypeEditors: Record<string, React.ComponentType<any>> = {
+  skill: SkillEditor,
+  station: StationEditor,
+  status: StatusEditor,
+  job: JobEditor,
+  experience: ExperienceEditor,
+}
+
+const pathEditors: Record<string, React.ComponentType<any>> = {
+  "bloom.yml": BloomEditor,
+  "buffs.yml": BuffsEditor,
+  "config.yml": ConfigEditor,
+  "keys.yml": KeysEditor,
+  "npc.yml": NpcEditor,
+  "selectors.yml": SelectorsEditor,
+  "state.yml": StateFileEditor,
+}
+
+function resolveEditor(file: OpenFile): React.ComponentType<any> {
+  if (file.configType && configTypeEditors[file.configType]) {
+    return configTypeEditors[file.configType]
+  }
+  if (file.path.startsWith("placeholders/")) {
+    return PlaceholderEditor
+  }
+  return pathEditors[file.path] ?? YamlEditor
+}
 
 export function EditorPage() {
   const { openFiles, activeFilePath, setActiveFile, closeFile, closeAllFiles, closeSavedFiles } = useEditorStore()
@@ -48,55 +79,8 @@ export function EditorPage() {
     if (!activeFile) return null
     const content = activeFile.draft ?? activeFile.content
     const handleChange = (value: string) => useEditorStore.getState().updateDraft(activeFile.path, value)
-
-    if (activeFile.configType === "skill") {
-      return <SkillEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    if (activeFile.configType === "station") {
-      return <StationEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    if (activeFile.configType === "status") {
-      return <StatusEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    if (activeFile.configType === "job") {
-      return <JobEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    if (activeFile.configType === "experience") {
-      return <ExperienceEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    if (activeFile.path.startsWith("placeholders/")) {
-      return <PlaceholderEditor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
-    }
-
-    // 单文件专用编辑器
-    if (activeFile.path === "bloom.yml") {
-      return <BloomEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "buffs.yml") {
-      return <BuffsEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "config.yml") {
-      return <ConfigEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "keys.yml") {
-      return <KeysEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "npc.yml") {
-      return <NpcEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "selectors.yml") {
-      return <SelectorsEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-    if (activeFile.path === "state.yml") {
-      return <StateFileEditor key={activeFile.path} content={content} onChange={handleChange} />
-    }
-
-    return <YamlEditor key={activeFile.path} content={content} onChange={handleChange} />
+    const Editor = resolveEditor(activeFile)
+    return <Editor key={activeFile.path} content={content} onChange={handleChange} filePath={activeFile.path} />
   }
 
   return (

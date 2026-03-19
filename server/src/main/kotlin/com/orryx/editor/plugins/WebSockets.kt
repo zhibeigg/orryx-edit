@@ -14,7 +14,7 @@ fun Application.configureWebSockets(
     install(WebSockets) {
         pingPeriodMillis = 15_000
         timeoutMillis = 15_000
-        maxFrameSize = Long.MAX_VALUE
+        maxFrameSize = 1_048_576 // 1 MB，防止恶意超大帧导致 OOM
         masking = false
     }
 

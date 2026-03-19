@@ -36,8 +36,8 @@ class SessionRegistry {
     fun registerServer(serverKey: String, serverName: String, session: WebSocketSession) {
         val server = GameServer(serverKey, serverName, session)
         sessions[session] = server
-        serverSessions.getOrPut(serverKey) { ConcurrentHashMap.newKeySet() }.add(session)
-        serverBrowsers.putIfAbsent(serverKey, ConcurrentHashMap.newKeySet())
+        serverSessions.computeIfAbsent(serverKey) { ConcurrentHashMap.newKeySet() }.add(session)
+        serverBrowsers.computeIfAbsent(serverKey) { ConcurrentHashMap.newKeySet() }
     }
 
     fun unregisterServer(session: WebSocketSession) {
@@ -116,6 +116,16 @@ class SessionRegistry {
 
     fun getBrowsersForServer(serverKey: String): Set<WebSocketSession> {
         return serverBrowsers[serverKey] ?: emptySet()
+    }
+
+    // ---- 清理 ----
+
+    /** 清理所有已过期的 token，防止内存泄漏 */
+    fun cleanupExpiredTokens(): Int {
+        val now = System.currentTimeMillis()
+        val expired = tokens.entries.filter { now > it.value.expiresAt }
+        expired.forEach { tokens.remove(it.key) }
+        return expired.size
     }
 
     // ---- 统计 ----
