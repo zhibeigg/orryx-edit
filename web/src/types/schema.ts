@@ -76,3 +76,84 @@ export interface ActionsSchemaV2 {
   selectors: SchemaSelector[]
   triggers?: unknown[]
 }
+
+// ============ v1 → v2 兼容层 ============
+
+const DEFAULT_TYPES: Record<string, SchemaType> = {
+  DOUBLE:    { widget: "number",   color: "#6366f1" },
+  INT:       { widget: "number",   color: "#6366f1", step: 1 },
+  STRING:    { widget: "text",     color: "#db2777" },
+  BOOLEAN:   { widget: "toggle",   color: "#f59e0b" },
+  CONTAINER: { widget: "selector", color: "#d97706" },
+  VECTOR:    { widget: "vector3",  color: "#10b981" },
+  LOCATION:  { widget: "location", color: "#10b981" },
+  DURATION:  { widget: "duration", color: "#06b6d4" },
+  ACTION:    { widget: "port",     color: "#6b7280" },
+  ANY:       { widget: "text",     color: "#6b7280" },
+}
+
+const DEFAULT_CATEGORY: SchemaCategory = { color: "#6b7280", icon: "puzzle" }
+
+/** 将 v1 或 v2 schema 统一转为 v2 格式 */
+export function normalizeSchema(raw: any): ActionsSchemaV2 {
+  if (raw?.version === 2) return raw as ActionsSchemaV2
+
+  // v1 → v2
+  const actions: SchemaAction[] = (raw?.actions ?? []).map((a: any) => {
+    const params: any[] = a.params ?? a.inputs ?? []
+    return {
+      name: a.name,
+      aliases: a.aliases ?? [],
+      category: a.category ?? "未分类",
+      namespace: a.namespace ?? "default",
+      description: a.description ?? "",
+      builtin: a.builtin ?? false,
+      inputs: params.map((p: any) => ({
+        name: p.name,
+        key: p.key ?? p.name,
+        type: p.type ?? "ANY",
+        required: p.required ?? !(p.optional ?? false),
+        default: p.default ?? null,
+        description: p.description ?? "",
+        keyword: p.keyword,
+        options: p.options,
+        min: p.min,
+        max: p.max,
+        step: p.step,
+      })),
+      output: a.output ?? null,
+      flow: a.flow ?? "normal",
+      slots: a.slots,
+      provides: a.provides,
+    }
+  })
+
+  const selectors: SchemaSelector[] = (raw?.selectors ?? []).map((s: any) => ({
+    name: s.name,
+    aliases: s.aliases ?? [],
+    description: s.description ?? "",
+    params: (s.params ?? []).map((p: any) => ({
+      name: p.name,
+      key: p.key ?? p.name,
+      type: p.type ?? "STRING",
+      default: p.default,
+    })),
+  }))
+
+  // 从 actions 收集 categories
+  const categories: Record<string, SchemaCategory> = raw?.categories ?? {}
+  for (const a of actions) {
+    if (!categories[a.category]) {
+      categories[a.category] = { ...DEFAULT_CATEGORY }
+    }
+  }
+
+  return {
+    version: 2,
+    types: raw?.types ?? DEFAULT_TYPES,
+    categories,
+    actions,
+    selectors,
+    triggers: raw?.triggers,
+  }
+}

@@ -3,6 +3,7 @@ import Editor, { type OnMount } from "@monaco-editor/react"
 import { registerKetherLanguage, loadActionsSchema, KETHER_LANGUAGE_ID, getActionsSchema, onWizardTrigger, type WizardTrigger } from "@/lib/kether-language"
 import { Code, Workflow } from "lucide-react"
 import type { ActionsSchemaV2, SchemaAction } from "@/types/schema"
+import { normalizeSchema } from "@/types/schema"
 import { ParameterWizard } from "./ParameterWizard"
 import { findAction, parseLineValues } from "@/lib/parameter-wizard"
 
@@ -25,16 +26,20 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     action: SchemaAction; values: Record<string, unknown>; lineNumber: number
   } | null>(null)
 
-  const [schema, setSchema] = useState<ActionsSchemaV2 | null>(
-    () => getActionsSchema() as ActionsSchemaV2 | null
-  )
+  const [schema, setSchema] = useState<ActionsSchemaV2 | null>(() => {
+    const raw = getActionsSchema()
+    return raw ? normalizeSchema(raw) : null
+  })
 
   // 确保 schema 加载完成后更新状态
   useEffect(() => {
     if (schema) return
     let cancelled = false
     loadActionsSchema().then(() => {
-      if (!cancelled) setSchema(getActionsSchema() as ActionsSchemaV2 | null)
+      if (!cancelled) {
+        const raw = getActionsSchema()
+        setSchema(raw ? normalizeSchema(raw) : null)
+      }
     })
     return () => { cancelled = true }
   }, [schema])
