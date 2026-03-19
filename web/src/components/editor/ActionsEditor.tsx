@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, lazy, Suspense, useMemo, useCallback } from "react"
+import { useRef, useEffect, useState, lazy, Suspense, useCallback } from "react"
 import Editor, { type OnMount } from "@monaco-editor/react"
 import { registerKetherLanguage, loadActionsSchema, KETHER_LANGUAGE_ID, getActionsSchema, onWizardTrigger, type WizardTrigger } from "@/lib/kether-language"
 import { Code, Workflow } from "lucide-react"
@@ -25,7 +25,19 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     action: SchemaAction; values: Record<string, unknown>; lineNumber: number
   } | null>(null)
 
-  const schema = useMemo(() => getActionsSchema() as ActionsSchemaV2 | null, [])
+  const [schema, setSchema] = useState<ActionsSchemaV2 | null>(
+    () => getActionsSchema() as ActionsSchemaV2 | null
+  )
+
+  // 确保 schema 加载完成后更新状态
+  useEffect(() => {
+    if (schema) return
+    let cancelled = false
+    loadActionsSchema().then(() => {
+      if (!cancelled) setSchema(getActionsSchema() as ActionsSchemaV2 | null)
+    })
+    return () => { cancelled = true }
+  }, [schema])
 
   // keep ref in sync so keybinding closure can access latest schema
   useEffect(() => { schemaRef.current = schema }, [schema])
