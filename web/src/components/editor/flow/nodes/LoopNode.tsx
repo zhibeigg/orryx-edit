@@ -1,17 +1,22 @@
-import { memo } from "react"
-import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { memo, useCallback } from "react"
+import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react"
 import type { KetherNodeData } from "../flow-types"
 
-export const LoopNode = memo(function LoopNode({ data }: NodeProps) {
+export const LoopNode = memo(function LoopNode({ id, data }: NodeProps) {
   const d = data as KetherNodeData
   const bodyCount = d.slotChildren.body?.length ?? 0
+  const { updateNodeData } = useReactFlow()
+
+  const updateVariable = useCallback((value: string) => {
+    updateNodeData(id, { inputs: { ...d.inputs, variable: value } })
+  }, [id, d.inputs, updateNodeData])
 
   return (
     <div className="rounded-lg overflow-hidden shadow-lg min-w-[260px] border-2 border-orange-600">
       <div className="px-3 py-1.5 bg-orange-600 text-[12px] font-medium text-white flex items-center gap-2">
         <span>for</span>
         <input type="text" value={String(d.inputs.variable ?? "i")}
-          onChange={e => { d.inputs.variable = e.target.value }}
+          onChange={e => updateVariable(e.target.value)}
           className="w-12 px-1 py-0 text-[11px] bg-black/30 border border-white/10 rounded text-white font-mono" />
         <span className="text-[10px] opacity-70">in</span>
         <Handle type="target" position={Position.Left} id="iterable"

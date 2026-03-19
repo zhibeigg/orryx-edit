@@ -331,13 +331,15 @@ class KetherReader {
 
 // ============ KetherParser ============
 
-// 内置关键字（Kether 核心语法，不在 schema 中）
-const BUILTIN_KEYWORDS = new Set([
-  "set", "if", "else", "then", "for", "in", "range", "to",
-  "case", "when", "check", "any", "all", "math", "calc",
-  "inline", "lazy", "flag", "sync", "async", "exit",
-  "def", "true", "false", "not"
+// 能独立开始一条新语句的关键字
+const STATEMENT_STARTERS = new Set([
+  "set", "if", "for", "case", "check", "any", "all",
+  "math", "calc", "inline", "lazy", "flag",
+  "sync", "async", "exit", "def"
 ])
+
+// 语法胶水词 / 字面量 — 不是语句起始，不应中断 action 参数消费
+// else, then, in, range, to, when, true, false, not
 
 const COMPARATORS = ["==", "!=", ">", ">=", "<", "<="] as const
 export type Comparator = typeof COMPARATORS[number]
@@ -672,16 +674,16 @@ class KetherParser {
           continue
         }
 
-        // 检查是否是下一条语句的开始（另一个 action 名或关键字）
-        if (this.isStatementStart(peek)) break
-
-        // 消费位置参数
+        // 还有位置参数要消费 → parseExpression(asArgument=true)
+        // asArgument 模式下 set/if/for/case 当作标识符，不递归解析
         if (posIdx < positionalParams.length) {
-          args.push(this.parseExpression())
+          args.push(this.parseExpression(true))
           posIdx++
-        } else {
-          break
+          continue
         }
+
+        // 位置参数已消费完，检查是否是语句边界
+        break
       }
     } else {
       // 未知 action：贪婪消费到行尾或块结束
@@ -697,7 +699,8 @@ class KetherParser {
   }
 
   // ---- 表达式解析 ----
-  private parseExpression(): ASTNode {
+  // asArgument: 作为 action 参数解析时，不递归解析 set/if/for/case 等语句关键字
+  private parseExpression(asArgument = false): ASTNode {
     if (!this.reader.hasNext()) {
       const pos = this.reader.getPosition()
       return { type: "error", message: "意外的文件结束", raw: "", start: pos, end: pos }
@@ -740,7 +743,7 @@ class KetherParser {
       return { type: "number", value: parseFloat(token), start, end: this.reader.getPosition() }
     }
 
-    // 内置表达式关键字
+    // 内置表达式关键字 — 这些始终可以作为嵌套表达式
     if (lower === "check") { this.reader.reset(); return this.parseCheck() }
     if (lower === "any" || lower === "all") { this.reader.reset(); return this.parseLogic(lower as "any" | "all") }
     if (lower === "math") { this.reader.reset(); return this.parseMath() }
@@ -748,10 +751,15 @@ class KetherParser {
     if (lower === "inline") { this.reader.reset(); return this.parseInline() }
     if (lower === "lazy") { this.reader.reset(); return this.parseLazy() }
     if (lower === "flag") { this.reader.reset(); return this.parseFlag() }
-    if (lower === "set") { this.reader.reset(); return this.parseSet() }
-    if (lower === "if") { this.reader.reset(); return this.parseIf() }
-    if (lower === "for") { this.reader.reset(); return this.parseFor() }
-    if (lower === "case") { this.reader.reset(); return this.parseCase() }
+
+    // 语句关键字 — 仅在非参数上下文中递归解析
+    // 作为 action 参数时（如 potion set、cooldown set），当作普通标识符
+    if (!asArgument) {
+      if (lower === "set") { this.reader.reset(); return this.parseSet() }
+      if (lower === "if") { this.reader.reset(); return this.parseIf() }
+      if (lower === "for") { this.reader.reset(); return this.parseFor() }
+      if (lower === "case") { this.reader.reset(); return this.parseCase() }
+    }
 
     // 选择器字符串 "@range 5 !@self"
     if (token.startsWith('"') && token.includes("@")) {
@@ -817,7 +825,7 @@ class KetherParser {
   // ---- 判断 token 是否是语句开始 ----
   private isStatementStart(token: string): boolean {
     const lower = token.toLowerCase()
-    if (BUILTIN_KEYWORDS.has(lower)) return true
+    if (STATEMENT_STARTERS.has(lower)) return true
     if (this.actionMap.has(lower)) return true
     return false
   }
@@ -830,6 +838,10 @@ class KetherStringifier {
 
   stringify(node: ScriptNode): string {
     return node.body.map(n => this.node(n)).join("\n")
+  }
+
+  stringifyOne(node: ASTNode): string {
+    return this.node(node)
   }
 
   private pad(): string { return "  ".repeat(this.indent) }
@@ -954,4 +966,9 @@ export function parseKether(source: string, schema?: ActionsSchema): ScriptNode 
 
 export function stringifyKether(ast: ScriptNode): string {
   return new KetherStringifier().stringify(ast)
+}
+
+/** 将单个 AST 节点序列化为文本 */
+export function stringifyNode(node: ASTNode): string {
+  return new KetherStringifier().stringifyOne(node)
 }

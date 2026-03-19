@@ -106,7 +106,7 @@ export function parseTimeline(script: string): TimelineEvent[] {
     }
 
     // dragon ani
-    if (line.includes("dragon ani") || line.includes("dragon ani")) {
+    if (line.includes("dragon ani") || line.includes("dragon animation")) {
       const aniMatch = line.match(/dragon\s+ani\s+to\s+player\s+(\S+)/)
       events.push({
         tick: currentTick,

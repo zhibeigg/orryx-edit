@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react"
 import type React from "react"
 import {
   ReactFlow, Background, Controls, MiniMap,
-  useNodesState, useEdgesState, addEdge,
+  useNodesState, useEdgesState, addEdge, useReactFlow, ReactFlowProvider,
   type Connection, type OnConnect, type NodeTypes
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -17,6 +17,7 @@ import { CalcNode } from "./nodes/CalcNode"
 import { SetNode } from "./nodes/SetNode"
 import { BranchNode } from "./nodes/BranchNode"
 import { LoopNode } from "./nodes/LoopNode"
+import { SchemaProvider } from "./SchemaContext"
 
 const nodeTypes: NodeTypes = {
   actionNode: ActionNode,
@@ -33,7 +34,18 @@ interface FlowEditorProps {
   schema: ActionsSchemaV2
 }
 
-export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
+export function FlowEditor(props: FlowEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <SchemaProvider value={props.schema}>
+        <FlowEditorInner {...props} />
+      </SchemaProvider>
+    </ReactFlowProvider>
+  )
+}
+
+function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
+  const reactFlowInstance = useReactFlow()
   const positionsRef = useRef(new Map<string, { x: number; y: number }>())
 
   // 外部文本变更 → 同步到节点图（300ms 防抖）
@@ -137,11 +149,10 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
     if (!data) return
 
     const parsed = JSON.parse(data)
-    const reactFlowBounds = event.currentTarget.getBoundingClientRect()
-    const position = {
-      x: event.clientX - reactFlowBounds.left,
-      y: event.clientY - reactFlowBounds.top,
-    }
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    })
 
     let newNode: KetherNode
     if ("builtin" in parsed) {
@@ -177,7 +188,7 @@ export function FlowEditor({ value, onChange, schema }: FlowEditorProps) {
     }
 
     setNodes(nds => [...nds, newNode])
-  }, [setNodes])
+  }, [setNodes, reactFlowInstance])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
