@@ -283,35 +283,58 @@ export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) 
     player.position.y = 0.9
     scene.add(player)
 
-    // 鼠标旋转
+    // 鼠标交互：左键旋转，右键/中键平移，滚轮缩放
     let isDragging = false
+    let isPanning = false
     let prevX = 0, prevY = 0
     let theta = Math.PI / 4, phi = Math.PI / 4, radius = 12
+    let panX = 0, panY = 0
 
-    const onMouseDown = (e: MouseEvent) => { isDragging = true; prevX = e.clientX; prevY = e.clientY }
-    const onMouseUp = () => { isDragging = false }
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return
-      theta -= (e.clientX - prevX) * 0.01
-      phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - (e.clientY - prevY) * 0.01))
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 2 || e.button === 1) {
+        isPanning = true
+      } else {
+        isDragging = true
+      }
       prevX = e.clientX; prevY = e.clientY
     }
+    const onMouseUp = () => { isDragging = false; isPanning = false }
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - prevX
+      const dy = e.clientY - prevY
+      prevX = e.clientX; prevY = e.clientY
+
+      if (isPanning) {
+        // 平移：根据相机朝向计算右方和上方向量
+        const panSpeed = radius * 0.002
+        panX -= dx * panSpeed
+        panY += dy * panSpeed
+      } else if (isDragging) {
+        theta -= dx * 0.01
+        phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - dy * 0.01))
+      }
+    }
     const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
       radius = Math.max(3, Math.min(30, radius + e.deltaY * 0.01))
     }
+    const onContextMenu = (e: MouseEvent) => { e.preventDefault() }
 
     container.addEventListener("mousedown", onMouseDown)
     container.addEventListener("mouseup", onMouseUp)
+    container.addEventListener("mouseleave", onMouseUp)
     container.addEventListener("mousemove", onMouseMove)
-    container.addEventListener("wheel", onWheel)
+    container.addEventListener("wheel", onWheel, { passive: false })
+    container.addEventListener("contextmenu", onContextMenu)
 
     const animate = () => {
+      const target = new THREE.Vector3(panX, panY, 0)
       camera.position.set(
-        radius * Math.sin(phi) * Math.cos(theta),
-        radius * Math.cos(phi),
+        panX + radius * Math.sin(phi) * Math.cos(theta),
+        panY + radius * Math.cos(phi),
         radius * Math.sin(phi) * Math.sin(theta)
       )
-      camera.lookAt(0, 0, 0)
+      camera.lookAt(target)
       renderer.render(scene, camera)
       sceneRef.current!.animId = requestAnimationFrame(animate)
     }
@@ -330,8 +353,10 @@ export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) 
       cancelAnimationFrame(sceneRef.current?.animId ?? 0)
       container.removeEventListener("mousedown", onMouseDown)
       container.removeEventListener("mouseup", onMouseUp)
+      container.removeEventListener("mouseleave", onMouseUp)
       container.removeEventListener("mousemove", onMouseMove)
       container.removeEventListener("wheel", onWheel)
+      container.removeEventListener("contextmenu", onContextMenu)
       window.removeEventListener("resize", onResize)
       renderer.dispose()
       container.removeChild(renderer.domElement)
@@ -373,8 +398,8 @@ export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) 
         })}
       </div>
 
-      <div ref={containerRef} className="w-full h-[400px] rounded-lg border border-border bg-black/50" />
-      <p className="text-xs text-muted-foreground">鼠标拖拽旋转，滚轮缩放。黄色线框为玩家参考位置。</p>
+      <div ref={containerRef} className="w-full aspect-[4/3] max-h-[360px] rounded-lg border border-border bg-black/50 overflow-hidden" />
+      <p className="text-xs text-muted-foreground">左键旋转，右键平移，滚轮缩放。黄色线框为玩家参考位置。</p>
     </div>
   )
 }

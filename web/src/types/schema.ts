@@ -90,6 +90,15 @@ const DEFAULT_TYPES: Record<string, SchemaType> = {
   DURATION:  { widget: "duration", color: "#06b6d4" },
   ACTION:    { widget: "port",     color: "#6b7280" },
   ANY:       { widget: "text",     color: "#6b7280" },
+  // 小写类型名（actions-schema.json v1 使用）
+  number:    { widget: "number",   color: "#6366f1" },
+  int:       { widget: "number",   color: "#6366f1", step: 1 },
+  long:      { widget: "number",   color: "#6366f1", step: 1 },
+  text:      { widget: "text",     color: "#db2777" },
+  boolean:   { widget: "toggle",   color: "#f59e0b" },
+  selector:  { widget: "selector", color: "#d97706" },
+  any:       { widget: "text",     color: "#6b7280" },
+  keyword:   { widget: "text",     color: "#9ca3af" },
 }
 
 const DEFAULT_CATEGORY: SchemaCategory = { color: "#6b7280", icon: "puzzle" }

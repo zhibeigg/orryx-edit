@@ -1,5 +1,5 @@
-import { X, Upload, Terminal, ChevronDown, ChevronUp, MoreHorizontal } from "lucide-react"
-import { useState } from "react"
+import { X, Upload, Terminal, ChevronDown, ChevronUp, MoreHorizontal, Keyboard } from "lucide-react"
+import { useState, useEffect } from "react"
 import { useEditorStore } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
 import { getFileIconInfo } from "@/lib/file-icons"
@@ -20,6 +20,7 @@ import { SelectorsEditor } from "@/components/editor/SelectorsEditor"
 import { PublishPanel } from "@/components/publish/PublishPanel"
 import { LogConsole } from "@/components/visualizer/LogConsole"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 import type { OpenFile } from "@/store/editor-store"
@@ -61,6 +62,18 @@ export function EditorPage() {
   const [showPublish, setShowPublish] = useState(false)
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null)
   const dirtyCount = openFiles.filter((f) => f.dirty).length
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+        e.preventDefault()
+        setShowShortcuts((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
 
   if (openFiles.length === 0) {
     return (
@@ -217,8 +230,55 @@ export function EditorPage() {
           {bottomPanel === null ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         <div className="flex-1" />
+        <button
+          onClick={() => setShowShortcuts(true)}
+          className="flex items-center gap-1 hover:bg-white/10 px-1 mr-2"
+          title="快捷键 (Ctrl+/)"
+        >
+          <Keyboard className="w-3 h-3" />
+        </button>
         {activeFile && <span className="opacity-80">{activeFile.path}</span>}
       </div>
+
+      {/* 快捷键面板 */}
+      <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+        <DialogContent className="w-[420px] max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>快捷键</DialogTitle>
+            <DialogDescription>Ctrl+/ 打开/关闭此面板</DialogDescription>
+          </DialogHeader>
+          <div className="p-4 space-y-4 text-[13px] overflow-y-auto">
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-[#858585] uppercase tracking-wider mb-2">文件操作</p>
+              <ShortcutRow keys="Ctrl+S" desc="保存当前文件" />
+              <ShortcutRow keys="Ctrl+Shift+S" desc="全部保存" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-[#858585] uppercase tracking-wider mb-2">标签页</p>
+              <ShortcutRow keys="Ctrl+W" desc="关闭当前标签页" />
+              <ShortcutRow keys="Ctrl+Shift+T" desc="重新打开最近关闭的标签页" />
+              <ShortcutRow keys="Ctrl+Tab" desc="下一个标签页" />
+              <ShortcutRow keys="Ctrl+Shift+Tab" desc="上一个标签页" />
+              <ShortcutRow keys="Ctrl+1~9" desc="切换到第 N 个标签页" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-[#858585] uppercase tracking-wider mb-2">组合键 (Ctrl+K 前缀)</p>
+              <ShortcutRow keys="Ctrl+K W" desc="全部关闭" />
+              <ShortcutRow keys="Ctrl+K U" desc="关闭已保存" />
+              <ShortcutRow keys="Ctrl+K S" desc="全部保存并关闭" />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function ShortcutRow({ keys, desc }: { keys: string; desc: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[#cccccc]">{desc}</span>
+      <kbd className="text-[11px] text-[#cccccc] bg-[#3c3c3c] border border-[#555] px-1.5 py-0.5 rounded font-mono">{keys}</kbd>
     </div>
   )
 }

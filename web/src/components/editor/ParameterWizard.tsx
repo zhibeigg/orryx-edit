@@ -30,18 +30,33 @@ export function ParameterWizard({ action, schema, initialValues, onInsert, onCan
     const widget = typeInfo?.widget ?? "text"
 
     switch (widget) {
-      case "number":
+      case "number": {
+        // Kether 的 number 参数可以是嵌套表达式（lazy *damage、math mul [...]）
+        // 只有纯数字才用 number input，否则降级为文本输入
+        const strVal = String(val ?? "")
+        const isPlainNumber = /^-?\d+(\.\d+)?$/.test(strVal)
+        if (isPlainNumber) {
+          return (
+            <input
+              type="number"
+              value={Number(val ?? 0)}
+              onChange={e => updateValue(input.key, +e.target.value)}
+              min={input.min}
+              max={input.max}
+              step={input.step ?? typeInfo?.step}
+              className="w-20 px-1.5 py-0.5 text-[12px] bg-[#3c3c3c] border border-[#555] rounded text-white"
+            />
+          )
+        }
         return (
           <input
-            type="number"
-            value={Number(val ?? 0)}
-            onChange={e => updateValue(input.key, +e.target.value)}
-            min={input.min}
-            max={input.max}
-            step={input.step ?? typeInfo?.step}
-            className="w-20 px-1.5 py-0.5 text-[12px] bg-[#3c3c3c] border border-[#555] rounded text-white"
+            type="text"
+            value={strVal}
+            onChange={e => updateValue(input.key, e.target.value)}
+            className="w-32 px-1.5 py-0.5 text-[12px] bg-[#3c3c3c] border border-[#555] rounded text-white font-mono"
           />
         )
+      }
       case "toggle":
         return (
           <button

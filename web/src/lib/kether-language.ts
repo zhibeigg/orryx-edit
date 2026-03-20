@@ -407,6 +407,13 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
   registerDiagnostics(monaco)
 
   // ---- CodeLens: action 名称左侧显示向导图标 ----
+  // 内置控制流关键字 — 参数向导无法处理这些语句的复杂结构
+  const WIZARD_EXCLUDED = new Set([
+    "if", "else", "for", "set", "case", "check", "any", "all",
+    "math", "calc", "inline", "lazy", "sync", "async",
+    "exit", "break", "return", "def", "not", "then", "when",
+  ])
+
   monaco.languages.registerCodeLensProvider(KETHER_LANGUAGE_ID, {
     provideCodeLenses(model) {
       const lenses: languages.CodeLens[] = []
@@ -415,8 +422,12 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
 
       const actionNames = new Set<string>()
       for (const a of schema.actions) {
-        actionNames.add(a.name.toLowerCase())
-        for (const alias of a.aliases ?? []) actionNames.add(alias.toLowerCase())
+        const n = a.name.toLowerCase()
+        if (!WIZARD_EXCLUDED.has(n)) actionNames.add(n)
+        for (const alias of a.aliases ?? []) {
+          const al = alias.toLowerCase()
+          if (!WIZARD_EXCLUDED.has(al)) actionNames.add(al)
+        }
       }
 
       for (let i = 1; i <= model.getLineCount(); i++) {

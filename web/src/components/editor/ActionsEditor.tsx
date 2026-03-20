@@ -17,6 +17,13 @@ interface ActionsEditorProps {
 
 let ketherRegistered = false
 
+// 内置控制流关键字 — 参数向导无法处理
+const BUILTIN_KEYWORDS = new Set([
+  "if", "else", "for", "set", "case", "check", "any", "all",
+  "math", "calc", "inline", "lazy", "sync", "async",
+  "exit", "break", "return", "def", "not", "then", "when",
+])
+
 export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEditorProps) {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
@@ -71,6 +78,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
         const line = ed.getModel()?.getLineContent(pos.lineNumber) ?? ""
         const firstToken = line.trim().split(/\s+/)[0]
         if (!firstToken) return
+        if (BUILTIN_KEYWORDS.has(firstToken.toLowerCase())) return
         const action = findBestOverload(firstToken, line, currentSchema)
         if (action) {
           const vals = parseLineValues(line, action, currentSchema)
@@ -99,8 +107,11 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     const model = editorRef.current.getModel()
     if (!model) return
     const ln = wizardState.lineNumber
+    const lineContent = model.getLineContent(ln)
+    // 保留原行的前导缩进
+    const indent = lineContent.match(/^(\s*)/)?.[1] ?? ""
     const range = new monacoRef.current.Range(ln, 1, ln, model.getLineMaxColumn(ln))
-    editorRef.current.executeEdits("wizard", [{ range, text }])
+    editorRef.current.executeEdits("wizard", [{ range, text: indent + text }])
     setWizardState(null)
   }, [wizardState])
 

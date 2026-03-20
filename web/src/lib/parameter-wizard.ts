@@ -50,7 +50,11 @@ export function findBestOverload(name: string, line: string, schema: ActionsSche
 export function generateKetherText(action: SchemaAction, values: Record<string, unknown>): string {
   const parts: string[] = [action.name]
 
-  // 按 schema inputs 原始顺序输出，保持 keyword 和位置参数的相对位置
+  // 按 schema inputs 原始顺序输出
+  // Kether 规则：
+  //   keyword 参数 → 输出标识符（标记型只输出 keyword，前缀型输出 keyword + value）
+  //   required 位置参数 → 直接输出值
+  //   optional 参数（无 keyword）→ 输出 key 标识符 + value
   for (const input of action.inputs ?? []) {
     const val = values[input.key]
 
@@ -72,10 +76,16 @@ export function generateKetherText(action: SchemaAction, values: Record<string, 
         parts.push(kwParts[0])
         parts.push(formatValue(val, input))
       }
-    } else {
-      if (val == null && !input.required) continue
+    } else if (input.required) {
+      // 必填位置参数 → 直接输出值
       const formatted = formatValue(val, input)
       if (formatted !== "") parts.push(formatted)
+    } else {
+      // 可选参数（无 keyword）→ key 作为标识符 + value
+      // 跳过未提供或等于默认值的可选参数
+      if (val == null || String(val) === String(input.default ?? "")) continue
+      parts.push(input.key)
+      parts.push(formatValue(val, input))
     }
   }
 
@@ -84,7 +94,8 @@ export function generateKetherText(action: SchemaAction, values: Record<string, 
 
 function formatValue(value: unknown, input: SchemaInput): string {
   if (value == null) return String(input.default ?? "")
-  if (input.type === "STRING" || input.type === "CONTAINER") {
+  const t = input.type.toLowerCase()
+  if (t === "string" || t === "text" || t === "container" || t === "selector") {
     const s = String(value)
     return s.includes(" ") || s.startsWith("@") ? `"${s}"` : s
   }
@@ -99,7 +110,13 @@ const BRACKET_PREFIXES = new Set(["math", "any", "all"])
 
 /**
  * 从一行 Kether 文本中解析参数值。
- * 基于 token 级别匹配，支持嵌套块和多 token 表达式合并。
+ *
+ * Kether 语句解析规则：
+ * - 语句以 action name 开头，后面按 schema inputs 顺序依次解析
+ * - type="keyword" 且有 keyword 字段 → 固定标识符，必须原样匹配（如 set、ady、level）
+ * - 其他 required 参数 → 位置参数，按顺序消费一个表达式
+ * - required=false 的可选参数 → 需要先匹配到 key 作为标识符，再消费后面的值
+ *   例如 `potion set SLOW 20 level 3` 中 level 是可选参数的标识符，3 是值
  */
 export function parseLineValues(line: string, action: SchemaAction, schema?: ActionsSchemaV2): Record<string, unknown> {
   const values: Record<string, unknown> = {}
@@ -122,65 +139,74 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
   }
 
   const inputs = action.inputs ?? []
-  const keywordMap = new Map<string, SchemaInput>()
-  for (const input of inputs) {
-    if (input.keyword) {
-      // 支持 "set/to" 复合 keyword — 每个部分都注册
-      for (const kw of input.keyword.toLowerCase().split("/")) {
-        keywordMap.set(kw, input)
-      }
-    } else if (!input.required && input.key) {
-      // 没有 keyword 字段但 key 出现在 token 列表中 → 当作隐式 keyword
-      // 处理 schema 中 they/source/type 等没有标注 keyword 但实际是 keyword 的情况
-      const keyLower = input.key.toLowerCase()
-      if (tokens.some(t => t.toLowerCase() === keyLower)) {
-        keywordMap.set(keyLower, input)
-      }
-    }
-  }
-  const positional = inputs.filter(p => !p?.keyword)
-  let posIdx = 0
-  let i = 0
 
-  while (i < tokens.length) {
+  // 第一遍：按 schema inputs 顺序消费 keyword 和 required 位置参数
+  let i = 0
+  for (const input of inputs) {
+    if (i >= tokens.length) break
+    if (!input.required && !input.keyword) continue // 可选参数第二遍处理
+
     const tok = tokens[i]
     const lower = tok.toLowerCase()
 
-    // 检查是否匹配某个 keyword 参数
-    const kwInput = keywordMap.get(lower)
-    if (kwInput) {
-      // 标记型 keyword：type 为 "keyword"，keyword 本身就是值（如 set/to、remove/delete）
-      // 前缀型 keyword：type 为具体类型，keyword 后面跟一个值（如 level 3、timeout 200）
-      const isMarkerKeyword = kwInput.type === "keyword"
-
-      if (isMarkerKeyword) {
-        values[kwInput.key] = tok
-        i++
-      } else {
-        i++ // consume keyword
-        if (i < tokens.length) {
-          const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
-          values[kwInput.key] = value
-          i = nextIndex
+    if (input.keyword) {
+      // 有 keyword 字段的参数 → 必须匹配标识符
+      const kwParts = input.keyword.toLowerCase().split("/")
+      if (kwParts.includes(lower)) {
+        if (input.type === "keyword") {
+          values[input.key] = tok
+          i++
+        } else {
+          i++ // consume keyword
+          if (i < tokens.length) {
+            const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
+            values[input.key] = value
+            i = nextIndex
+          }
         }
       }
+      // keyword 不匹配 → 跳过此参数
       continue
     }
 
-    // 消费位置参数
-    if (posIdx < positional.length) {
-      const param = positional[posIdx]
-      // selector 类型参数：如果当前 token 是 "they"，跳过它取下一个 token 作为值
-      if (param.type === "selector" && lower === "they" && i + 1 < tokens.length) {
-        i++ // skip "they"
+    if (input.required) {
+      // 必填位置参数
+      // Kether 约定：如果当前 token 恰好等于参数的 key（如 they、source），
+      // 则它是前缀标识符，真正的值在下一个 token
+      if (lower === input.key.toLowerCase() && i + 1 < tokens.length) {
+        i++ // skip key 标识符
       }
       const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
-      values[param.key] = value
-      posIdx++
+      values[input.key] = value
       i = nextIndex
-    } else {
-      // 没有更多参数定义了，跳过
-      i++
+    }
+  }
+
+  // 第二遍：处理可选参数（无 keyword 的 required=false）
+  // 可选参数的 key 作为标识符，可以以任意顺序出现在剩余 token 中
+  const optionalInputs = inputs.filter(inp => !inp.required && !inp.keyword)
+  if (optionalInputs.length > 0) {
+    // 构建可选参数的 key 查找表
+    const optKeyMap = new Map<string, SchemaInput>()
+    for (const inp of optionalInputs) {
+      optKeyMap.set(inp.key.toLowerCase(), inp)
+    }
+
+    while (i < tokens.length) {
+      const tok = tokens[i]
+      const lower = tok.toLowerCase()
+      const optInput = optKeyMap.get(lower)
+      if (optInput) {
+        i++ // consume key 标识符
+        if (i < tokens.length) {
+          const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
+          values[optInput.key] = value
+          i = nextIndex
+        }
+      } else {
+        // 不认识的 token，跳过
+        i++
+      }
     }
   }
 
@@ -267,14 +293,17 @@ function consumeExpression(
         parts.push(inner.value)
         idx = inner.nextIndex
       } else {
-        // optional 位置参数：只消费明确的值 token（数字、引号、块、*、&）
-        // 避免贪婪消费外层的 keyword
-        if (/^-?\d/.test(curTok) || curTok.startsWith('"') || curTok.startsWith('{') || curTok.startsWith('[') || curTok.startsWith('*') || curTok.startsWith('&')) {
-          const inner = consumeExpression(tokens, idx, actionLookup)
-          parts.push(inner.value)
-          idx = inner.nextIndex
+        // 可选参数：key 作为标识符，匹配到才消费
+        if (curTok.toLowerCase() === input.key.toLowerCase()) {
+          parts.push(curTok)
+          idx++
+          if (idx < tokens.length) {
+            const inner = consumeExpression(tokens, idx, actionLookup)
+            parts.push(inner.value)
+            idx = inner.nextIndex
+          }
         }
-        // 否则跳过，不消费
+        // key 不匹配 → 此可选参数未提供，跳过
       }
     }
     return { value: parts.join(" "), nextIndex: idx }

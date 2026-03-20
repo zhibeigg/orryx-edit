@@ -79,11 +79,10 @@ function evaluateExpr(
       innerExpr = innerExpr.substring(7).trim()
     }
 
-    // lazy *变量名 → 替换为变量值
+    // lazy *变量名 → 替换为变量值（支持变量值为 kether 表达式）
     innerExpr = innerExpr.replace(/lazy\s+\*(\w+)/g, (_, varName: string) => {
-      const key = varName.charAt(0).toUpperCase() + varName.slice(1)
-      const val = variables[key] ?? variables[varName] ?? 0
-      return String(Number(val) || 0)
+      const val = resolveVariable(varName, variables, level)
+      return String(val)
     })
 
     // &level → 当前等级
@@ -110,7 +109,63 @@ function evaluateExpr(
 }
 
 /**
- * 求值描述行，返回 HTML 字符串。
+ * 解析变量值。
+ * 变量值可能是纯数字，也可能是 kether 表达式（如 calc "..."）。
+ * 查找时忽略大小写。
+ */
+function resolveVariable(
+  varName: string,
+  variables: Record<string, number | string>,
+  level: number
+): number {
+  // 忽略大小写查找变量
+  const val = findVariable(varName, variables)
+  if (val === undefined) return 0
+
+  // 纯数字直接返回
+  if (typeof val === "number") return val
+  const num = Number(val)
+  if (!isNaN(num)) return num
+
+  // 字符串表达式 → 用 kether-eval 求值
+  try {
+    return evaluateKether(String(val), { level })
+  } catch {
+    return 0
+  }
+}
+
+/** 忽略大小写查找变量 */
+function findVariable(
+  varName: string,
+  variables: Record<string, number | string>
+): number | string | undefined {
+  // 精确匹配
+  if (varName in variables) return variables[varName]
+  // 首字母大写匹配（damage → Damage）
+  const capitalized = varName.charAt(0).toUpperCase() + varName.slice(1)
+  if (capitalized in variables) return variables[capitalized]
+  // 全小写匹配
+  const lower = varName.toLowerCase()
+  for (const [k, v] of Object.entries(variables)) {
+    if (k.toLowerCase() === lower) return v
+  }
+  return undefined
+}
+
+/** 求值描述行，所有 {{ }} 用当前等级求值，不带升级预览 */
+function evaluateDescriptionLine(
+  line: string,
+  variables: Record<string, number | string>,
+  level: number
+): string {
+  return line.replace(/\{\{(.+?)\}\}/g, (_, expr: string) => {
+    return evaluateExpr(expr, variables, level)
+  })
+}
+
+/**
+ * 求值描述行并带升级预览。
  * 对 {{ }} 模板分别用 level 和 level+1 求值，
  * 如果两个值不同，显示 "当前值→下一级值"。
  */
@@ -151,7 +206,7 @@ function evaluateSimpleExpr(expr: string): number | null {
 export function DescriptionEditor({ descriptions, variables, minLevel, maxLevel, onChange }: DescriptionEditorProps) {
   const [previewLevel, setPreviewLevel] = useState(minLevel)
   const [showPreview, setShowPreview] = useState(true)
-  const [previewMode, setPreviewMode] = useState<"primary" | "secondary">("primary")
+
 
   const updateLine = (index: number, value: string) => {
     const newDescs = [...descriptions]
@@ -179,19 +234,20 @@ export function DescriptionEditor({ descriptions, variables, minLevel, maxLevel,
   const isStarLine = (line: string) => line.startsWith("*") || line.trimStart().startsWith("*")
   const previewLines = useMemo(() => {
     return descriptions
-      .filter(line => {
-        // 二级预览：过滤掉 * 开头的行
-        if (previewMode === "secondary" && isStarLine(line)) return false
-        return true
-      })
       .map(line => {
-        // * 开头的行去掉前缀后渲染
-        const cleaned = isStarLine(line) ? line.slice(line.indexOf("*") + 1) : line
+        const star = isStarLine(line)
+        // * 开头的行去掉前缀
+        const cleaned = star ? line.slice(line.indexOf("*") + 1) : line
         // 空行保留为空行
         if (cleaned.trim() === "") return ""
+        // * 行：仅求值当前等级，不带升级预览
+        // 普通行：带升级预览（当前值→下一级值）
+        if (star) {
+          return evaluateDescriptionLine(cleaned, variables, previewLevel)
+        }
         return evaluateDescriptionLineWithDiff(cleaned, variables, previewLevel, maxLevel)
       })
-  }, [descriptions, variables, previewLevel, previewMode, maxLevel])
+  }, [descriptions, variables, previewLevel, maxLevel])
 
   return (
     <div className="flex flex-col h-full">
@@ -260,20 +316,6 @@ export function DescriptionEditor({ descriptions, variables, minLevel, maxLevel,
               className="flex-1"
             />
             <span className="text-[13px] text-[#007acc] font-mono w-8 text-center">{previewLevel}</span>
-            <div className="flex items-center rounded overflow-hidden border border-[#3c3c3c] shrink-0">
-              <button
-                onClick={() => setPreviewMode("primary")}
-                className={`text-[11px] px-2 py-0.5 ${previewMode === "primary" ? "bg-[#007acc] text-white" : "text-[#858585] hover:text-[#cccccc]"}`}
-              >
-                一级
-              </button>
-              <button
-                onClick={() => setPreviewMode("secondary")}
-                className={`text-[11px] px-2 py-0.5 ${previewMode === "secondary" ? "bg-[#007acc] text-white" : "text-[#858585] hover:text-[#cccccc]"}`}
-              >
-                二级
-              </button>
-            </div>
           </div>
 
           {/* Minecraft 风格预览框 */}
@@ -295,7 +337,7 @@ export function DescriptionEditor({ descriptions, variables, minLevel, maxLevel,
               ))}
             </div>
             <p className="text-[10px] text-[#858585] mt-1">
-              游戏内预览 (Lv.{previewLevel}{previewMode === "secondary" ? " · 二级" : ""}) · <code className="text-[#dcdcaa]">&amp;颜色代码</code> 已渲染 · <code className="text-[#dcdcaa]">{"{{ }}"}</code> 已求值
+              游戏内预览 (Lv.{previewLevel}) · <code className="text-[#dcdcaa]">&amp;颜色代码</code> 已渲染 · <code className="text-[#dcdcaa]">{"{{ }}"}</code> 已求值
             </p>
           </div>
         </div>
