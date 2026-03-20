@@ -14,6 +14,14 @@ interface ParameterWizardProps {
 export function ParameterWizard({ action, schema, initialValues, onInsert, onCancel }: ParameterWizardProps) {
   const [values, setValues] = useState<Record<string, unknown>>(initialValues)
   const [showOptional, setShowOptional] = useState(false)
+  const [prevAction, setPrevAction] = useState(action.name)
+
+  // 当 action 变化时，重置 values 和 showOptional
+  if (action.name !== prevAction) {
+    setValues(initialValues)
+    setShowOptional(false)
+    setPrevAction(action.name)
+  }
 
   const required = useMemo(() => action.inputs.filter(p => p.required), [action])
   const optional = useMemo(() => action.inputs.filter(p => !p.required), [action])
