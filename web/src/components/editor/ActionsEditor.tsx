@@ -34,7 +34,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
   } | null>(null)
 
   const [schema, setSchema] = useState<ActionsSchemaV2 | null>(() => {
-    const raw = getActionsSchema()
+    const raw = getActionsSchema() as unknown as ActionsSchemaV2
     return raw ? normalizeSchema(raw) : null
   })
 
@@ -44,7 +44,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     let cancelled = false
     loadActionsSchema().then(() => {
       if (!cancelled) {
-        const raw = getActionsSchema()
+        const raw = getActionsSchema() as unknown as ActionsSchemaV2
         setSchema(raw ? normalizeSchema(raw) : null)
       }
     })

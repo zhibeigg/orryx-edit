@@ -150,22 +150,22 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
       description: a.description ?? "",
       builtin: a.builtin ?? false,
       inputs: params.map((p: Record<string, unknown>) => ({
-        name: p.name,
-        key: p.key ?? p.name,
-        type: p.type ?? "ANY",
+        name: p.name as string,
+        key: (p.key ?? p.name) as string,
+        type: (p.type ?? "ANY") as string,
         required: p.required ?? !(p.optional ?? false),
         default: p.default ?? null,
-        description: p.description ?? "",
+        description: (p.description ?? "") as string,
         keyword: p.keyword,
         options: p.options,
         min: p.min,
         max: p.max,
         step: p.step,
       })),
-      output: a.output ?? null,
-      flow: a.flow ?? "normal",
-      slots: a.slots,
-      provides: a.provides,
+      output: a.output ? (typeof a.output === 'string' ? { type: a.output } : a.output as SchemaOutput) : null,
+      flow: (a.flow && ["normal", "branch", "loop", "container"].includes(a.flow) ? a.flow : "normal") as FlowType,
+      slots: a.slots as SchemaSlot[] | undefined,
+      provides: a.provides as SchemaProvide[] | undefined,
     }
   })
 
@@ -174,15 +174,15 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
     aliases: s.aliases ?? [],
     description: s.description ?? "",
     params: (s.params ?? []).map((p: Record<string, unknown>) => ({
-      name: p.name,
-      key: p.key ?? p.name,
-      type: p.type ?? "STRING",
+      name: p.name as string,
+      key: (p.key ?? p.name) as string,
+      type: (p.type ?? "STRING") as string,
       default: p.default,
     })),
   }))
 
   // 从 actions 收集 categories
-  const categories: Record<string, SchemaCategory> = raw?.categories ?? {}
+  const categories: Record<string, SchemaCategory> = (raw?.categories ?? {}) as Record<string, SchemaCategory>
   for (const a of actions) {
     if (!categories[a.category]) {
       categories[a.category] = { ...DEFAULT_CATEGORY }
@@ -191,7 +191,7 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
 
   return {
     version: 2,
-    types: raw?.types ?? DEFAULT_TYPES,
+    types: (raw?.types ?? DEFAULT_TYPES) as Record<string, SchemaType>,
     categories,
     actions,
     selectors,

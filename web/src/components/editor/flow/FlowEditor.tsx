@@ -51,7 +51,7 @@ function FlowEditorInner({ value, schema }: FlowEditorProps) {
   // AST → Flow (initial)
   const initialFlow = useMemo(() => {
     try {
-      const ast = parseKether(value, schema as ActionsSchema)
+      const ast = parseKether(value, schema as unknown as ActionsSchema)
       return astToFlow(ast, schema, positionsRef.current)
     } catch {
       return { nodes: [], edges: [] }
@@ -66,7 +66,7 @@ function FlowEditorInner({ value, schema }: FlowEditorProps) {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     syncTimerRef.current = setTimeout(() => {
       try {
-        const ast = parseKether(value, schema as ActionsSchema)
+        const ast = parseKether(value, schema as unknown as ActionsSchema)
         const flow = astToFlow(ast, schema, positionsRef.current)
         setNodes(flow.nodes)
         setEdges(flow.edges)
