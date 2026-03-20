@@ -90,7 +90,7 @@ function rebuildFromSchema() {
   deprecatedKeywords = new Set()
 
   for (const a of cachedSchema.actions) {
-    const first = a.syntax.split(/\s+/)[0].replace(/[<>\[\]]/g, "")
+    const first = a.syntax.split(/\s+/)[0].replace(/[<>[\]]/g, "")
     const names = [first]
     if (first.includes("/")) names.push(...first.split("/"))
     for (const n of names) {
@@ -155,7 +155,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
       { open: '"', close: '"' },
     ],
     comments: { lineComment: "#" },
-    wordPattern: /(-?\d*\.\d\w*)|([^\s`~!@#%^&*()\-=+\[{\]}\\|;:'",.<>/?\s]+)/g,
+    wordPattern: /(-?\d*\.\d\w*)|([^\s`~!@#%^&*()\-=+[{\]}\\|;:'",.<>/?\s]+)/g,
   })
 
   // ---- Monarch tokenizer ----
@@ -193,7 +193,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
           },
         }],
         // 括号
-        [/[{}()\[\]]/, "bracket"],
+        [/[{}()[\]]/, "bracket"],
         // 运算符
         [/@symbols/, {
           cases: {

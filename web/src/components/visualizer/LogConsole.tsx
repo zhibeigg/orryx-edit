@@ -16,7 +16,7 @@ export function LogConsole() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [filter, setFilter] = useState("")
   const [subscribed, setSubscribed] = useState(false)
-  const connected = useConnectionStore((s) => s.connected)
+
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,8 +29,13 @@ export function LogConsole() {
 
   // 断线时重置订阅状态
   useEffect(() => {
-    if (!connected) setSubscribed(false)
-  }, [connected])
+    const unsub = useConnectionStore.subscribe((state, prevState) => {
+      if (prevState.connected && !state.connected) {
+        setSubscribed(false)
+      }
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
