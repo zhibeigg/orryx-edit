@@ -106,76 +106,96 @@ export function ConnectPage() {
 
   return (
     <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
-      <div className="w-full max-w-sm p-6 space-y-5">
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-medium text-[#cccccc]">Orryx Editor</h1>
-          <p className="text-[13px] text-[#858585]">输入 Token 连接到游戏服务器</p>
+      <div className="card-elevated w-full max-w-sm p-6 space-y-5">
+        <div className="text-center space-y-2">
+          <h1 className="text-headline-small text-[#cccccc]">Orryx Editor</h1>
+          <p className="text-body-small text-[#858585]">输入 Token 连接到游戏服务器</p>
         </div>
 
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-            placeholder="输入一次性 Token..."
-            className="w-full px-3 py-2 bg-[#3c3c3c] border border-[#3c3c3c] text-[#cccccc] placeholder:text-[#858585] focus:outline-none focus:border-[#007acc] text-[13px]"
-            disabled={connecting}
-          />
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-label-small text-[#858585]">Token</label>
+            <input
+              type="text"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+              placeholder="输入一次性 Token..."
+              className="input-filled w-full text-[13px]"
+              disabled={connecting}
+            />
+          </div>
 
           {error && (
-            <p className="text-[13px] text-[#f44747]">{error}</p>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/30">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <p className="text-[13px] text-red-400">{error}</p>
+            </div>
           )}
 
           <button
             onClick={() => handleConnect()}
             disabled={connecting || !tokenInput.trim()}
-            className="w-full py-2 bg-[#007acc] text-white text-[13px] font-medium hover:bg-[#0098ff] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn btn-filled w-full"
           >
             {connecting ? "连接中..." : "连接"}
           </button>
         </div>
 
-        {/* 解绑 IP */}
-        <div className="pt-2 border-t border-[#3c3c3c]">
+        <div className="border-t border-[#3c3c3c] pt-4">
           <button
             onClick={() => { setShowUnbind(!showUnbind); setUnbindStatus(null) }}
-            className="flex items-center gap-1.5 text-[12px] text-[#858585] hover:text-[#cccccc] transition-colors"
+            className="flex items-center gap-2 text-label-medium text-[#858585] hover:text-[#cccccc] transition-colors"
           >
-            <Unlink className="w-3.5 h-3.5" />
+            <Unlink className="w-4 h-4" />
             {showUnbind ? "收起" : "更换服务器？解绑 IP"}
           </button>
 
           {showUnbind && (
-            <div className="mt-3 space-y-2">
-              <p className="text-[11px] text-[#858585]">
+            <div className="mt-4 space-y-3">
+              <p className="text-body-small text-[#858585]">
                 输入你的 License Key 解绑当前 IP，下次插件启动时将自动绑定新服务器 IP。
               </p>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <KeyRound className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#858585]" />
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#858585]" />
                   <input
                     type="text"
                     value={unbindKey}
                     onChange={(e) => setUnbindKey(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleUnbind()}
                     placeholder="License Key"
-                    className="w-full pl-7 pr-2 py-1.5 bg-[#3c3c3c] border border-[#3c3c3c] text-[#cccccc] placeholder:text-[#858585] focus:outline-none focus:border-[#007acc] text-[12px]"
+                    className="input-filled w-full pl-10 text-[12px]"
                     disabled={unbinding}
                   />
                 </div>
                 <button
                   onClick={handleUnbind}
                   disabled={unbinding || !unbindKey.trim()}
-                  className="px-3 py-1.5 bg-[#d97706] text-white text-[12px] hover:bg-[#f59e0b] disabled:opacity-40 transition-colors shrink-0"
+                  className="btn btn-outlined px-4 text-[12px]"
+                  style={{ 
+                    backgroundColor: unbinding ? undefined : '#d97706',
+                    borderColor: unbinding ? undefined : '#d97706',
+                    color: 'white'
+                  }}
                 >
                   {unbinding ? "..." : "解绑"}
                 </button>
               </div>
               {unbindStatus && (
-                <div className={`flex items-start gap-1.5 text-[11px] ${unbindStatus.type === "success" ? "text-[#4ec9b0]" : "text-[#f44747]"}`}>
-                  {unbindStatus.type === "success" ? <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
-                  {unbindStatus.msg}
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-md ${
+                  unbindStatus.type === "success" 
+                    ? "bg-green-500/10 border border-green-500/30" 
+                    : "bg-red-500/10 border border-red-500/30"
+                }`}>
+                  {unbindStatus.type === "success" ? (
+                    <Check className="w-4 h-4 text-green-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  )}
+                  <span className={`text-[12px] ${unbindStatus.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                    {unbindStatus.msg}
+                  </span>
                 </div>
               )}
             </div>
