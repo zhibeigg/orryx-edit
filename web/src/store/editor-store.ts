@@ -13,6 +13,8 @@ export interface OpenFile {
 interface EditorState {
   openFiles: OpenFile[]
   activeFilePath: string | null
+  /** 最近关闭的文件（用于 Ctrl+Shift+T 重新打开） */
+  recentlyClosed: OpenFile[]
   /** 所有已加载文件的内容缓存（path → content），用于交叉引用分析 */
   fileContents: Map<string, string>
 
@@ -23,6 +25,8 @@ interface EditorState {
   setActiveFile: (path: string) => void
   updateDraft: (path: string, draft: string) => void
   markSaved: (path: string, content: string) => void
+  /** 重新打开最近关闭的标签页 */
+  reopenLastClosed: () => OpenFile | null
   /** 批量缓存文件内容（用于交叉引用分析） */
   cacheFileContent: (path: string, content: string) => void
   cacheFileContents: (files: Map<string, string>) => void
@@ -31,6 +35,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set, get) => ({
   openFiles: [],
   activeFilePath: null,
+  recentlyClosed: [],
   fileContents: new Map(),
 
   openFile: (file) => {
@@ -62,14 +67,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   closeFile: (path) => {
-    const { openFiles, activeFilePath } = get()
+    const { openFiles, activeFilePath, recentlyClosed } = get()
+    const closing = openFiles.find((f) => f.path === path)
     const newFiles = openFiles.filter((f) => f.path !== path)
     let newActive = activeFilePath
     if (activeFilePath === path) {
       const idx = openFiles.findIndex((f) => f.path === path)
       newActive = newFiles[Math.min(idx, newFiles.length - 1)]?.path ?? null
     }
-    set({ openFiles: newFiles, activeFilePath: newActive })
+    // 记录关闭的文件（最多保留 20 个）
+    const newClosed = closing
+      ? [closing, ...recentlyClosed.filter(f => f.path !== path)].slice(0, 20)
+      : recentlyClosed
+    set({ openFiles: newFiles, activeFilePath: newActive, recentlyClosed: newClosed })
   },
 
   closeAllFiles: () => {
@@ -105,6 +115,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }))
     // 同步更新缓存
     get().cacheFileContent(path, content)
+  },
+
+  reopenLastClosed: () => {
+    const { recentlyClosed, openFiles } = get()
+    if (recentlyClosed.length === 0) return null
+    // 跳过已经打开的文件
+    const idx = recentlyClosed.findIndex(f => !openFiles.some(o => o.path === f.path))
+    if (idx === -1) return null
+    const file = recentlyClosed[idx]
+    const newClosed = [...recentlyClosed]
+    newClosed.splice(idx, 1)
+    set({ recentlyClosed: newClosed })
+    get().openFile(file)
+    return file
   },
 
   cacheFileContent: (path, content) => {
