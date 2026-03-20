@@ -100,7 +100,9 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
   const [showEventList, setShowEventList] = useState(false)
 
   // 从 schema 加载 triggers，按 category 分组
-  const { triggerGroups, allTriggerNames } = useMemo(() => {
+  // useState + useMemo 替换为单次计算的值，避免 React Compiler 警告
+  // getActionsSchema() 返回全局单例，不需要依赖项
+  const [triggerGroups, allTriggerNames] = useMemo(() => {
     const schema = getActionsSchema()
     type TriggerItem = { name: string; description?: string; variables?: { name: string; type: string; description?: string }[] }
     if (schema?.triggers && schema.triggers.length > 0) {
@@ -111,12 +113,12 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
         groups[cat].push(t)
       }
       const names = schema.triggers.map(t => t.name)
-      return { triggerGroups: groups, allTriggerNames: names }
+      return [groups, names] as const
     }
-    return {
-      triggerGroups: { "默认": FALLBACK_EVENTS.map(name => ({ name }) as TriggerItem) } as Record<string, TriggerItem[]>,
-      allTriggerNames: FALLBACK_EVENTS,
-    }
+    return [
+      { "默认": FALLBACK_EVENTS.map(name => ({ name }) as TriggerItem) } as Record<string, TriggerItem[]>,
+      FALLBACK_EVENTS,
+    ] as const
   }, [])
 
   const filteredTriggers = eventFilter

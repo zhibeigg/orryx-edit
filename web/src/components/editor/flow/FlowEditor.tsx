@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useRef } from "react"
 import {
   ReactFlow, Background, Controls, MiniMap,
   useNodesState, useEdgesState, ReactFlowProvider,
@@ -48,20 +48,11 @@ function FlowEditorInner({ value, schema }: FlowEditorProps) {
   const positionsRef = useRef(new Map<string, { x: number; y: number }>())
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // AST → Flow (initial)
-  const initialFlow = useMemo(() => {
-    try {
-      const ast = parseKether(value, schema as unknown as ActionsSchema)
-      return astToFlow(ast, schema, positionsRef.current)
-    } catch {
-      return { nodes: [], edges: [] }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // 初始节点和边为空，在useEffect中设置
+  const [nodes, setNodes, onNodesChange] = useNodesState<KetherNode>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<KetherEdge>([])
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<KetherNode>(initialFlow.nodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState<KetherEdge>(initialFlow.edges)
-
-  // 文本变更 → 单向同步到节点图（只读，不回写）
+  // 初始化和更新节点图
   useEffect(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     syncTimerRef.current = setTimeout(() => {
@@ -71,9 +62,12 @@ function FlowEditorInner({ value, schema }: FlowEditorProps) {
         setNodes(flow.nodes)
         setEdges(flow.edges)
       } catch { /* 解析失败时保持当前状态 */ }
-    }, 300)
+    }, 0) // 使用0ms超时确保在渲染后执行
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current) }
   }, [value, schema, setNodes, setEdges])
+
+  // 文本变更 → 单向同步到节点图（只读，不回写）
+  // 注意：上面的useEffect已经处理了文本变更，所以这里不需要额外的effect
 
   // 拖动节点时保存位置（仅用于布局记忆，不回写文本）
   const onNodeDragStop = (_: unknown, node: KetherNode) => {
