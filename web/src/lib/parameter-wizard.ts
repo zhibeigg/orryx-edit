@@ -14,6 +14,39 @@ export function findAction(name: string, schema: ActionsSchemaV2): SchemaAction 
   ) ?? null
 }
 
+/**
+ * 从同名 action 的多个重载中，根据文本内容选择最匹配的重载。
+ * 通过检查文本中是否包含某个重载的 keyword 来判断。
+ */
+export function findBestOverload(name: string, line: string, schema: ActionsSchemaV2): SchemaAction | null {
+  const lower = name.toLowerCase()
+  const candidates = schema.actions.filter(a =>
+    a.name.toLowerCase() === lower || (a.aliases ?? []).some(al => al.toLowerCase() === lower)
+  )
+  if (candidates.length === 0) return null
+  if (candidates.length === 1) return candidates[0]
+
+  // 对每个重载，计算它的 keyword 在文本中的匹配数
+  const lineTokens = new Set(line.trim().toLowerCase().split(/\s+/))
+  let bestScore = -1
+  let best: SchemaAction = candidates[0]
+
+  for (const candidate of candidates) {
+    let score = 0
+    for (const input of candidate.inputs ?? []) {
+      if (!input.keyword) continue
+      // 支持 "set/to" 复合 keyword
+      const kwParts = input.keyword.toLowerCase().split("/")
+      if (kwParts.some(kw => lineTokens.has(kw))) score++
+    }
+    if (score > bestScore) {
+      bestScore = score
+      best = candidate
+    }
+  }
+  return best
+}
+
 export function generateKetherText(action: SchemaAction, values: Record<string, unknown>): string {
   const parts: string[] = [action.name]
 
@@ -23,13 +56,20 @@ export function generateKetherText(action: SchemaAction, values: Record<string, 
 
     if (input.keyword) {
       if (val == null) continue
-      // 标记型 keyword：值等于 keyword 本身，只输出一次（不输出 keyword value 两个 token）
-      if (String(val).toLowerCase() === input.keyword.toLowerCase()) {
-        parts.push(input.keyword)
+      // 标记型 keyword (type === "keyword")：值是 keyword 的某个部分，只输出一次
+      if (input.type === "keyword") {
+        const kwParts = input.keyword.toLowerCase().split("/")
+        const valLower = String(val).toLowerCase()
+        if (kwParts.includes(valLower)) {
+          parts.push(String(val))
+        } else {
+          parts.push(kwParts[0])
+        }
       } else {
-        // 值等于 default 时跳过（非标记型）
+        // 前缀型 keyword：输出 keyword + value
         if (val === input.default) continue
-        parts.push(input.keyword)
+        const kwParts = input.keyword.split("/")
+        parts.push(kwParts[0])
         parts.push(formatValue(val, input))
       }
     } else {
@@ -71,7 +111,12 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
   const inputs = action.inputs ?? []
   const keywordMap = new Map<string, SchemaInput>()
   for (const input of inputs) {
-    if (input.keyword) keywordMap.set(input.keyword.toLowerCase(), input)
+    if (input.keyword) {
+      // 支持 "set/to" 复合 keyword — 每个部分都注册
+      for (const kw of input.keyword.toLowerCase().split("/")) {
+        keywordMap.set(kw, input)
+      }
+    }
   }
   const positional = inputs.filter(p => !p?.keyword)
   let posIdx = 0
@@ -84,31 +129,20 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
     // 检查是否匹配某个 keyword 参数
     const kwInput = keywordMap.get(lower)
     if (kwInput) {
-      // 判断是"标记型 keyword"还是"前缀型 keyword"
-      // 标记型：keyword 本身就是值（如 potion set / cooldown get）
-      //   → 后面还有未消费的位置参数，keyword 后的 token 属于位置参数
-      // 前缀型：keyword 后面跟一个值（如 level 3 / they "@self"）
-      //   → 后面没有未消费的位置参数了
-      const hasRemainingPositional = posIdx < positional.length
-      const nextTok = i + 1 < tokens.length ? tokens[i + 1].toLowerCase() : null
-      const isMarkerKeyword =
-        // 后面还有位置参数要消费，keyword 后的 token 应该给位置参数
-        hasRemainingPositional ||
-        // 下一个 token 是另一个 keyword 标记
-        (nextTok !== null && keywordMap.has(nextTok)) ||
-        // 没有下一个 token
-        nextTok === null
+      // 标记型 keyword：type 为 "keyword"，keyword 本身就是值（如 set/to、remove/delete）
+      // 前缀型 keyword：type 为具体类型，keyword 后面跟一个值（如 level 3、timeout 200）
+      const isMarkerKeyword = kwInput.type === "keyword"
 
       if (isMarkerKeyword) {
-        // 标记型：值就是 keyword 本身
         values[kwInput.key] = tok
         i++
       } else {
-        // 前缀型：消费 keyword + 后面的值
         i++ // consume keyword
-        const { value, nextIndex } = consumeExpression(tokens, i)
-        values[kwInput.key] = value
-        i = nextIndex
+        if (i < tokens.length) {
+          const { value, nextIndex } = consumeExpression(tokens, i)
+          values[kwInput.key] = value
+          i = nextIndex
+        }
       }
       continue
     }

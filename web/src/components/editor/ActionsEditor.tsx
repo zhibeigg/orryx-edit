@@ -5,7 +5,7 @@ import { Code, Workflow } from "lucide-react"
 import type { ActionsSchemaV2, SchemaAction } from "@/types/schema"
 import { normalizeSchema } from "@/types/schema"
 import { ParameterWizard } from "./ParameterWizard"
-import { findAction, parseLineValues } from "@/lib/parameter-wizard"
+import { findBestOverload, parseLineValues } from "@/lib/parameter-wizard"
 
 const FlowEditor = lazy(() => import("./flow/FlowEditor").then(m => ({ default: m.FlowEditor })))
 
@@ -71,7 +71,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
         const line = ed.getModel()?.getLineContent(pos.lineNumber) ?? ""
         const firstToken = line.trim().split(/\s+/)[0]
         if (!firstToken) return
-        const action = findAction(firstToken, currentSchema)
+        const action = findBestOverload(firstToken, line, currentSchema)
         if (action) {
           const vals = parseLineValues(line, action)
           setWizardState({ action, values: vals, lineNumber: pos.lineNumber })
@@ -83,11 +83,11 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
   useEffect(() => {
     if (!schema) return
     const unsub = onWizardTrigger((trigger: WizardTrigger) => {
-      const action = findAction(trigger.actionName, schema)
-      if (!action) return
       const editor = editorRef.current
       if (!editor) return
       const line = editor.getModel()?.getLineContent(trigger.lineNumber) ?? ""
+      const action = findBestOverload(trigger.actionName, line, schema)
+      if (!action) return
       const vals = parseLineValues(line, action)
       setWizardState({ action, values: vals, lineNumber: trigger.lineNumber })
     })
