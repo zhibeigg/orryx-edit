@@ -109,15 +109,6 @@ function evaluateExpr(
   }
 }
 
-/** 求值描述行，返回纯文本（单等级） */
-function evaluateDescriptionLine(
-  line: string,
-  variables: Record<string, number | string>,
-  level: number
-): string {
-  return line.replace(/\{\{(.+?)\}\}/g, (_, expr: string) => evaluateExpr(expr, variables, level))
-}
-
 /**
  * 求值描述行，返回 HTML 字符串。
  * 对 {{ }} 模板分别用 level 和 level+1 求值，
