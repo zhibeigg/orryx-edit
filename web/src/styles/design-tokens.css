@@ -1,0 +1,156 @@
+/**
+ * Material Design 3 Design Tokens
+ * Based on Google's Material Design 3 specification
+ */
+
+:root {
+  /* ===== Primary Colors ===== */
+  --md-sys-color-primary: #6750A4;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #EADDFF;
+  --md-sys-color-on-primary-container: #21005D;
+
+  /* ===== Secondary Colors ===== */
+  --md-sys-color-secondary: #625B71;
+  --md-sys-color-on-secondary: #FFFFFF;
+  --md-sys-color-secondary-container: #E8DEF8;
+  --md-sys-color-on-secondary-container: #1D192B;
+
+  /* ===== Tertiary Colors ===== */
+  --md-sys-color-tertiary: #7D5260;
+  --md-sys-color-on-tertiary: #FFFFFF;
+  --md-sys-color-tertiary-container: #FFD8E4;
+  --md-sys-color-on-tertiary-container: #31111D;
+
+  /* ===== Error Colors ===== */
+  --md-sys-color-error: #B3261E;
+  --md-sys-color-on-error: #FFFFFF;
+  --md-sys-color-error-container: #F9DEDC;
+  --md-sys-color-on-error-container: #410E0B;
+
+  /* ===== Surface Colors ===== */
+  --md-sys-color-surface: #FFFBFE;
+  --md-sys-color-surface-dim: #DED8E1;
+  --md-sys-color-surface-bright: #FFFBFE;
+  --md-sys-color-surface-container-lowest: #FFFFFF;
+  --md-sys-color-surface-container-low: #F7F2FA;
+  --md-sys-color-surface-container: #F3EDF7;
+  --md-sys-color-surface-container-high: #ECE6F0;
+  --md-sys-color-surface-container-highest: #E6E0E9;
+  --md-sys-color-surface-variant: #E7E0EC;
+  --md-sys-color-on-surface: #1C1B1F;
+  --md-sys-color-on-surface-variant: #49454F;
+
+  /* ===== Background Colors ===== */
+  --md-sys-color-background: #FFFBFE;
+  --md-sys-color-on-background: #1C1B1F;
+
+  /* ===== Outline Colors ===== */
+  --md-sys-color-outline: #79747E;
+  --md-sys-color-outline-variant: #CAC4D0;
+
+  /* ===== Spacing System ===== */
+  --md-spacing-0: 0px;
+  --md-spacing-xs: 4px;
+  --md-spacing-sm: 8px;
+  --md-spacing-md: 16px;
+  --md-spacing-lg: 24px;
+  --md-spacing-xl: 32px;
+  --md-spacing-2xl: 48px;
+  --md-spacing-3xl: 64px;
+
+  /* ===== Border Radius ===== */
+  --md-radius-none: 0px;
+  --md-radius-xs: 2px;
+  --md-radius-sm: 4px;
+  --md-radius-md: 8px;
+  --md-radius-lg: 12px;
+  --md-radius-xl: 16px;
+  --md-radius-2xl: 28px;
+  --md-radius-full: 9999px;
+
+  /* ===== Elevation/Shadow ===== */
+  --md-elevation-0: none;
+  --md-elevation-1: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elevation-2: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-4: 0px 6px 10px 4px rgba(0, 0, 0, 0.15), 0px 2px 3px rgba(0, 0, 0, 0.3);
+  --md-elevation-5: 0px 8px 12px 6px rgba(0, 0, 0, 0.15), 0px 4px 4px rgba(0, 0, 0, 0.3);
+
+  /* ===== Typography ===== */
+  --md-font-family: 'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --md-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* ===== Font Sizes ===== */
+  --md-font-size-xs: 0.625rem;  /* 10px */
+  --md-font-size-sm: 0.75rem;   /* 12px */
+  --md-font-size-md: 0.875rem;  /* 14px */
+  --md-font-size-lg: 1rem;       /* 16px */
+  --md-font-size-xl: 1.25rem;    /* 20px */
+  --md-font-size-2xl: 1.5rem;    /* 24px */
+  --md-font-size-3xl: 2rem;      /* 32px */
+
+  /* ===== Line Heights ===== */
+  --md-line-height-tight: 1.2;
+  --md-line-height-normal: 1.5;
+  --md-line-height-loose: 1.75;
+
+  /* ===== Font Weights ===== */
+  --md-font-weight-normal: 400;
+  --md-font-weight-medium: 500;
+  --md-font-weight-semibold: 600;
+  --md-font-weight-bold: 700;
+
+  /* ===== Transition Durations ===== */
+  --md-transition-fast: 150ms;
+  --md-transition-normal: 250ms;
+  --md-transition-slow: 350ms;
+
+  /* ===== Z-Index Scale ===== */
+  --md-z-index-dropdown: 1000;
+  --md-z-index-modal: 1100;
+  --md-z-index-popover: 1200;
+  --md-z-index-tooltip: 1300;
+  --md-z-index-toast: 1400;
+
+  /* ===== Dark Mode Overrides ===== */
+  /* Note: This project currently uses a dark theme (VS Code-like)
+   * so we also define dark mode variants
+   */
+  --md-dark-bg-primary: #1e1e1e;
+  --md-dark-bg-secondary: #252526;
+  --md-dark-bg-tertiary: #2d2d2d;
+  --md-dark-bg-hover: #2a2d2e;
+  --md-dark-bg-active: #37373d;
+
+  --md-dark-text-primary: #cccccc;
+  --md-dark-text-secondary: #969696;
+  --md-dark-text-muted: #858585;
+
+  --md-dark-border: #3c3c3c;
+  --md-dark-border-active: #007acc;
+
+  --md-dark-accent-primary: #007acc;
+  --md-dark-accent-success: #4ec9b0;
+  --md-dark-accent-warning: #dcdcaa;
+  --md-dark-accent-error: #f44747;
+
+  /* ===== Semantic Colors for VS Code Dark Theme ===== */
+  --color-bg-primary: var(--md-dark-bg-primary);
+  --color-bg-secondary: var(--md-dark-bg-secondary);
+  --color-bg-tertiary: var(--md-dark-bg-tertiary);
+  --color-bg-hover: var(--md-dark-bg-hover);
+  --color-bg-active: var(--md-dark-bg-active);
+
+  --color-text-primary: var(--md-dark-text-primary);
+  --color-text-secondary: var(--md-dark-text-secondary);
+  --color-text-muted: var(--md-dark-text-muted);
+
+  --color-border: var(--md-dark-border);
+  --color-border-active: var(--md-dark-border-active);
+
+  --color-accent-primary: var(--md-dark-accent-primary);
+  --color-accent-success: var(--md-dark-accent-success);
+  --color-accent-warning: var(--md-dark-accent-warning);
+  --color-accent-error: var(--md-dark-accent-error);
+}
