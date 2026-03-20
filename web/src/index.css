@@ -94,3 +94,337 @@ select {
 select:focus {
   outline: 1px solid #007acc;
 }
+
+/* ===== Material Design Button Styles ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--md-spacing-sm);
+  font-family: var(--md-font-family);
+  font-weight: var(--md-font-weight-medium);
+  font-size: var(--md-font-size-md);
+  line-height: 1;
+  border-radius: var(--md-radius-md);
+  transition: all var(--md-transition-fast) ease;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Filled Button - Primary */
+.btn-filled {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  padding: var(--md-spacing-sm) var(--md-spacing-md);
+  height: 40px;
+}
+
+.btn-filled:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--md-sys-color-primary) 92%, white);
+}
+
+.btn-filled:focus-visible {
+  box-shadow: 0 0 0 2px var(--md-sys-color-background), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+.btn-filled:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--md-sys-color-primary) 88%, white);
+}
+
+/* Outlined Button */
+.btn-outlined {
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  padding: var(--md-spacing-sm) var(--md-spacing-md);
+  height: 40px;
+  border: 1px solid var(--md-sys-color-outline);
+}
+
+.btn-outlined:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.btn-outlined:focus-visible {
+  box-shadow: 0 0 0 2px var(--md-sys-color-background), 0 0 0 4px var(--md-sys-color-primary);
+}
+
+/* Text Button */
+.btn-text {
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  padding: var(--md-spacing-sm) var(--md-spacing-md);
+  height: 40px;
+}
+
+.btn-text:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.btn-text:focus-visible {
+  background-color: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+}
+
+/* Elevated Button */
+.btn-elevated {
+  background-color: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-primary);
+  padding: var(--md-spacing-sm) var(--md-spacing-md);
+  height: 40px;
+  box-shadow: var(--md-elevation-1);
+}
+
+.btn-elevated:hover:not(:disabled) {
+  box-shadow: var(--md-elevation-2);
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.btn-elevated:focus-visible {
+  box-shadow: var(--md-elevation-2);
+}
+
+/* Button Sizes */
+.btn-sm {
+  height: 32px;
+  padding: var(--md-spacing-xs) var(--md-spacing-sm);
+  font-size: var(--md-font-size-sm);
+}
+
+.btn-lg {
+  height: 48px;
+  padding: var(--md-spacing-md) var(--md-spacing-lg);
+  font-size: var(--md-font-size-lg);
+}
+
+/* ===== Material Design Input Styles ===== */
+.input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font-family: var(--md-font-family);
+  font-size: var(--md-font-size-md);
+  line-height: var(--md-line-height-normal);
+  color: var(--md-sys-color-on-surface);
+  background-color: var(--md-sys-color-surface-container-highest);
+  border: none;
+  border-radius: var(--md-radius-sm);
+  padding: var(--md-spacing-md);
+  transition: background-color var(--md-transition-fast) ease;
+}
+
+.input:focus {
+  outline: none;
+  caret-color: var(--md-sys-color-primary);
+}
+
+.input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Outlined Input */
+.input-outlined {
+  background-color: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-radius-md);
+  padding: var(--md-spacing-md);
+}
+
+.input-outlined:focus {
+  border-color: var(--md-sys-color-primary);
+  border-width: 2px;
+}
+
+.input-outlined:hover:not(:focus) {
+  border-color: var(--md-sys-color-on-surface);
+}
+
+/* Filled Input */
+.input-filled {
+  background-color: var(--md-sys-color-surface-container-highest);
+  border-bottom: 1px solid var(--md-sys-color-on-surface-variant);
+  border-radius: var(--md-radius-xs) var(--md-radius-xs) 0 0;
+  padding: var(--md-spacing-md);
+}
+
+.input-filled:focus {
+  border-bottom-color: var(--md-sys-color-primary);
+  border-bottom-width: 2px;
+}
+
+/* ===== Material Design Card Styles ===== */
+.card {
+  background-color: var(--md-sys-color-surface-container);
+  border-radius: var(--md-radius-lg);
+  overflow: hidden;
+}
+
+.card-elevated {
+  background-color: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-elevation-1);
+  border-radius: var(--md-radius-lg);
+}
+
+.card-elevated:hover {
+  box-shadow: var(--md-elevation-2);
+}
+
+.card-filled {
+  background-color: var(--md-sys-color-surface-container-highest);
+  border-radius: var(--md-radius-lg);
+}
+
+.card-outlined {
+  background-color: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-radius-lg);
+}
+
+/* Card Header */
+.card-header {
+  padding: var(--md-spacing-md);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.card-title {
+  font-size: var(--md-font-size-lg);
+  font-weight: var(--md-font-weight-medium);
+  color: var(--md-sys-color-on-surface);
+}
+
+.card-subtitle {
+  font-size: var(--md-font-size-sm);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Card Content */
+.card-content {
+  padding: var(--md-spacing-md);
+}
+
+/* Card Actions */
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--md-spacing-sm);
+  padding: var(--md-spacing-md);
+}
+
+/* ===== Dark Theme Overrides ===== */
+/* For the existing dark VS Code theme, we keep the dark colors */
+/* and apply Material Design shapes and interactions */
+
+.dark {
+  --md-sys-color-primary: #007acc;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #005a9e;
+  --md-sys-color-on-primary-container: #d0e8ff;
+
+  --md-sys-color-surface: #1e1e1e;
+  --md-sys-color-surface-container: #252526;
+  --md-sys-color-surface-container-low: #1e1e1e;
+  --md-sys-color-surface-container-high: #2d2d2d;
+  --md-sys-color-surface-container-highest: #37373d;
+  
+  --md-sys-color-on-surface: #cccccc;
+  --md-sys-color-on-surface-variant: #858585;
+  
+  --md-sys-color-outline: #3c3c3c;
+  --md-sys-color-outline-variant: #424242;
+}
+
+/* ===== Utility Classes ===== */
+.text-display-large {
+  font-size: 57px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-tight);
+}
+
+.text-display-medium {
+  font-size: 45px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-tight);
+}
+
+.text-display-small {
+  font-size: 36px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-tight);
+}
+
+.text-headline-large {
+  font-size: 32px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-headline-medium {
+  font-size: 28px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-headline-small {
+  font-size: 24px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-title-large {
+  font-size: 22px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-title-medium {
+  font-size: 16px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-title-small {
+  font-size: 14px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-body-large {
+  font-size: 16px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-body-medium {
+  font-size: 14px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-body-small {
+  font-size: 12px;
+  font-weight: var(--md-font-weight-normal);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-label-large {
+  font-size: 14px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-label-medium {
+  font-size: 12px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
+
+.text-label-small {
+  font-size: 11px;
+  font-weight: var(--md-font-weight-medium);
+  line-height: var(--md-line-height-normal);
+}
