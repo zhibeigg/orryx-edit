@@ -92,17 +92,21 @@ export function AdminPage() {
   if (!authed) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
-        <div className="w-full max-w-sm p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <Shield className="w-10 h-10 mx-auto text-[#858585]" />
-            <h1 className="text-2xl font-bold text-white">Orryx Admin</h1>
+        <div className="card-elevated w-full max-w-sm p-8 space-y-6">
+          <div className="text-center space-y-3">
+            <Shield className="w-12 h-12 mx-auto text-[#007acc]" />
+            <h1 className="text-headline-large text-white">Orryx Admin</h1>
           </div>
-          <div className="space-y-3">
-            <input type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="Admin Key"
-              className="w-full px-4 py-3 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-600" />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <button onClick={handleLogin} className="w-full py-3 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff]">登录</button>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-label-medium text-[#858585]">Admin Key</label>
+              <input type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()} 
+                className="input-filled w-full rounded-sm"
+                placeholder="输入管理密钥..." />
+            </div>
+            {error && <p className="text-body-small text-[#f44747]">{error}</p>}
+            <button onClick={handleLogin} className="btn btn-filled w-full">登录</button>
           </div>
         </div>
       </div>
@@ -111,12 +115,15 @@ export function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#1e1e1e] text-white">
-      <header className="border-b border-[#3c3c3c] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-[#858585]" />
-          <span className="font-bold text-lg">Orryx Admin</span>
+      <header className="border-b border-[#3c3c3c] px-6 py-4 flex items-center justify-between bg-[#252526]">
+        <div className="flex items-center gap-3">
+          <Shield className="w-6 h-6 text-[#007acc]" />
+          <span className="text-title-large">Orryx Admin</span>
         </div>
-        <button onClick={() => { setAuthed(false); sessionStorage.removeItem("adminKey") }} className="text-sm text-[#858585] hover:text-[#cccccc]">退出</button>
+        <button onClick={() => { setAuthed(false); sessionStorage.removeItem("adminKey") }} 
+          className="btn btn-text text-[#858585] hover:text-white">
+          退出
+        </button>
       </header>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -130,25 +137,36 @@ export function AdminPage() {
         )}
 
         {/* 创建 License */}
-        <div className="flex gap-3">
-          <input type="text" value={newOwner} onChange={(e) => setNewOwner(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()} placeholder="用户名 / 备注"
-            className="flex-1 px-4 py-2.5 rounded-sm bg-[#252526] border border-[#3c3c3c] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600" />
-          <Select value={String(newDays)} onValueChange={(v) => setNewDays(Number(v))}>
-            <SelectTrigger className="w-[100px] py-2.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">7 天</SelectItem>
-              <SelectItem value="30">30 天</SelectItem>
-              <SelectItem value="90">90 天</SelectItem>
-              <SelectItem value="180">180 天</SelectItem>
-              <SelectItem value="365">365 天</SelectItem>
-              <SelectItem value="0">永久</SelectItem>
-            </SelectContent>
-          </Select>
-          <button onClick={handleCreate} disabled={creating || !newOwner.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-sm bg-[#007acc] text-white font-medium hover:bg-[#0098ff] disabled:opacity-40">
-            <Plus className="w-4 h-4" />创建
-          </button>
+        <div className="card-elevated p-4">
+          <div className="flex gap-3">
+            <div className="flex-1 space-y-1">
+              <label className="text-label-small text-[#858585]">用户名 / 备注</label>
+              <input type="text" value={newOwner} onChange={(e) => setNewOwner(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                className="input-filled w-full"
+                placeholder="输入用户名或备注..." />
+            </div>
+            <div className="w-[120px] space-y-1">
+              <label className="text-label-small text-[#858585]">有效期</label>
+              <Select value={String(newDays)} onValueChange={(v) => setNewDays(Number(v))}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 天</SelectItem>
+                  <SelectItem value="30">30 天</SelectItem>
+                  <SelectItem value="90">90 天</SelectItem>
+                  <SelectItem value="180">180 天</SelectItem>
+                  <SelectItem value="365">365 天</SelectItem>
+                  <SelectItem value="0">永久</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <button onClick={handleCreate} disabled={creating || !newOwner.trim()}
+                className="btn btn-filled flex items-center gap-2">
+                <Plus className="w-4 h-4" />创建
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* 续费弹窗 */}
@@ -258,9 +276,11 @@ function ExpiryBadge({ expiresAt, remainingDays }: { expiresAt: number; remainin
 
 function StatCard({ icon: Icon, label, value }: { icon: typeof Server; label: string; value: number }) {
   return (
-    <div className="rounded-sm border border-[#3c3c3c] bg-[#252526]/30 p-4">
-      <div className="flex items-center gap-2 text-[#858585] text-xs mb-1"><Icon className="w-3.5 h-3.5" />{label}</div>
-      <div className="text-2xl font-bold">{value}</div>
+    <div className="card-elevated p-4">
+      <div className="flex items-center gap-2 text-[#858585] text-label-medium mb-2">
+        <Icon className="w-4 h-4" />{label}
+      </div>
+      <div className="text-headline-large">{value}</div>
     </div>
   )
 }
