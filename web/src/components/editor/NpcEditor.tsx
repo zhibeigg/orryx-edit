@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
@@ -20,7 +20,9 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const rawRef = useRef(content)
-  rawRef.current = content
+  useEffect(() => {
+    rawRef.current = content
+  }, [content])
 
   const npcs = useMemo(() => {
     try { return parseYaml<Record<string, NpcConfig>>(content) }

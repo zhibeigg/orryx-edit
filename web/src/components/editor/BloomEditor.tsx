@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
@@ -19,7 +19,9 @@ interface BloomConfig {
 export function BloomEditor({ content, onChange }: BloomEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const rawRef = useRef(content)
-  rawRef.current = content
+  useEffect(() => {
+    rawRef.current = content
+  }, [content])
 
   const data = useMemo(() => {
     try {
