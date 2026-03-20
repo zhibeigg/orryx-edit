@@ -73,7 +73,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
         if (!firstToken) return
         const action = findBestOverload(firstToken, line, currentSchema)
         if (action) {
-          const vals = parseLineValues(line, action)
+          const vals = parseLineValues(line, action, currentSchema)
           setWizardState({ action, values: vals, lineNumber: pos.lineNumber })
         }
       },
@@ -88,7 +88,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
       const line = editor.getModel()?.getLineContent(trigger.lineNumber) ?? ""
       const action = findBestOverload(trigger.actionName, line, schema)
       if (!action) return
-      const vals = parseLineValues(line, action)
+      const vals = parseLineValues(line, action, schema)
       setWizardState({ action, values: vals, lineNumber: trigger.lineNumber })
     })
     return unsub

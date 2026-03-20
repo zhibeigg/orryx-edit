@@ -101,12 +101,25 @@ const BRACKET_PREFIXES = new Set(["math", "any", "all"])
  * 从一行 Kether 文本中解析参数值。
  * 基于 token 级别匹配，支持嵌套块和多 token 表达式合并。
  */
-export function parseLineValues(line: string, action: SchemaAction): Record<string, unknown> {
+export function parseLineValues(line: string, action: SchemaAction, schema?: ActionsSchemaV2): Record<string, unknown> {
   const values: Record<string, unknown> = {}
   const tokens = tokenizeLine(line.trim())
   if (tokens.length === 0) return values
 
   tokens.shift() // skip action name
+
+  // 构建已知 action 查找表（用于嵌套表达式消费）
+  const actionLookup = new Map<string, SchemaAction>()
+  if (schema) {
+    for (const a of schema.actions) {
+      const n = a.name.toLowerCase()
+      if (!actionLookup.has(n)) actionLookup.set(n, a)
+      for (const al of a.aliases ?? []) {
+        const aln = al.toLowerCase()
+        if (!actionLookup.has(aln)) actionLookup.set(aln, a)
+      }
+    }
+  }
 
   const inputs = action.inputs ?? []
   const keywordMap = new Map<string, SchemaInput>()
@@ -115,6 +128,13 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
       // 支持 "set/to" 复合 keyword — 每个部分都注册
       for (const kw of input.keyword.toLowerCase().split("/")) {
         keywordMap.set(kw, input)
+      }
+    } else if (!input.required && input.key) {
+      // 没有 keyword 字段但 key 出现在 token 列表中 → 当作隐式 keyword
+      // 处理 schema 中 they/source/type 等没有标注 keyword 但实际是 keyword 的情况
+      const keyLower = input.key.toLowerCase()
+      if (tokens.some(t => t.toLowerCase() === keyLower)) {
+        keywordMap.set(keyLower, input)
       }
     }
   }
@@ -139,7 +159,7 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
       } else {
         i++ // consume keyword
         if (i < tokens.length) {
-          const { value, nextIndex } = consumeExpression(tokens, i)
+          const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
           values[kwInput.key] = value
           i = nextIndex
         }
@@ -149,8 +169,13 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
 
     // 消费位置参数
     if (posIdx < positional.length) {
-      const { value, nextIndex } = consumeExpression(tokens, i)
-      values[positional[posIdx].key] = value
+      const param = positional[posIdx]
+      // selector 类型参数：如果当前 token 是 "they"，跳过它取下一个 token 作为值
+      if (param.type === "selector" && lower === "they" && i + 1 < tokens.length) {
+        i++ // skip "they"
+      }
+      const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
+      values[param.key] = value
       posIdx++
       i = nextIndex
     } else {
@@ -164,10 +189,14 @@ export function parseLineValues(line: string, action: SchemaAction): Record<stri
 
 /**
  * 从 tokens[startIdx] 开始消费一个"表达式值"。
- * 处理多 token 表达式：lazy *var、math add [ 1 2 ]、check a == b、{ ... } 等。
+ * 处理多 token 表达式：lazy *var、math add [ 1 2 ]、range 1 to 10、{ ... } 等。
  * 返回合并后的字符串值和下一个 token 的索引。
  */
-function consumeExpression(tokens: string[], startIdx: number): { value: string; nextIndex: number } {
+function consumeExpression(
+  tokens: string[],
+  startIdx: number,
+  actionLookup: Map<string, SchemaAction> = new Map()
+): { value: string; nextIndex: number } {
   if (startIdx >= tokens.length) return { value: "", nextIndex: startIdx }
 
   const tok = tokens[startIdx]
@@ -180,16 +209,14 @@ function consumeExpression(tokens: string[], startIdx: number): { value: string;
 
   // lazy/not + 下一个 token
   if (EXPRESSION_PREFIXES.has(lower) && startIdx + 1 < tokens.length) {
-    const inner = consumeExpression(tokens, startIdx + 1)
+    const inner = consumeExpression(tokens, startIdx + 1, actionLookup)
     return { value: tok + " " + inner.value, nextIndex: inner.nextIndex }
   }
 
   // math/any/all + OP + [ ... ]
   if (BRACKET_PREFIXES.has(lower)) {
     let end = startIdx + 1
-    // math 后面还有一个操作符 token（如 div/mul/add）
     if (lower === "math" && end < tokens.length) end++
-    // 然后是 [ ... ] 块
     if (end < tokens.length && tokens[end].startsWith("[")) end++
     const merged = tokens.slice(startIdx, end).join(" ")
     return { value: merged, nextIndex: end }
@@ -204,6 +231,53 @@ function consumeExpression(tokens: string[], startIdx: number): { value: string;
   if (lower === "check" && startIdx + 3 < tokens.length) {
     const merged = tokens.slice(startIdx, startIdx + 4).join(" ")
     return { value: merged, nextIndex: startIdx + 4 }
+  }
+
+  // 已知 action 名 → 按 schema 参数结构递归消费
+  const nestedAction = actionLookup.get(lower)
+  if (nestedAction) {
+    const parts: string[] = [tok]
+    let idx = startIdx + 1
+    const nestedInputs = nestedAction.inputs ?? []
+
+    for (const input of nestedInputs) {
+      if (idx >= tokens.length) break
+      const curTok = tokens[idx]
+
+      if (input.keyword) {
+        const kwParts = input.keyword.toLowerCase().split("/")
+        if (kwParts.includes(curTok.toLowerCase())) {
+          if (input.type === "keyword") {
+            parts.push(curTok)
+            idx++
+          } else {
+            parts.push(curTok)
+            idx++
+            if (idx < tokens.length) {
+              const inner = consumeExpression(tokens, idx, actionLookup)
+              parts.push(inner.value)
+              idx = inner.nextIndex
+            }
+          }
+        }
+        // keyword 不匹配则跳过
+      } else if (input.required) {
+        // required 位置参数：始终消费
+        const inner = consumeExpression(tokens, idx, actionLookup)
+        parts.push(inner.value)
+        idx = inner.nextIndex
+      } else {
+        // optional 位置参数：只消费明确的值 token（数字、引号、块、*、&）
+        // 避免贪婪消费外层的 keyword
+        if (/^-?\d/.test(curTok) || curTok.startsWith('"') || curTok.startsWith('{') || curTok.startsWith('[') || curTok.startsWith('*') || curTok.startsWith('&')) {
+          const inner = consumeExpression(tokens, idx, actionLookup)
+          parts.push(inner.value)
+          idx = inner.nextIndex
+        }
+        // 否则跳过，不消费
+      }
+    }
+    return { value: parts.join(" "), nextIndex: idx }
   }
 
   // 普通单 token
