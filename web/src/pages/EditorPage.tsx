@@ -27,8 +27,14 @@ import type { OpenFile } from "@/store/editor-store"
 
 type BottomPanel = "log" | null
 
+interface EditorProps {
+  content: string
+  onChange: (value: string) => void
+  filePath?: string
+}
+
 // 编辑器注册表 —— 新增编辑器只需在此添加映射
-const configTypeEditors: Record<string, React.ComponentType<any>> = {
+const configTypeEditors: Record<string, React.ComponentType<EditorProps>> = {
   skill: SkillEditor,
   station: StationEditor,
   status: StatusEditor,
@@ -36,7 +42,7 @@ const configTypeEditors: Record<string, React.ComponentType<any>> = {
   experience: ExperienceEditor,
 }
 
-const pathEditors: Record<string, React.ComponentType<any>> = {
+const pathEditors: Record<string, React.ComponentType<EditorProps>> = {
   "bloom.yml": BloomEditor,
   "buffs.yml": BuffsEditor,
   "config.yml": ConfigEditor,
@@ -46,7 +52,7 @@ const pathEditors: Record<string, React.ComponentType<any>> = {
   "state.yml": StateFileEditor,
 }
 
-function resolveEditor(file: OpenFile): React.ComponentType<any> {
+function resolveEditor(file: OpenFile): React.ComponentType<EditorProps> {
   if (file.configType && configTypeEditors[file.configType]) {
     return configTypeEditors[file.configType]
   }

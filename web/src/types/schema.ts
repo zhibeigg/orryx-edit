@@ -103,13 +103,45 @@ const DEFAULT_TYPES: Record<string, SchemaType> = {
 
 const DEFAULT_CATEGORY: SchemaCategory = { color: "#6b7280", icon: "puzzle" }
 
+// v1 schema 类型定义
+interface V1Action {
+  name: string
+  aliases?: string[]
+  category?: string
+  namespace?: string
+  description?: string
+  builtin?: boolean
+  params?: Record<string, unknown>[]
+  inputs?: Record<string, unknown>[]
+  output?: unknown
+  flow?: string
+  slots?: unknown[]
+  provides?: unknown[]
+}
+
+interface V1Selector {
+  name: string
+  aliases?: string[]
+  description?: string
+  params?: Record<string, unknown>[]
+}
+
+interface V1Schema {
+  version?: 1
+  types?: Record<string, unknown>
+  categories?: Record<string, unknown>
+  actions?: V1Action[]
+  selectors?: V1Selector[]
+  triggers?: unknown[]
+}
+
 /** 将 v1 或 v2 schema 统一转为 v2 格式 */
-export function normalizeSchema(raw: any): ActionsSchemaV2 {
+export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV2 {
   if (raw?.version === 2) return raw as ActionsSchemaV2
 
   // v1 → v2
-  const actions: SchemaAction[] = (raw?.actions ?? []).map((a: any) => {
-    const params: any[] = a.params ?? a.inputs ?? []
+  const actions: SchemaAction[] = (raw?.actions ?? []).map((a: V1Action) => {
+    const params: Record<string, unknown>[] = a.params ?? a.inputs ?? []
     return {
       name: a.name,
       aliases: a.aliases ?? [],
@@ -117,7 +149,7 @@ export function normalizeSchema(raw: any): ActionsSchemaV2 {
       namespace: a.namespace ?? "default",
       description: a.description ?? "",
       builtin: a.builtin ?? false,
-      inputs: params.map((p: any) => ({
+      inputs: params.map((p: Record<string, unknown>) => ({
         name: p.name,
         key: p.key ?? p.name,
         type: p.type ?? "ANY",
@@ -137,11 +169,11 @@ export function normalizeSchema(raw: any): ActionsSchemaV2 {
     }
   })
 
-  const selectors: SchemaSelector[] = (raw?.selectors ?? []).map((s: any) => ({
+  const selectors: SchemaSelector[] = (raw?.selectors ?? []).map((s: V1Selector) => ({
     name: s.name,
     aliases: s.aliases ?? [],
     description: s.description ?? "",
-    params: (s.params ?? []).map((p: any) => ({
+    params: (s.params ?? []).map((p: Record<string, unknown>) => ({
       name: p.name,
       key: p.key ?? p.name,
       type: p.type ?? "STRING",
