@@ -40,7 +40,8 @@ export function KeysEditor({ content, onChange }: KeysEditorProps) {
   }
 
   const removeKey = (id: string) => {
-    const { [id]: _, ...rest } = data
+    const { [id]: _removed, ...rest } = data
+    void _removed
     save(rest)
   }
 

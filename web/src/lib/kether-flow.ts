@@ -98,7 +98,7 @@ function convertActionCall(
 
 function convertSet(
   node: ASTSetNode, nodes: KetherNode[], _edges: KetherEdge[],
-  _actionMap: Map<string, SchemaAction>, _schema: ActionsSchemaV2, parentId: string | null // eslint-disable-line @typescript-eslint/no-unused-vars
+  _actionMap: Map<string, SchemaAction>, _schema: ActionsSchemaV2, parentId: string | null
 ): string {
   const id = nextId("set")
   nodes.push({
@@ -257,7 +257,8 @@ function applyLayout(
 
 // ============ Flow → AST ============
 
-export function flowToAst(state: FlowState, _schema: ActionsSchemaV2): ScriptNode {
+export function flowToAst(state: FlowState, schema: ActionsSchemaV2): ScriptNode {
+  void schema // reserved for future schema-aware conversion
   const nodeMap = new Map(state.nodes.map(n => [n.id, n]))
   const topLevel = state.nodes
     .filter(n => !n.parentId)

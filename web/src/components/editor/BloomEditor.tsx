@@ -52,7 +52,8 @@ export function BloomEditor({ content, onChange }: BloomEditorProps) {
   }
 
   const removeConfig = (id: string) => {
-    const { [id]: _, ...rest } = data.configs
+    const { [id]: _removed, ...rest } = data.configs
+    void _removed
     save({ "sync-delay": data.syncDelay, configs: rest })
   }
 

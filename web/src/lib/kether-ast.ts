@@ -343,6 +343,7 @@ const STATEMENT_STARTERS = new Set([
 
 const COMPARATORS = ["==", "!=", ">", ">=", "<", "<="] as const
 export type Comparator = typeof COMPARATORS[number]
+void COMPARATORS
 
 class KetherParser {
   private reader: KetherReader

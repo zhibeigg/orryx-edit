@@ -42,7 +42,8 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
   }
 
   const removeNpc = (id: string) => {
-    const { [id]: _, ...rest } = npcs
+    const { [id]: _removed, ...rest } = npcs
+    void _removed
     save(rest)
   }
 

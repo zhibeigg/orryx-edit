@@ -57,6 +57,7 @@ function extractRefs(file: string, content: string): CrossRef[] {
 
     // cooldown 检查（隐式：if cooldown / check cooldown）
     for (const _m of line.matchAll(/(?:if|check)\s+cooldown/g)) {
+      void _m
       refs.push({ type: "cooldown", name: "(当前技能)", action: "check", file, line: lineNum, snippet: line.trim() })
     }
 
