@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { ExperienceData, ExperienceOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -15,7 +15,9 @@ interface ExperienceEditorProps {
 
 export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const data = useMemo<ExperienceData>(() => {
     try {

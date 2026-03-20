@@ -11,7 +11,9 @@ export function useDraftSync() {
   const openFiles = useEditorStore((s) => s.openFiles)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const filesRef = useRef(openFiles)
-  filesRef.current = openFiles
+  useEffect(() => {
+    filesRef.current = openFiles
+  }, [openFiles])
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)

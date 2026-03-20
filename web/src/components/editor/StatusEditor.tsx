@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
 import { Switch } from "@/components/ui/switch"
@@ -81,7 +81,9 @@ interface StatusEditorProps {
 export function StatusEditor({ content, onChange, filePath }: StatusEditorProps) {
   const [selectedState, setSelectedState] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const data = useMemo<StatusData>(() => {
     try { return parseYaml<StatusData>(content) }

@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from "react"
+import { useMemo, useCallback, useRef, useEffect } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -12,7 +12,9 @@ interface ConfigEditorProps {
 
 export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
   const rawRef = useRef(content)
-  rawRef.current = content
+  useEffect(() => {
+    rawRef.current = content
+  }, [content])
 
   const config = useMemo(() => {
     try { return parseYaml<Record<string, unknown>>(content) }

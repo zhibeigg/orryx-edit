@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Copy, Check } from "lucide-react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
@@ -19,7 +19,9 @@ interface PlaceholderEntry {
 export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const entries = useMemo<PlaceholderEntry[]>(() => {
     try {

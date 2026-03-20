@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
@@ -40,7 +40,9 @@ interface StateFileEditorProps {
 export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const data = useMemo<StateFileData>(() => {
     try { return parseYaml<StateFileData>(content) }

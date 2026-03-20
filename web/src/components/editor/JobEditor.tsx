@@ -16,7 +16,9 @@ interface JobEditorProps {
 
 export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const job = useMemo<JobData>(() => {
     try {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { StationData, StationOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { Switch } from "@/components/ui/switch"
@@ -38,7 +38,9 @@ const PRIORITIES = ["LOWEST", "LOW", "NORMAL", "HIGH", "HIGHEST", "MONITOR"]
 
 export function StationEditor({ content, onChange, filePath }: StationEditorProps) {
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const station = useMemo<StationData>(() => {
     try { return parseYaml<StationData>(content) }

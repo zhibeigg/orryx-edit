@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from "react"
+import { useMemo, useCallback, useRef, useEffect } from "react"
 import type { SkillData, SkillOptions } from "@/types"
 import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
 import { OptionsPanel } from "./OptionsPanel"
@@ -19,7 +19,9 @@ interface SkillEditorProps {
 export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
   // 保留原始 YAML 文本用于注释保留的增量更新
   const rawYamlRef = useRef(content)
-  rawYamlRef.current = content
+  useEffect(() => {
+    rawYamlRef.current = content
+  }, [content])
 
   const skill = useMemo<SkillData>(() => {
     try {
