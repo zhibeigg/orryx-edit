@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "必须与根 VERSION 一致，例如 0.3.1"
+        required: true
+        type: string
+      publish_image:
+        description: "发布 GHCR 镜像"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}-${{ inputs.version || '' }}
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: "21"
+  NODE_VERSION: "22"
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          VERSION_VALUE="$(tr -d '\r\n' < VERSION)"
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then REQUESTED="${GITHUB_REF_NAME#v}"; else REQUESTED="${{ inputs.version }}"; fi
+          test "$REQUESTED" = "$VERSION_VALUE" || { echo "Requested $REQUESTED does not match VERSION $VERSION_VALUE"; exit 1; }
+          [[ "$VERSION_VALUE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid VERSION"; exit 1; }
+          echo "version=$VERSION_VALUE" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - name: Validate pinned workflows and deployment hardening
+        run: node scripts/validate-deployment.mjs
+      - name: Run complete release gate
+        env:
+          BUILD_COMMIT: ${{ github.sha }}
+        run: bash build.sh
+      - name: Build release assets
+        run: |
+          node scripts/create-release-assets.mjs
+          tar -czf "release/orryx-editor-${{ steps.version.outputs.version }}-launcher.tar.gz" -C release \
+            "orryx-editor-${{ steps.version.outputs.version }}.jar" \
+            "orryx-editor-${{ steps.version.outputs.version }}.jar.sha256" \
+            update-manifest.json start.sh start.ps1 env.example README.md PLUGIN_API.md
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-assets-${{ steps.version.outputs.version }}
+          path: release
+          if-no-files-found: error
+
+  github-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-assets-*
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: v${{ needs.build-release.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            release/*.jar
+            release/*.sha256
+            release/update-manifest.json
+            release/*.tar.gz
+            release/start.sh
+            release/start.ps1
+            release/env.example
+
+  ghcr:
+    needs: build-release
+    if: github.event_name == 'push' || inputs.publish_image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.build-release.outputs.version }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

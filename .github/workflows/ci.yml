@@ -1,0 +1,230 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "21"
+  NODE_VERSION: "22"
+
+jobs:
+  frontend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      - name: Lint, typecheck and test with coverage
+        working-directory: web
+        run: npm run lint && npm run typecheck && npm run test:ci
+      - name: Build and enforce bundle budgets
+        working-directory: web
+        run: npm run build && npm run check:bundle && npm run check:secrets
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: frontend-coverage
+          path: web/coverage
+          if-no-files-found: error
+
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: orryx_test
+          POSTGRES_USER: orryx
+          POSTGRES_PASSWORD: orryx_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orryx -d orryx_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: r2dbc:postgresql://127.0.0.1:5432/orryx_test
+      TEST_DATABASE_USER: orryx
+      TEST_DATABASE_PASSWORD: orryx_test_password
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - name: Run backend unit and PostgreSQL integration tests
+        working-directory: server
+        run: ./gradlew --no-daemon test
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: backend-test-reports
+          path: |
+            server/build/test-results/test
+            server/build/reports/tests/test
+          if-no-files-found: error
+
+  container-build:
+    needs: [frontend-quality, backend-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          tags: orryx-editor:ci
+
+  package-smoke:
+    needs: [frontend-quality, backend-test, container-build]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: orryx_smoke
+          POSTGRES_USER: orryx
+          POSTGRES_PASSWORD: orryx_smoke_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orryx -d orryx_smoke"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - name: Validate pinned workflows and deployment hardening
+        run: node scripts/validate-deployment.mjs
+      - name: Clean package build
+        env:
+          BUILD_COMMIT: ${{ github.sha }}
+        run: bash build.sh
+      - name: Start packaged server and verify readiness
+        env:
+          ADMIN_KEY: 0123456789abcdef-ci-smoke
+          DATABASE_URL: r2dbc:postgresql://127.0.0.1:5432/orryx_smoke
+          DATABASE_USER: orryx
+          DATABASE_PASSWORD: orryx_smoke_password
+          PORT: "19090"
+          DATA_DIR: ${{ runner.temp }}/orryx-smoke
+        run: |
+          JAR="server/build/libs/orryx-editor-server-$(tr -d '\r\n' < VERSION).jar"
+          java -jar "$JAR" > server-smoke.log 2>&1 &
+          echo $! > server-smoke.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:19090/health/ready | tee health.json | grep -q '"status":"UP"'; then exit 0; fi
+            sleep 2
+          done
+          cat server-smoke.log
+          exit 1
+      - name: Verify packaged resources
+        run: |
+          VERSION_VALUE="$(tr -d '\r\n' < VERSION)"
+          JAR="server/build/libs/orryx-editor-server-$VERSION_VALUE.jar"
+          unzip -p "$JAR" build-info.properties | grep -q "version=$VERSION_VALUE"
+          unzip -l "$JAR" static/index.html static/actions-schema.json
+      - name: Stop smoke server
+        if: always()
+        run: test ! -f server-smoke.pid || kill "$(cat server-smoke.pid)" || true
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: packaged-server
+          path: server/build/libs/orryx-editor-server-*.jar
+          if-no-files-found: error
+
+  e2e:
+    needs: package-smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: orryx_e2e
+          POSTGRES_USER: orryx
+          POSTGRES_PASSWORD: orryx_e2e_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orryx -d orryx_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: packaged-server
+          path: artifacts
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Install frontend and Chromium
+        working-directory: web
+        run: npm ci && npm run e2e:install
+      - name: Start packaged server
+        env:
+          ADMIN_KEY: 0123456789abcdef-e2e
+          DATABASE_URL: r2dbc:postgresql://127.0.0.1:5432/orryx_e2e
+          DATABASE_USER: orryx
+          DATABASE_PASSWORD: orryx_e2e_password
+          PORT: "19090"
+          DATA_DIR: ${{ runner.temp }}/orryx-e2e
+        run: |
+          JAR="$(ls artifacts/*.jar)"
+          java -jar "$JAR" > server-e2e.log 2>&1 &
+          echo $! > server-e2e.pid
+          for attempt in {1..30}; do curl --fail --silent http://127.0.0.1:19090/health/ready && exit 0; sleep 2; done
+          cat server-e2e.log
+          exit 1
+      - name: Run responsive and accessibility E2E
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:19090
+          E2E_ADMIN_KEY: 0123456789abcdef-e2e
+        run: npm run e2e
+      - name: Stop E2E server
+        if: always()
+        run: test ! -f server-e2e.pid || kill "$(cat server-e2e.pid)" || true
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: failure()
+        with:
+          name: playwright-failure-artifacts
+          path: |
+            web/test-results
+            web/playwright-report
+            server-e2e.log
+          if-no-files-found: ignore

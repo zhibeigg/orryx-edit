@@ -41,6 +41,9 @@ Thumbs.db
 
 # Runtime data
 data/
+release/
+.env
+.env.local
 *.jar
 plan.md
 wiki.md

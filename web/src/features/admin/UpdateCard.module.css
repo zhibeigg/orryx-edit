@@ -8,8 +8,8 @@
 .grid dd { margin: 4px 0 0; font-weight: 650; overflow-wrap: anywhere; }
 .progress { width: 100%; accent-color: #35a56f; }
 .warning, .error { margin: 0; padding: 10px 12px; border-radius: 8px; }
-.warning { background: rgba(234, 179, 8, .14); color: #a16207; }
-.error { background: rgba(239, 68, 68, .12); color: #b91c1c; }
+.warning { background: rgba(234, 179, 8, .14); color: #fde68a; }
+.error { background: rgba(239, 68, 68, .12); color: #fecaca; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .button { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 7px; padding: 8px 12px; background: transparent; color: inherit; cursor: pointer; }
 .primary { background: #18794e; border-color: #18794e; color: white; }

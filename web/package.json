@@ -7,6 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "typecheck": "tsc -b",
+    "test:ci": "vitest run --coverage",
+    "check:bundle": "node ../scripts/check-bundle.mjs",
+    "check:secrets": "node ../scripts/check-frontend-secrets.mjs",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install --with-deps chromium",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -37,12 +43,15 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.1",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",

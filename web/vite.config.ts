@@ -34,5 +34,19 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    exclude: ["e2e/**", "node_modules/**"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "html"],
+      reportsDirectory: "coverage",
+      include: ["src/lib/parameter-wizard.ts", "src/types/schema.ts"],
+      thresholds: {
+        lines: 60,
+        functions: 55,
+        statements: 60,
+        branches: 40,
+      },
+    },
   },
 })

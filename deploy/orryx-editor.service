@@ -1,0 +1,33 @@
+[Unit]
+Description=Orryx Editor Server
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orryx
+Group=orryx
+WorkingDirectory=/opt/orryx-editor
+EnvironmentFile=/etc/orryx-editor.env
+ExecStart=/opt/orryx-editor/start.sh
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+SuccessExitStatus=0
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+ReadWritePaths=/opt/orryx-editor /var/lib/orryx-editor
+UMask=0027
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -9,7 +9,7 @@ JAR="$SERVER_DIR/build/libs/orryx-editor-server-$VERSION.jar"
 
 echo "=== Orryx Editor $VERSION 构建 ==="
 
-echo "[1/6] 安装前端依赖..."
+echo "[1/8] 安装前端依赖..."
 cd "$WEB_DIR"
 if [ -f package-lock.json ]; then
   npm ci
@@ -20,19 +20,26 @@ else
   exit 1
 fi
 
-echo "[2/6] 检查前端代码规范..."
+echo "[2/8] 检查前端代码规范..."
 npm run lint
 
-echo "[3/6] 检查前端类型..."
-npm exec -- tsc -b
+echo "[3/8] 检查前端类型..."
+npm run typecheck
 
-echo "[4/6] 运行前端测试..."
-npm exec -- vitest run
+echo "[4/8] 运行前端覆盖率测试..."
+npm run test:ci
 
-echo "[5/6] 构建前端静态资源..."
+echo "[5/8] 构建前端静态资源..."
 npm run build
 
-echo "[6/6] 测试并构建服务端..."
+echo "[6/8] 检查 bundle 预算和前端敏感信息..."
+npm run check:bundle
+npm run check:secrets
+
+echo "[7/8] 验证 CI 与部署配置..."
+node "$SCRIPT_DIR/scripts/validate-deployment.mjs"
+
+echo "[8/8] 测试并构建服务端..."
 cd "$SERVER_DIR"
 ./gradlew --no-daemon test shadowJar
 

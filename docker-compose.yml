@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orryx_editor}
+      POSTGRES_USER: ${POSTGRES_USER:-orryx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: ${ORRYX_IMAGE:-orryx-editor:local}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-9090}:9090"
+    environment:
+      PORT: "9090"
+      ADMIN_KEY: ${ADMIN_KEY:?ADMIN_KEY is required}
+      DATABASE_URL: r2dbc:postgresql://postgres:5432/${POSTGRES_DB:-orryx_editor}
+      DATABASE_USER: ${POSTGRES_USER:-orryx}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DATA_DIR: /app/data
+      DEPLOYMENT_MODE: container
+      UPDATE_ENABLED: ${UPDATE_ENABLED:-false}
+      UPDATE_GITHUB_REPOSITORY: ${UPDATE_GITHUB_REPOSITORY:-zhibeigg/orryx-edit}
+      UPDATE_GITHUB_TOKEN: ${UPDATE_GITHUB_TOKEN:-}
+      CORS_HOSTS: ${CORS_HOSTS:-}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      HSTS_ENABLED: ${HSTS_ENABLED:-false}
+    volumes:
+      - app-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:9090/health/ready"]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 4
+
+volumes:
+  postgres-data:
+  app-data:

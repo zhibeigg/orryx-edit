@@ -127,6 +127,35 @@ Admin 后台可以检查、下载、校验并暂存 Release。应用请求重启
 
 `container` 模式不会在容器内替换 JAR，只允许检查新版本。
 
+## CI/CD 与发布
+
+`.github/workflows/ci.yml` 在 Pull Request 和 `master` push 上执行。前端关键解析模块当前覆盖率基线为语句 60%、分支 40%、函数 55%、行 60%，CI 会拒绝低于基线的变更：
+
+- 前端 lint、typecheck、覆盖率测试、bundle budget 和静态资源 secret scan
+- 后端单元测试、JUnit 报告和真实 PostgreSQL 集成测试
+- clean fat JAR 打包、静态资源/版本 smoke test
+- Playwright 360/768/1024/1440 响应式与 axe 无障碍检查
+
+`.github/workflows/release.yml` 在 `vA.B.C` tag 或手动触发时校验 tag 与根 `VERSION` 一致，生成 JAR、SHA-256、`update-manifest.json`、launcher 部署包和可选 GHCR 镜像。Actions 使用最小权限、并发控制和固定 commit SHA；Dependabot 维护 action/npm/Gradle/Docker 更新。
+
+常用本地质量命令：
+
+```bash
+cd web
+npm run lint
+npm run typecheck
+npm run test:ci
+npm run build
+npm run check:bundle
+npm run check:secrets
+npm run e2e          # 需要已运行的测试服务
+
+cd ../server
+./gradlew --no-daemon test shadowJar
+```
+
+容器与 systemd/launcher 部署见 `deploy/README.md`。Docker Compose 使用非 root、只读根文件系统，并在 container 模式下禁用原地 JAR 替换。
+
 ## 健康检查
 
 - `GET /health/live`：进程存活和版本。
