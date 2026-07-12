@@ -119,15 +119,16 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
 
   return (
     <div style={{ height }} className="flex flex-col relative">
-      <div className="flex items-center gap-1 px-2 py-1 border-b border-[#3c3c3c] bg-[#252526] shrink-0">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[#2f3136] bg-[linear-gradient(180deg,#252a33_0%,#1f232b_100%)] shrink-0">
         <button onClick={() => setMode("text")}
-          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded ${mode === "text" ? "bg-[#007acc] text-white" : "text-[#858585] hover:text-[#cccccc]"}`}>
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-md transition-all ${mode === "text" ? "bg-[#3b82f6] text-white shadow-[0_4px_10px_rgba(59,130,246,0.35)]" : "text-[#94a0b4] hover:text-[#d4dbe8] hover:bg-[#2a303a]"}`}>
           <Code className="w-3 h-3" />文本
         </button>
         <button onClick={() => setMode("flow")}
-          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded ${mode === "flow" ? "bg-[#007acc] text-white" : "text-[#858585] hover:text-[#cccccc]"}`}>
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-md transition-all ${mode === "flow" ? "bg-[#3b82f6] text-white shadow-[0_4px_10px_rgba(59,130,246,0.35)]" : "text-[#94a0b4] hover:text-[#d4dbe8] hover:bg-[#2a303a]"}`}>
           <Workflow className="w-3 h-3" />节点
         </button>
+        {mode === "flow" && <div className="ml-auto text-[10px] text-[#8f9cb0]">拖拽创建 · 连线编辑 · 自动回写</div>}
       </div>
 
       <div className="flex-1 min-h-0">

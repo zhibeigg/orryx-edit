@@ -7,6 +7,8 @@ export interface KetherNodeData extends Record<string, unknown> {
   schemaAction: SchemaAction | null
   inputs: Record<string, unknown>
   slotChildren: Record<string, string[]>
+  onSlotDrop?: (slot: string, payload: SchemaAction | { builtin: string }) => void
+  onInlineEdit?: () => void
   provides?: Record<string, string>
   astRef?: ASTNode
   nodeKind: "action" | "branch" | "loop" | "data" | "set" | "calc"

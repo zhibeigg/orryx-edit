@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.orryx.editor"
-version = "0.1.0"
+version = rootProject.projectDir.parentFile.resolve("VERSION").readText().trim()
 
 application {
     mainClass.set("com.orryx.editor.ApplicationKt")

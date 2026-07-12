@@ -260,13 +260,70 @@ function applyLayout(
 export function flowToAst(state: FlowState, schema: ActionsSchemaV2): ScriptNode {
   void schema // reserved for future schema-aware conversion
   const nodeMap = new Map(state.nodes.map(n => [n.id, n]))
-  const topLevel = state.nodes
-    .filter(n => !n.parentId)
-    .sort((a, b) => a.position.y - b.position.y)
+  const topLevel = sortTopLevelByEdges(state.nodes, state.edges)
 
   const body = topLevel.map(n => nodeToAst(n, nodeMap)).filter(Boolean) as ASTNode[]
   const pos = { offset: 0, line: 1, column: 1 }
   return { type: "script", body, start: pos, end: pos }
+}
+
+function sortTopLevelByEdges(nodes: KetherNode[], edges: KetherEdge[]): KetherNode[] {
+  const topLevel = nodes.filter((node) => !node.parentId)
+  if (topLevel.length <= 1 || edges.length === 0) {
+    return [...topLevel].sort((a, b) => a.position.y - b.position.y)
+  }
+
+  const topIds = new Set(topLevel.map((node) => node.id))
+  const outgoing = new Map<string, string[]>()
+  const incomingCount = new Map<string, number>()
+
+  for (const node of topLevel) {
+    outgoing.set(node.id, [])
+    incomingCount.set(node.id, 0)
+  }
+
+  for (const edge of edges) {
+    if (!topIds.has(edge.source) || !topIds.has(edge.target)) continue
+    outgoing.get(edge.source)?.push(edge.target)
+    incomingCount.set(edge.target, (incomingCount.get(edge.target) ?? 0) + 1)
+  }
+
+  const nodeById = new Map(topLevel.map((node) => [node.id, node]))
+  const queue = topLevel
+    .filter((node) => (incomingCount.get(node.id) ?? 0) === 0)
+    .sort((a, b) => a.position.y - b.position.y)
+    .map((node) => node.id)
+
+  const result: KetherNode[] = []
+  const visited = new Set<string>()
+
+  while (queue.length > 0) {
+    const id = queue.shift()
+    if (!id || visited.has(id)) continue
+    visited.add(id)
+
+    const node = nodeById.get(id)
+    if (node) result.push(node)
+
+    const targets = outgoing.get(id) ?? []
+    targets.sort((a, b) => {
+      const aNode = nodeById.get(a)
+      const bNode = nodeById.get(b)
+      if (!aNode || !bNode) return 0
+      return aNode.position.y - bNode.position.y
+    })
+
+    for (const targetId of targets) {
+      incomingCount.set(targetId, (incomingCount.get(targetId) ?? 0) - 1)
+      if ((incomingCount.get(targetId) ?? 0) <= 0) queue.push(targetId)
+    }
+  }
+
+  for (const node of topLevel.sort((a, b) => a.position.y - b.position.y)) {
+    if (!visited.has(node.id)) result.push(node)
+  }
+
+  return result
 }
 
 function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>): ASTNode | null {
@@ -334,6 +391,9 @@ function valueToAst(value: unknown, pos: { offset: number; line: number; column:
   if (typeof value === "number") return { type: "number", value, start: pos, end: pos }
   if (typeof value === "boolean") return { type: "boolean", value, start: pos, end: pos }
   if (typeof value === "string") {
+    if (value.startsWith("\\&") || value.startsWith("\\*")) {
+      return { type: "string", value: value.slice(1), start: pos, end: pos }
+    }
     if (value.startsWith("&")) {
       const name = value.slice(1)
       const bracketIdx = name.indexOf("[")
