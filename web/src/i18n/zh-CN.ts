@@ -1,0 +1,35 @@
+export const zhCN = {
+  update: {
+    status: {
+      QUEUED: "已排队",
+      CHECKING: "检查版本",
+      DOWNLOADING: "下载中",
+      VERIFYING: "校验中",
+      STAGED: "已暂存",
+      RESTART_PENDING: "等待启动器重启",
+      SUCCEEDED: "已完成",
+      FAILED: "失败",
+    },
+    errors: {
+      UPDATE_DISABLED: "服务器未启用在线更新检查。",
+      UPDATE_INVALID_VERSION: "当前版本格式无效，无法安全更新。",
+      UPDATE_RELEASE_UNAVAILABLE: "暂时无法获取稳定版发布信息。",
+      UPDATE_ASSET_MISSING: "发布包缺少 JAR、校验和或更新清单。",
+      UPDATE_REDIRECT_REJECTED: "下载地址未通过安全校验。",
+      UPDATE_DOWNLOAD_TOO_LARGE: "更新包超过服务器允许的大小。",
+      UPDATE_DOWNLOAD_FAILED: "更新包下载失败。",
+      UPDATE_CHECKSUM_INVALID: "更新包 SHA-256 校验失败。",
+      UPDATE_MANIFEST_INVALID: "更新清单无效或与发布包不匹配。",
+      UPDATE_IN_PROGRESS: "已有更新任务正在执行。",
+      UPDATE_APPLY_NOT_SUPPORTED: "当前部署方式不支持暂存或重启更新。",
+      UPDATE_ACTIVE_USERS: "仍有活跃用户；请等待用户离线或确认强制操作。",
+      UPDATE_IO_FAILED: "服务器无法写入更新暂存区。",
+      UPDATE_REQUEST_FAILED: "更新服务请求失败，请稍后重试。",
+    },
+  },
+  collaboration: {
+    revisionConflict: "文件已被其他协作者修改",
+    sessionExpired: "编辑会话已失效",
+    reconnectFailed: "重连失败，请刷新页面重试",
+  },
+} as const

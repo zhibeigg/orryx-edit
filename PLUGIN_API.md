@@ -1,489 +1,256 @@
-# Orryx Editor - 插件端对接文档
+# Orryx Editor 插件端协议（0.3.1）
 
-> 本文档面向负责 Bukkit/Spigot 插件端开发的同学。
-> 编辑器前端和中转服务器由中心服务器统一托管，插件端只需实现 WebSocket 客户端对接即可。
+插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
----
+## 通用消息
 
-## 1. 架构概览
-
-```
-玩家浏览器  ←HTTP+WS(/ws)→  中心服务器  ←WS(/ws/server)→  MC服务器 Orryx 插件
-                              (你部署)                        (用户部署)
-```
-
-**完整流程：**
-1. MC 服务器启动 → Orryx 插件连接中心服务器 `ws://中心服务器/ws/server`，发送 `server.register` 注册
-2. 玩家输入 `/orryx editor` → 插件生成一次性 Token → 发送 `token.register` 到中心服务器
-3. 插件返回 URL：`https://editor.你的域名/?token=xxx`
-4. 玩家打开 URL → 浏览器自动连接中心服务器 → 用 Token 认证 → 中心服务器找到对应插件端
-5. 后续所有消息（文件读写、重载等）由中心服务器在浏览器和插件端之间透传
-
-**插件端不需要开放任何端口，不需要部署任何前端资源。**
-
----
-
-## 2. 插件端需要实现的功能
-
-### 2.1 连接中心服务器
-
-插件启动时（或按需），建立 WebSocket 连接：
-
-```
-ws://中心服务器地址:端口/ws/server
+```json
+{
+  "type": "message.type",
+  "id": "request-id",
+  "data": {}
+}
 ```
 
-建议使用 [Java-WebSocket](https://github.com/TooTallNate/Java-WebSocket) 库：
+- `type` 最长 64 字符。
+- `id` 最长 128 字符。
+- 单帧最大 1 MiB。
+- 文件路径必须为相对路径，不允许空段、`.`、`..` 或控制字符。
+- 错误统一返回 `type=error`，`data={code,message}`。
 
-```kotlin
-// build.gradle.kts
-implementation("org.java-websocket:Java-WebSocket:1.5.7")
-```
-
-### 2.2 注册游戏服务器
-
-连接成功后，用 license 注册：
+## 1. 注册服务器
 
 ```json
 {
   "type": "server.register",
-  "id": "reg_1",
+  "id": "reg-1",
   "data": {
-    "license": "用户购买时获得的license",
-    "serverName": "生存服-1"
+    "license": "LICENSE_KEY",
+    "serverName": "生存服-1",
+    "serverId": "survival-1"
   }
 }
 ```
 
-- `license`：用户购买插件时获得的授权码，由中心服务器管理员通过 Admin API 创建
-- `serverName`：显示在编辑器顶栏的名称，建议从 `server.properties` 自动读取
+`serverId` 应为安装实例的稳定 ID。旧插件省略时服务会从 `serverName` 派生，但多个同名子服会落入同一 workspace，因此新实现必须发送稳定且唯一的 `serverId`。
 
 响应：
+
 ```json
 {
   "type": "server.register.result",
-  "id": "reg_1",
-  "data": { "success": true, "serverKey": "自动分配的唯一ID", "message": "已注册: 生存服-1" }
+  "id": "reg-1",
+  "data": {
+    "success": true,
+    "serverKey": "...",
+    "serverId": "survival-1",
+    "workspaceId": "sha256..."
+  }
 }
 ```
 
-插件端可以缓存返回的 `serverKey`，但不是必须的——每次用 license 注册即可。
+中心服务使用 `SHA-256(serverKey + NUL + serverId)` 生成 workspace。同 License 的不同 `serverId` 不共享请求、文件事件、日志或浏览器会话。
 
-### 2.3 注册 Token（玩家请求编辑器时）
-
-玩家输入 `/orryx editor` 时，插件生成 Token 并注册到中心服务器：
+## 2. 注册一次性编辑 Token
 
 ```json
 {
   "type": "token.register",
-  "id": "tok_1",
+  "id": "token-1",
   "data": {
-    "token": "a1b2c3d4e5f6",
+    "token": "cryptographically-random-token",
     "playerName": "Steve",
     "expiresIn": 300000
   }
 }
 ```
 
-- `token`：插件端生成的随机字符串（建议 16 位）
-- `playerName`：请求编辑器的玩家名
-- `expiresIn`：过期时间（毫秒），建议 5 分钟（300000）
+- Token 长度 8–512，不得含空白或控制字符。
+- TTL 范围 1 秒至 10 分钟。
+- Token 绑定当前插件 WebSocket 和 workspace。
+- 浏览器认证时原子消费；无论成功、过期或插件离线都不能再次使用。
 
-响应：
-```json
-{
-  "type": "token.register.result",
-  "id": "tok_1",
-  "data": { "success": true, "token": "a1b2c3d4e5f6" }
-}
+向玩家返回的 URL 必须使用 fragment：
+
+```text
+https://editor.example.com/#token=<token>
 ```
 
-注册成功后，插件向玩家发送 URL：
-```
-https://editor.你的域名/?token=a1b2c3d4e5f6
-```
+旧 `?token=` 暂时兼容，但前端会在发起认证请求前清除地址栏凭据。
 
-### 2.4 撤销 Token（可选）
+撤销：
 
 ```json
-{
-  "type": "token.revoke",
-  "id": "rev_1",
-  "data": { "token": "a1b2c3d4e5f6" }
-}
+{"type":"token.revoke","id":"token-2","data":{"token":"..."}}
 ```
 
-### 2.5 处理浏览器转发来的消息
+## 3. Relay 请求 ID
 
-玩家打开编辑器后，浏览器发送的所有消息会被中心服务器原样转发给插件端。
-插件端需要处理这些消息并返回响应（响应会被中心服务器转发回浏览器）。
+浏览器原始 ID 不会原样发送给插件。中心服务会生成全局 relay ID；插件响应时必须原样返回收到的 relay ID。中心服务随后恢复浏览器原 ID，并只将响应发送给请求发起者。
 
-需要处理的消息类型见下方第 3 节。
+插件不得把某个浏览器请求的响应作为广播发送。
 
----
+## 4. 文件协议与 revision
 
-## 3. 消息协议（浏览器 ↔ 插件端，经中心服务器透传）
+### 文件树
 
-所有消息格式：
 ```json
-{
-  "type": "消息类型",
-  "id": "请求唯一ID",
-  "data": { ... }
-}
-```
-
-`id` 由浏览器生成，插件端响应时必须原样返回。
-
-### 3.1 认证 `auth`
-
-浏览器认证成功后，中心服务器会将 auth 消息转发给插件端（仅通知，无需响应）：
-```json
-{ "type": "auth", "id": "req_1", "data": { "token": "a1b2c3d4e5f6" } }
-```
-
-插件端可以用这个消息记录"哪个玩家正在使用编辑器"，也可以忽略。
-
-### 3.2 文件列表 `file.list`
-
-请求：
-```json
-{ "type": "file.list", "id": "req_2", "data": { "path": null } }
+{"type":"file.list","id":"relay-id","data":{"path":null}}
 ```
 
 响应：
+
+```json
+{"type":"file.tree","id":"relay-id","data":{"files":[]}}
+```
+
+### 读取
+
+```json
+{"type":"file.read","id":"relay-id","data":{"path":"skills/example.yml"}}
+```
+
+插件响应：
+
+```json
+{"type":"file.content","id":"relay-id","data":{"path":"skills/example.yml","content":"..."}}
+```
+
+中心服务会向浏览器响应补充 `revision`。
+
+### 写入
+
+浏览器到中心服务：
+
 ```json
 {
-  "type": "file.tree",
-  "id": "req_2",
+  "type": "file.write",
+  "id": "browser-id",
   "data": {
-    "files": [
+    "path": "skills/example.yml",
+    "content": "...",
+    "baseRevision": 4,
+    "force": false
+  }
+}
+```
+
+中心服务仅在 revision 匹配后转发给插件。冲突时插件不会收到请求，浏览器收到：
+
+```json
+{
+  "type": "error",
+  "id": "browser-id",
+  "data": {
+    "code": "REVISION_CONFLICT",
+    "message": "文件版本冲突",
+    "currentRevision": 5
+  }
+}
+```
+
+插件成功响应：
+
+```json
+{"type":"file.written","id":"relay-id","data":{"path":"skills/example.yml","success":true}}
+```
+
+成功后中心服务递增 revision，并向同 workspace 广播：
+
+```json
+{
+  "type": "file.changed",
+  "id": "",
+  "data": {
+    "workspaceId": "...",
+    "path": "skills/example.yml",
+    "revision": 6,
+    "browserId": "writer-browser-id"
+  }
+}
+```
+
+`force=true` 只用于用户在冲突对话框中明确确认覆盖，不应成为插件默认行为。
+
+### 其他文件操作
+
+```text
+file.create {path,isDirectory} -> file.written
+file.delete {path}             -> file.written
+file.rename {oldPath,newPath}  -> file.written
+```
+
+## 5. Presence 与广播
+
+`presence.update` 在中心服务内部处理，不会转发给插件。浏览器收到：
+
+```json
+{
+  "type": "presence.updated",
+  "id": "",
+  "data": {
+    "workspaceId": "...",
+    "members": [
       {
-        "name": "skills",
-        "path": "skills",
-        "isDirectory": true,
-        "children": [
-          {
-            "name": "剑修",
-            "path": "skills/剑修",
-            "isDirectory": true,
-            "children": [
-              { "name": "刹那.yml", "path": "skills/剑修/刹那.yml", "isDirectory": false }
-            ]
-          }
-        ]
+        "browserId": "...",
+        "playerName": "Steve",
+        "currentFile": "skills/example.yml",
+        "lastActiveAt": 1710000000000
       }
     ]
   }
 }
 ```
 
-**要点：** `path` 相对于 Orryx 插件数据目录，用 `/` 分隔。目录排在文件前面。
+只有以下主动消息允许向同 workspace 广播：
 
-### 3.3 读取文件 `file.read`
+- `log.entry`
+- `presence.updated`
+- `file.changed`
 
-请求：`{ "type": "file.read", "id": "req_3", "data": { "path": "skills/剑修/刹那.yml" } }`
+其他带 ID 的插件响应必须匹配有效 relay 请求，否则会被丢弃。
 
-响应：`{ "type": "file.content", "id": "req_3", "data": { "path": "skills/剑修/刹那.yml", "content": "YAML内容..." } }`
+## 6. 重载与线程要求
 
-### 3.4 写入文件 `file.write`
-
-请求：`{ "type": "file.write", "id": "req_4", "data": { "path": "skills/剑修/刹那.yml", "content": "新内容..." } }`
-
-响应：`{ "type": "file.written", "id": "req_4", "data": { "path": "skills/剑修/刹那.yml", "success": true, "message": "可选描述" } }`
-
-**要点：必须在异步线程执行文件 I/O，不能阻塞 Bukkit 主线程。**
-
-### 3.5 创建文件/文件夹 `file.create`
-
-请求：`{ "type": "file.create", "id": "req_5", "data": { "path": "skills/新技能.yml", "isDirectory": false } }`
-
-响应：`{ "type": "file.written", "id": "req_5", "data": { "path": "skills/新技能.yml", "success": true } }`
-
-### 3.6 删除文件 `file.delete`
-
-请求：`{ "type": "file.delete", "id": "req_6", "data": { "path": "skills/废弃.yml" } }`
-
-响应：`{ "type": "file.written", "id": "req_6", "data": { "path": "skills/废弃.yml", "success": true } }`
-
-### 3.7 重命名/移动 `file.rename`
-
-请求：`{ "type": "file.rename", "id": "req_7", "data": { "oldPath": "skills/旧名.yml", "newPath": "skills/新名.yml" } }`
-
-响应：`{ "type": "file.written", "id": "req_7", "data": { "success": true } }`
-
-### 3.8 重载模块 `reload`
-
-请求：`{ "type": "reload", "id": "req_8", "data": { "module": "skill" } }`
-
-`module` 可选值：`"skill"` | `"job"` | `"status"` | `"controller"` | `"buff"` | `"all"`
-
-响应：`{ "type": "reload.result", "id": "req_8", "data": { "module": "skill", "success": true, "message": "已重载 23 个技能" } }`
-
-**要点：必须在 Bukkit 主线程执行重载。** 用 `Bukkit.getScheduler().runTask()` 切回主线程。
-
-### 3.9 日志订阅 `log.subscribe` / `log.unsubscribe`
-
-订阅：`{ "type": "log.subscribe", "id": "req_9", "data": { "filters": { "keyword": "刹那" } } }`
-
-取消：`{ "type": "log.unsubscribe", "id": "req_10", "data": {} }`
-
-订阅后，插件端主动推送日志：
 ```json
-{ "type": "log.entry", "id": "", "data": { "level": "INFO", "message": "日志内容", "timestamp": 1710000000000, "source": "SkillManager" } }
+{"type":"reload","id":"relay-id","data":{"module":"all"}}
 ```
 
-### 3.10 错误响应
+响应：
 
-任何请求失败时返回：
 ```json
-{ "type": "error", "id": "原始请求id", "data": { "message": "错误描述" } }
+{"type":"reload.result","id":"relay-id","data":{"module":"all","success":true}}
 ```
-
----
-
-## 4. 消息类型速查表
-
-| 方向 | type | 请求 data | 响应 type | 响应 data |
-|------|------|-----------|-----------|-----------|
-| 插件→中心 | `server.register` | `{ license, serverName }` | `server.register.result` | `{ success, serverKey?, message? }` |
-| 插件→中心 | `token.register` | `{ token, playerName, expiresIn }` | `token.register.result` | `{ success, token }` |
-| 插件→中心 | `token.revoke` | `{ token }` | `token.revoke.result` | `{ success }` |
-| 浏览器→插件 | `file.list` | `{ path? }` | `file.tree` | `{ files: FileTreeNode[] }` |
-| 浏览器→插件 | `file.read` | `{ path }` | `file.content` | `{ path, content }` |
-| 浏览器→插件 | `file.write` | `{ path, content }` | `file.written` | `{ path, success, message? }` |
-| 浏览器→插件 | `file.create` | `{ path, isDirectory }` | `file.written` | `{ path, success }` |
-| 浏览器→插件 | `file.delete` | `{ path }` | `file.written` | `{ path, success }` |
-| 浏览器→插件 | `file.rename` | `{ oldPath, newPath }` | `file.written` | `{ success }` |
-| 浏览器→插件 | `reload` | `{ module }` | `reload.result` | `{ module, success, message? }` |
-| 浏览器→插件 | `log.subscribe` | `{ filters? }` | — | 开始推送 log.entry |
-| 浏览器→插件 | `log.unsubscribe` | `{}` | — | 停止推送 |
-| 插件→浏览器 | `log.entry` | — | — | `{ level, message, timestamp, source? }` |
-
----
-
-## 5. 插件端实现参考（Kotlin）
-
-```kotlin
-import org.java_websocket.client.WebSocketClient
-import org.java_websocket.handshake.ServerHandshake
-import java.net.URI
-import java.util.UUID
-
-class OrryxEditorClient(
-    private val plugin: OrryxPlugin,
-    private val editorUrl: String,      // "wss://editor.你的域名/ws/server"
-    private val license: String,        // 用户购买时获得的 license
-    private val serverName: String       // 自动从 server.properties 读取
-) {
-    private var ws: WebSocketClient? = null
-
-    fun connect() {
-        ws = object : WebSocketClient(URI(editorUrl)) {
-            override fun onOpen(handshake: ServerHandshake) {
-                // 注册服务器
-                send("""{"type":"server.register","id":"reg","data":{"license":"$license","serverName":"$serverName"}}""")
-            }
-
-            override fun onMessage(message: String) {
-                val msg = parseJson(message) // 你的 JSON 解析
-                when (msg.type) {
-                    "server.register.result" -> plugin.logger.info("编辑器服务器注册: ${msg.data}")
-                    "token.register.result"  -> { /* token 注册成功 */ }
-                    // 浏览器转发来的消息
-                    "file.list"   -> handleFileList(msg)
-                    "file.read"   -> handleFileRead(msg)
-                    "file.write"  -> handleFileWrite(msg)
-                    "file.create" -> handleFileCreate(msg)
-                    "file.delete" -> handleFileDelete(msg)
-                    "file.rename" -> handleFileRename(msg)
-                    "reload"      -> handleReload(msg)
-                    "log.subscribe"   -> handleLogSubscribe(msg)
-                    "log.unsubscribe" -> handleLogUnsubscribe(msg)
-                    "auth"        -> { /* 可选：记录谁在使用编辑器 */ }
-                }
-            }
-
-            override fun onClose(code: Int, reason: String, remote: Boolean) {
-                plugin.logger.warning("编辑器连接断开: $reason, 5秒后重连...")
-                plugin.server.scheduler.runTaskLaterAsynchronously(plugin, { connect() }, 100L)
-            }
-
-            override fun onError(ex: Exception) {
-                plugin.logger.severe("编辑器连接错误: ${ex.message}")
-            }
-        }
-        ws?.connect()
-    }
-
-    /**
-     * 玩家输入 /orryx editor 时调用
-     */
-    fun generateEditorUrl(playerName: String): String {
-        val token = UUID.randomUUID().toString().replace("-", "").take(16)
-        ws?.send("""{"type":"token.register","id":"","data":{"token":"$token","playerName":"$playerName","expiresIn":300000}}""")
-        return "https://editor.你的域名/?token=$token"
-    }
-
-    // ---- 消息处理器（异步线程执行文件 I/O） ----
-
-    private fun handleFileList(msg: WsMessage) {
-        plugin.server.scheduler.runTaskAsynchronously(plugin) {
-            val tree = buildFileTree(plugin.dataFolder, "")
-            ws?.send("""{"type":"file.tree","id":"${msg.id}","data":{"files":${toJson(tree)}}}""")
-        }
-    }
-
-    private fun handleFileRead(msg: WsMessage) {
-        plugin.server.scheduler.runTaskAsynchronously(plugin) {
-            val path = msg.data.path
-            val file = File(plugin.dataFolder, path)
-            // 路径安全检查
-            if (!file.canonicalPath.startsWith(plugin.dataFolder.canonicalPath)) {
-                ws?.send("""{"type":"error","id":"${msg.id}","data":{"message":"非法路径"}}""")
-                return@runTaskAsynchronously
-            }
-            val content = file.readText(Charsets.UTF_8)
-            ws?.send("""{"type":"file.content","id":"${msg.id}","data":{"path":"$path","content":${toJsonString(content)}}}""")
-        }
-    }
-
-    private fun handleReload(msg: WsMessage) {
-        // reload 必须回主线程
-        plugin.server.scheduler.runTask(plugin) {
-            val module = msg.data.module ?: "all"
-            // 调用 Orryx 的 reload API
-            val success = orryxReload(module)
-            ws?.send("""{"type":"reload.result","id":"${msg.id}","data":{"module":"$module","success":$success}}""")
-        }
-    }
-
-    // ... 其他处理器类似
-}
-```
-
-### 命令注册
-
-```kotlin
-// /orryx editor
-fun onEditorCommand(sender: Player) {
-    val url = editorClient.generateEditorUrl(sender.name)
-    sender.sendMessage("§a§l[Orryx] §f点击打开编辑器:")
-    // 发送可点击的 URL（使用 Adventure 或 Spigot API）
-    sender.spigot().sendMessage(
-        TextComponent(url).apply {
-            color = ChatColor.AQUA
-            isUnderlined = true
-            clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, url)
-            hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, Text("点击打开 Orryx 编辑器"))
-        }
-    )
-}
-```
-
----
-
-## 6. 线程安全注意事项
 
 | 操作 | 线程要求 |
-|------|----------|
-| WebSocket 连接/重连 | **异步线程** |
-| 文件读写 (file.read/write/create/delete/rename) | **异步线程** |
-| 模块重载 (reload) | **Bukkit 主线程** |
-| 日志推送 (log.entry) | 任意线程 |
-| Token 生成 (/orryx editor) | 主线程（命令处理） |
+|---|---|
+| WebSocket、JSON、文件读取/写入 | 异步线程/协程 |
+| Bukkit 配置应用、模块 reload | Bukkit 主线程 |
+| 日志推送 | 任意线程，但不得阻塞 Bukkit 主线程 |
 
----
+禁止从异步回调直接调用 Bukkit 主线程敏感 API。应使用 Bukkit Scheduler 切回主线程。
 
-## 7. 配置建议
+## 7. 稳定错误码
 
-插件端无需用户配置。以下信息硬编码在插件代码中：
+常见错误：
 
-```kotlin
-// 硬编码在插件代码中，用户无需配置
-private const val EDITOR_URL = "wss://editor.你的域名/ws/server"
+```text
+INVALID_MESSAGE
+FRAME_TOO_LARGE
+INVALID_LICENSE
+LICENSE_DISABLED
+LICENSE_EXPIRED
+IP_NOT_ALLOWED
+INVALID_SERVER_ID
+INVALID_TOKEN
+TOKEN_ALREADY_EXISTS
+NOT_AUTHENTICATED
+INVALID_RESUME_TOKEN
+SERVER_OFFLINE
+INVALID_PATH
+MISSING_BASE_REVISION
+REVISION_CONFLICT
+PLUGIN_ERROR
 ```
 
-用户唯一需要的是购买时获得的 license，插件首次启动时自动读取并注册。
-建议将 license 存储在 `plugins/Orryx/license.key` 文件中（首次启动时提示用户输入）。
-
----
-
-## 8. 中心服务器部署
-
-中心服务器是一个单 jar 文件，需要 Java 21+：
-
-```bash
-java -jar orryx-editor-server-all.jar
-```
-
-环境变量：
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PORT` | 监听端口 | `9090` |
-| `ADMIN_KEY` | 管理 API 密钥 | `change-me` |
-| `DATA_DIR` | 数据目录（存放 licenses.json） | `data` |
-
-部署示例：
-```bash
-PORT=9090 ADMIN_KEY=myAdminSecret java -jar orryx-editor-server-all.jar
-```
-
-### License 管理 API
-
-创建 license（分发给用户）：
-```bash
-curl -X POST https://editor.你的域名/api/admin/license \
-  -H "Authorization: Bearer myAdminSecret" \
-  -H "Content-Type: application/json" \
-  -d '{"owner":"用户名"}'
-# 返回: {"license":"a1b2c3d4e5f6g7h8i9j0","serverKey":"...","owner":"用户名"}
-```
-
-列出所有 license：
-```bash
-curl https://editor.你的域名/api/admin/licenses \
-  -H "Authorization: Bearer myAdminSecret"
-```
-
-禁用 license：
-```bash
-curl -X DELETE https://editor.你的域名/api/admin/license/a1b2c3d4e5f6g7h8i9j0 \
-  -H "Authorization: Bearer myAdminSecret"
-```
-
-建议用 Nginx 反代并配置 SSL：
-```nginx
-server {
-    listen 443 ssl;
-    server_name editor.你的域名;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:9090;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
----
-
-## 9. 扩展预留
-
-| type | 说明 | 状态 |
-|------|------|------|
-| `player.list` | 获取在线玩家列表 | 预留 |
-| `player.info` | 获取玩家详细信息 | 预留 |
-| `skill.test` | 让指定玩家测试释放技能 | 预留 |
-| `skill.validate` | 校验 Kether 脚本语法 | 预留 |
-| `backup.create` | 创建配置备份 | 预留 |
-| `backup.restore` | 恢复配置备份 | 预留 |
-
-扩展新消息类型时，中心服务器会原样透传，无需修改中心服务器代码。
+错误消息只用于显示；插件逻辑应依据稳定 `code` 分支。

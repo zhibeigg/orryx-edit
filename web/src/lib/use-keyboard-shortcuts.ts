@@ -1,7 +1,6 @@
 import { useEffect } from "react"
 import { useEditorStore } from "@/store/editor-store"
-import { wsClient } from "@/lib/ws-client"
-import { deleteDraft } from "@/lib/draft-storage"
+import { saveEditorFile } from "@/lib/file-save"
 
 /**
  * 全局快捷键 Hook
@@ -120,16 +119,12 @@ export function useKeyboardShortcuts() {
 
 /** 保存当前活动文件 */
 async function saveActiveFile() {
-  const { openFiles, activeFilePath, markSaved } = useEditorStore.getState()
+  const { openFiles, activeFilePath } = useEditorStore.getState()
   const activeFile = openFiles.find((f) => f.path === activeFilePath)
   if (!activeFile?.dirty || activeFile.draft == null) return
 
   try {
-    const res = await wsClient.fileWrite(activeFile.path, activeFile.draft)
-    if (res.success) {
-      markSaved(activeFile.path, activeFile.draft)
-      await deleteDraft(activeFile.path)
-    }
+    await saveEditorFile(activeFile, activeFile.draft)
   } catch (err) {
     console.error("保存失败:", err)
   }
@@ -141,11 +136,7 @@ async function saveAllFiles() {
   for (const f of store.openFiles.filter((f) => f.dirty)) {
     try {
       const content = f.draft ?? f.content
-      const res = await wsClient.fileWrite(f.path, content)
-      if (res.success) {
-        store.markSaved(f.path, content)
-        await deleteDraft(f.path)
-      }
+      await saveEditorFile(f, content)
     } catch { /* skip */ }
   }
 }

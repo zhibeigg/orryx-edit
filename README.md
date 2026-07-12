@@ -1,128 +1,145 @@
 # Orryx Editor
 
-Orryx 插件的 Web 配置编辑器。通过中心服务器中转，让 MC 服务器管理员在浏览器中实时编辑 Orryx 插件配置。
-
-## 架构
-
-```
-玩家浏览器 ←HTTP+WS→ 中心服务器 ←WS→ MC服务器 Orryx 插件
-                      (本项目)
-```
-
-- 中心服务器托管前端页面 + WebSocket 中转
-- 插件端连接中心服务器注册，玩家输入 `/orryx editor` 获取编辑器 URL
-- 浏览器打开 URL 自动认证，消息在浏览器和插件端之间透传
+面向 Minecraft 服主与 Orryx 开发者的多人 Web 配置编辑器。浏览器通过中心 Ktor 服务与指定 Minecraft 子服建立隔离工作区，支持可恢复会话、协作者状态、文件版本冲突保护和受控在线更新。
 
 ## 技术栈
 
-| 模块 | 技术 |
-|------|------|
-| 前端 | React 19 + TypeScript + Vite 8 + Tailwind CSS 4 |
-| 编辑器 | Monaco Editor（Kether 语法高亮 + 自动补全） |
-| 3D 预览 | Three.js（碰撞箱可视化） |
-| 后端 | Kotlin + Ktor 3 + Netty |
-| 协议 | WebSocket JSON |
+- Web：React 19、TypeScript、Vite 8、Tailwind CSS 4、Monaco、React Flow、Three.js
+- Server：Kotlin、Ktor 3、Netty、协程
+- 持久化：PostgreSQL、R2DBC PostgreSQL、R2DBC Pool
+- 协议：HTTP JSON + WebSocket JSON
 
-## 功能
+## 0.3.1 架构
 
-- YAML 配置文件编辑（通用编辑器 + 技能可视化编辑器）
-- Kether 脚本语法高亮、关键字补全
-- 技能时间轴可视化
-- 碰撞箱 3D 预览（range / obb / sector）
-- 文件树浏览、创建、重命名、删除
-- 草稿系统（IndexedDB 自动保存）
-- 发布面板（diff 对比 + 单文件撤销）
-- 实时日志控制台
-- 断线自动重连（指数退避）
-- License 管理（时长、IP 绑定、续费）
-- 管理后台 `/admin` + 客户自助 `/portal`
-
-## 项目结构
-
-```
-orryx-edit/
-├── web/                    # 前端 React 应用
-│   ├── src/
-│   │   ├── components/     # UI 组件
-│   │   ├── pages/          # 页面（ConnectPage, EditorPage, AdminPage, PortalPage）
-│   │   ├── store/          # Zustand 状态管理
-│   │   ├── lib/            # 工具库（WebSocket 客户端、Kether 语法、草稿存储等）
-│   │   └── types/          # TypeScript 类型定义
-│   └── vite.config.ts
-├── server/                 # Ktor 中转服务器
-│   └── src/main/kotlin/com/orryx/editor/
-│       ├── Application.kt          # 入口
-│       ├── license/                 # License 管理
-│       ├── plugins/                 # Ktor 插件（路由、WebSocket）
-│       ├── protocol/                # 消息协议定义
-│       └── relay/                   # 中转核心（SessionRegistry, RelayHandler, ServerEndpoint）
-├── PLUGIN_API.md           # 插件端对接文档
-└── build.sh                # 一键构建脚本
+```text
+浏览器 ── /ws ──> Orryx Editor Server <── /ws/server ── Minecraft 插件
+                       │
+                       ├── PostgreSQL / R2DBC
+                       └── 私有 GitHub Release（仅后端访问）
 ```
 
-## 开发
+- PostgreSQL 是唯一主存储；不回退到 JSON 或内存。
+- 旧 `licenses.json` 只在首次迁移时异步导入，原文件不会删除。
+- `workspaceId = SHA-256(serverKey + NUL + serverId)`，同 License 的不同子服完全隔离。
+- URL Token 只能原子消费一次；浏览器仅在 `sessionStorage` 保存可轮换的 resume token，数据库只保存 SHA-256。
+- 浏览器请求 ID 会在 relay 内改写，插件响应只返回发起请求的浏览器。
+- 文件写入携带 `baseRevision`；过期 revision 返回 `REVISION_CONFLICT`，不会静默覆盖。
+- 在线更新只接受稳定版、精确资产、HTTPS allowlist 和匹配的 SHA-256/manifest。
 
-前端开发（热更新）：
+## 环境要求
 
-```bash
-cd web
-npm install
-npm run dev
+- Java 21+
+- Node.js 20+
+- PostgreSQL 15+
+- Git Bash（Windows 执行 `build.sh` 时）
+
+复制 `.env.example` 并设置环境变量。生产必填：
+
+```text
+ADMIN_KEY          至少 16 字符的随机管理密钥
+DATABASE_URL       r2dbc:postgresql://host:5432/database
+DATABASE_USER      PostgreSQL 用户
+DATABASE_PASSWORD  PostgreSQL 密码
 ```
 
-后端运行（IntelliJ 直接运行 `Application.kt`，或命令行）：
+常用可选项：
 
-```bash
-cd server
-./gradlew run
+```text
+PORT=9090
+DATA_DIR=data
+DB_POOL_MIN_IDLE=1
+DB_POOL_MAX_SIZE=10
+EDITOR_SESSION_TTL_HOURS=24
+DEPLOYMENT_MODE=source|launcher|container
+UPDATE_ENABLED=false
+UPDATE_GITHUB_REPOSITORY=zhibeigg/orryx-edit
+UPDATE_GITHUB_TOKEN=<private repo read-only token>
 ```
 
-## 构建部署
+完整配置见 `.env.example`。GitHub Token 只存在于服务端环境和 GitHub Authorization 请求头，不会进入前端、响应或日志。
 
-一键构建：
+## 数据库与迁移
+
+应用启动顺序：
+
+1. 校验配置和强管理密钥。
+2. 建立 R2DBC Pool 并执行 `SELECT 1`。
+3. 在事务中获取 PostgreSQL advisory lock。
+4. 校验 `schema_migrations` checksum 并执行待应用迁移。
+5. 尝试一次性导入旧 `licenses.json`。
+6. 启动 HTTP、WebSocket 和会话清理任务。
+
+迁移不使用 Flyway、JDBC 或阻塞数据库 API。数据库不可用、checksum 不匹配或迁移失败时服务拒绝启动。
+
+## 构建与测试
 
 ```bash
 bash build.sh
 ```
 
-产物为单个 fat jar（约 15MB），包含前端 + 后端 + 所有依赖：
+根构建会执行：
 
-```
-server/build/libs/orryx-editor-server-all.jar
+- `npm ci`
+- ESLint、TypeScript、Vitest、Vite production build
+- `./gradlew --no-daemon test shadowJar`
+
+产物：
+
+```text
+server/build/libs/orryx-editor-server-A.B.C.jar
 ```
 
-启动：
+## 启动
+
+### source / container 模式
 
 ```bash
-java -jar orryx-editor-server-all.jar
+ADMIN_KEY=... DATABASE_URL=... DATABASE_USER=... DATABASE_PASSWORD=... bash start.sh
 ```
 
-环境变量：
+Windows：
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PORT` | 监听端口 | `9090` |
-| `ADMIN_KEY` | 管理后台密码 | `change-me` |
-| `DATA_DIR` | 数据目录（存放 licenses.json） | `data` |
+```powershell
+$env:ADMIN_KEY="..."
+$env:DATABASE_URL="r2dbc:postgresql://127.0.0.1:5432/orryx_editor"
+$env:DATABASE_USER="orryx"
+$env:DATABASE_PASSWORD="..."
+.\start.ps1
+```
 
-生产部署建议用 Nginx 反代 + SSL，参考 [PLUGIN_API.md](PLUGIN_API.md) 中的 Nginx 配置。
+### launcher 模式与自动回滚
 
-## 页面路由
+设置：
 
-| 路径 | 说明 |
-|------|------|
-| `/` | 编辑器（输入 Token 连接） |
-| `/admin` | 管理后台（创建/管理 License） |
-| `/portal` | 客户自助（查看 License 信息、解绑 IP） |
+```text
+DEPLOYMENT_MODE=launcher
+UPDATE_ENABLED=true
+UPDATE_GITHUB_TOKEN=<read-only token>
+```
 
-## License 流程
+Admin 后台可以检查、下载、校验并暂存 Release。应用请求重启后以退出码 `42` 退出；`start.sh`/`start.ps1` 会：
 
-1. 管理员在 `/admin` 创建 License，设置时长
-2. 将 License 发给用户，用户配置到插件中
-3. 插件启动时用 License 连接中心服务器，自动绑定服务器 IP
-4. 玩家输入 `/orryx editor` → 插件注册一次性 Token → 返回编辑器 URL
-5. 玩家打开 URL 即可使用编辑器
+1. 再次校验 pending manifest 与 staged JAR SHA-256。
+2. 备份当前 JAR。
+3. 在旧进程退出后切换 JAR。
+4. 启动新版本并轮询 `/health/ready`，同时核对版本。
+5. 失败时终止新进程、恢复备份并启动旧版本。
 
-## 插件端对接
+`container` 模式不会在容器内替换 JAR，只允许检查新版本。
 
-详见 [PLUGIN_API.md](PLUGIN_API.md)
+## 健康检查
+
+- `GET /health/live`：进程存活和版本。
+- `GET /health/ready`：真实 PostgreSQL 可用性、迁移完成状态和版本。
+
+## 页面与管理 API
+
+- `/`：编辑器连接与工作区
+- `/admin`：License、运行状态和在线更新
+- `/portal`：License 自助信息与 IP 解绑
+- `GET /api/admin/system/version`
+- `GET /api/admin/update/status`
+- `POST /api/admin/update/jobs`
+- `GET /api/admin/update/jobs/{id}`
+
+管理 API 使用 `Authorization: Bearer <ADMIN_KEY>`。详细插件 WebSocket 协议见 `PLUGIN_API.md`。

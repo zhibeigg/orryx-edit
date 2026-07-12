@@ -32,7 +32,7 @@ fun Application.configureWebSockets(
                     }
                 }
             } catch (e: Exception) {
-                log.error("浏览器 WebSocket 错误: ${e.message}")
+                log.warn("browser_websocket_closed type={}", e::class.simpleName)
             } finally {
                 relayHandler.onBrowserDisconnect(this)
                 log.info("浏览器客户端已断开")
@@ -55,7 +55,7 @@ fun Application.configureWebSockets(
                     }
                 }
             } catch (e: Exception) {
-                log.error("插件端 WebSocket 错误: ${e.message}")
+                log.warn("plugin_websocket_closed remoteIp={} type={}", remoteIp, e::class.simpleName)
             } finally {
                 serverEndpoint.onServerDisconnect(this)
                 log.info("插件端已断开: $remoteIp")

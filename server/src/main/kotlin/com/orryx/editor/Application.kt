@@ -1,6 +1,13 @@
 package com.orryx.editor
 
+import com.orryx.editor.audit.PostgresAuditRepository
+import com.orryx.editor.config.AppConfig
+import com.orryx.editor.database.DatabaseMigrator
+import com.orryx.editor.database.R2dbcDatabase
+import com.orryx.editor.license.LegacyLicenseImporter
 import com.orryx.editor.license.LicenseManager
+import com.orryx.editor.license.LicenseService
+import com.orryx.editor.license.PostgresLicenseRepository
 import com.orryx.editor.plugins.configureRouting
 import com.orryx.editor.plugins.configureWebSockets
 import com.orryx.editor.relay.RelayHandler
@@ -9,13 +16,27 @@ import com.orryx.editor.relay.SessionRegistry
 import com.orryx.editor.security.SecuritySettings
 import com.orryx.editor.security.loadSecuritySettings
 import com.orryx.editor.security.requireSecureAdminKey
+import com.orryx.editor.session.PostgresEditorSessionRepository
+import com.orryx.editor.session.PostgresRelayEditorSessionStore
+import com.orryx.editor.update.ArtifactDownloader
+import com.orryx.editor.update.GitHubReleaseClient
+import com.orryx.editor.update.PostgresUpdateJobStore
+import com.orryx.editor.update.UpdateHttpClientFactory
+import com.orryx.editor.update.UpdateJobRunner
+import com.orryx.editor.update.UpdateService
+import com.orryx.editor.update.UpdateStartupReconciler
 import io.ktor.server.application.ApplicationStopping
-import io.ktor.server.engine.*
-import io.ktor.server.netty.*
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.Instant
 
 data class ServerConfig(
     val port: Int,
@@ -24,6 +45,7 @@ data class ServerConfig(
     val securitySettings: SecuritySettings
 )
 
+/** 保留给安全配置单元测试；生产启动统一使用 [AppConfig]。 */
 fun loadServerConfig(environment: Map<String, String> = System.getenv()): ServerConfig {
     val port = environment["PORT"]?.toIntOrNull() ?: 9090
     require(port in 1..65535) { "PORT 必须在 1..65535 范围内" }
@@ -35,36 +57,85 @@ fun loadServerConfig(environment: Map<String, String> = System.getenv()): Server
     )
 }
 
-fun main() {
-    val config = loadServerConfig()
-    val licenseManager = LicenseManager(config.dataDir)
-    val registry = SessionRegistry()
+suspend fun main() {
+    val config = AppConfig.load()
+    val database = R2dbcDatabase.create(config.database)
+    val applicationJob = SupervisorJob()
+    val applicationScope = CoroutineScope(applicationJob + Dispatchers.Default)
+    val updateHttpClient = UpdateHttpClientFactory.create()
 
-    println("=== Orryx Editor Server ===")
-    println("  端口: ${config.port}")
-    println("  数据目录: ${config.dataDir.absolutePath}")
-    println("  访问: http://localhost:${config.port}")
-    println("  插件端: ws://localhost:${config.port}/ws/server")
-    println("  管理API: POST /api/admin/license (Authorization: Bearer <ADMIN_KEY>)")
-    println("===========================")
+    try {
+        database.warmUp()
+        DatabaseMigrator(database).migrate()
 
-    val server = embeddedServer(Netty, port = config.port) {
-        val relayHandler = RelayHandler(registry)
+        val licenseRepository = PostgresLicenseRepository(database)
+        val licenseService = LicenseService(licenseRepository)
+        val licenseManager = LicenseManager(licenseService)
+        val auditRepository = PostgresAuditRepository(database)
+        val editorSessions = PostgresEditorSessionRepository(database)
+        val relaySessionStore = PostgresRelayEditorSessionStore(database)
+        val legacyResult = LegacyLicenseImporter(database).importOnce(config.legacyLicensesFile)
+
+        val registry = SessionRegistry(config.sessions.relayRequestTimeout.toMillis())
+        val relayHandler = RelayHandler(registry, relaySessionStore, config.sessions.ttl.toMillis())
         val serverEndpoint = ServerEndpoint(registry, licenseManager)
-        configureRouting(licenseManager, registry, config.adminKey, config.securitySettings)
-        configureWebSockets(relayHandler, serverEndpoint, config.securitySettings)
 
-        launch {
-            while (isActive) {
-                delay(5 * 60_000L)
-                registry.cleanupExpiredTokens()
+        val updateStore = PostgresUpdateJobStore(database, config.updates.instanceId)
+        val updateService = UpdateService(
+            buildInfo = config.buildInfo,
+            config = config.updates,
+            releases = GitHubReleaseClient(updateHttpClient, config.updates),
+            downloader = ArtifactDownloader(updateHttpClient, config.updates),
+            store = updateStore,
+            runner = UpdateJobRunner(applicationScope),
+            activeUsers = registry::browserCount,
+            onRestartRequested = {
+                delay(750)
+                kotlin.system.exitProcess(42)
+            }
+        )
+
+        val pendingUpdate = UpdateStartupReconciler(config.updates.dataDirectory).reconcile()
+
+        println("=== Orryx Editor Server ${config.buildInfo.version} ===")
+        println("  端口: ${config.port}")
+        println("  数据目录: ${config.dataDir}")
+        println("  数据库: PostgreSQL / R2DBC")
+        println("  旧 License 导入: ${legacyResult::class.simpleName}")
+        println("  部署模式: ${config.buildInfo.deployment}")
+        if (pendingUpdate != null) println("  更新状态: 待 launcher 应用 ${pendingUpdate.version}")
+        println("====================================")
+
+        val server = embeddedServer(Netty, port = config.port) {
+            configureRouting(
+                licenseManager = licenseManager,
+                registry = registry,
+                adminKey = config.adminKey,
+                securitySettings = config.security,
+                auditRepository = auditRepository,
+                buildInfo = config.buildInfo,
+                readinessCheck = database::ping,
+                updateService = updateService
+            )
+            configureWebSockets(relayHandler, serverEndpoint, config.security)
+
+            launch {
+                while (isActive) {
+                    delay(config.sessions.cleanupInterval.toMillis())
+                    registry.cleanupExpiredTokens()
+                    editorSessions.cleanup(Instant.now())
+                }
+            }
+
+            monitor.subscribe(ApplicationStopping) {
+                applicationScope.cancel("Ktor application stopping")
             }
         }
 
-        monitor.subscribe(ApplicationStopping) {
-            licenseManager.shutdown()
-        }
+        server.start(wait = true)
+    } finally {
+        applicationScope.cancel("Orryx server shutdown")
+        updateHttpClient.close()
+        database.closeAsync()
     }
-
-    server.start(wait = true)
 }

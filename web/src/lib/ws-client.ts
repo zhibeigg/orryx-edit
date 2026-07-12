@@ -1,33 +1,182 @@
-import type { WsMessage } from "@/types"
+import type { FileTreeNode, WsMessage } from "@/types"
 import { MSG } from "@/types"
 
-type MessageHandler = (msg: WsMessage) => void
+export interface CollaboratorPresence {
+  browserId: string
+  playerName: string
+  currentFile?: string | null
+  lastActiveAt: number
+}
 
-let ws: WebSocket | null = null
+export interface AuthSession {
+  success: boolean
+  permissions?: string[]
+  serverName?: string
+  onlineCount?: number
+  workspaceId?: string
+  browserId?: string
+  playerName?: string
+  resumeToken?: string
+  collaborators?: CollaboratorPresence[]
+  message?: string
+}
+
+export interface FileReadResult {
+  path: string
+  content: string
+  revision: number
+}
+
+export interface FileWriteResult {
+  path: string
+  success: boolean
+  revision: number
+}
+
+export interface WsErrorData {
+  code?: string
+  message?: string
+  path?: string
+  currentRevision?: number
+  [key: string]: unknown
+}
+
+export class WsRequestError extends Error {
+  readonly code: string
+  readonly data: WsErrorData
+
+  constructor(data: WsErrorData = {}) {
+    super(data.message ?? "请求失败")
+    this.name = "WsRequestError"
+    this.code = data.code ?? "REQUEST_FAILED"
+    this.data = data
+  }
+}
+
+type MessageHandler = (msg: WsMessage) => void
+type PendingRequest = {
+  resolve: (data: unknown) => void
+  reject: (error: Error) => void
+  timeout: ReturnType<typeof setTimeout>
+}
+
+const RESUME_TOKEN_KEY = "orryx.resumeToken"
+const REQUEST_TIMEOUT_MS = 10_000
+const MAX_RECONNECT_ATTEMPTS = 10
+const RECONNECT_BASE_DELAY_MS = 1_000
+const RECONNECT_MAX_DELAY_MS = 30_000
+
+let socket: WebSocket | null = null
+let connectionPromise: Promise<void> | null = null
+let connectionUrl: string | null = null
 let messageId = 0
-const pendingRequests = new Map<string, { resolve: (data: unknown) => void; reject: (err: Error) => void }>()
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let reconnectAttempts = 0
+let manuallyClosed = false
+let authenticated = false
+let resumeToken: string | null = sessionStorage.getItem(RESUME_TOKEN_KEY)
+
+const pendingRequests = new Map<string, PendingRequest>()
 const listeners = new Map<string, Set<MessageHandler>>()
 let onStatusChange: ((connected: boolean) => void) | null = null
 let onReconnectFailed: (() => void) | null = null
-let onReconnected: ((serverName?: string, onlineCount?: number) => void) | null = null
-
-// 重连状态
-let reconnectUrl: string | null = null
-let reconnectToken: string | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-let reconnectAttempts = 0
-const MAX_RECONNECT_ATTEMPTS = 10
-const RECONNECT_BASE_DELAY = 1000
+let onReconnected: ((session: AuthSession) => void) | null = null
+let onAuthenticationLost: ((error: WsRequestError) => void) | null = null
 
 function nextId(): string {
-  return `req_${++messageId}_${Date.now()}`
+  messageId += 1
+  return `req_${messageId}_${Date.now()}`
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+}
+
+function rejectPendingRequests(error: Error) {
+  for (const pending of pendingRequests.values()) {
+    clearTimeout(pending.timeout)
+    pending.reject(error)
+  }
+  pendingRequests.clear()
+}
+
+function persistResumeToken(value: string | null) {
+  resumeToken = value
+  if (value) sessionStorage.setItem(RESUME_TOKEN_KEY, value)
+  else sessionStorage.removeItem(RESUME_TOKEN_KEY)
+}
+
+function dispatchMessage(msg: WsMessage) {
+  const typeListeners = listeners.get(msg.type)
+  if (!typeListeners) return
+  for (const handler of typeListeners) handler(msg)
+}
+
+function handleIncomingMessage(event: MessageEvent) {
+  try {
+    const msg = JSON.parse(String(event.data)) as WsMessage<WsErrorData>
+    if (msg.id) {
+      const pending = pendingRequests.get(msg.id)
+      if (pending) {
+        pendingRequests.delete(msg.id)
+        clearTimeout(pending.timeout)
+        if (msg.type === MSG.ERROR) pending.reject(new WsRequestError(msg.data))
+        else pending.resolve(msg.data)
+        return
+      }
+    }
+    dispatchMessage(msg)
+  } catch {
+    console.error("解析 WebSocket 消息失败")
+  }
+}
+
+function websocketUrl(): string {
+  if (connectionUrl) return connectionUrl
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}/ws`
+}
+
+function scheduleReconnect() {
+  if (manuallyClosed || !authenticated || !resumeToken || reconnectTimer) return
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    authenticated = false
+    onReconnectFailed?.()
+    return
+  }
+
+  const exponential = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempts, RECONNECT_MAX_DELAY_MS)
+  const jitteredDelay = Math.round(exponential * (0.8 + Math.random() * 0.4))
+  reconnectAttempts += 1
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null
+    try {
+      await connect(websocketUrl())
+      const session = await authenticateResume()
+      reconnectAttempts = 0
+      onReconnected?.(session)
+    } catch (error) {
+      if (error instanceof WsRequestError && ["INVALID_SESSION", "SESSION_EXPIRED", "LICENSE_INACTIVE"].includes(error.code)) {
+        authenticated = false
+        persistResumeToken(null)
+        onAuthenticationLost?.(error)
+        disconnect(false)
+        return
+      }
+      scheduleReconnect()
+    }
+  }, jitteredDelay)
 }
 
 export function setStatusChangeHandler(handler: (connected: boolean) => void) {
   onStatusChange = handler
 }
 
-export function setReconnectedHandler(handler: (serverName?: string, onlineCount?: number) => void) {
+export function setReconnectedHandler(handler: (session: AuthSession) => void) {
   onReconnected = handler
 }
 
@@ -35,144 +184,121 @@ export function setReconnectFailedHandler(handler: () => void) {
   onReconnectFailed = handler
 }
 
-function scheduleReconnect() {
-  if (!reconnectUrl || !reconnectToken) return
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.warn("已达最大重连次数，停止重连")
-    onReconnectFailed?.()
-    return
-  }
+export function setAuthenticationLostHandler(handler: (error: WsRequestError) => void) {
+  onAuthenticationLost = handler
+}
 
-  const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts), 30000)
-  reconnectAttempts++
-  console.log(`将在 ${delay}ms 后尝试第 ${reconnectAttempts} 次重连...`)
+export function connect(url = websocketUrl()): Promise<void> {
+  if (socket?.readyState === WebSocket.OPEN) return Promise.resolve()
+  if (socket?.readyState === WebSocket.CONNECTING && connectionPromise) return connectionPromise
 
-  reconnectTimer = setTimeout(async () => {
-    try {
-      await connect(reconnectUrl!)
-      // 重连成功，自动重新认证
-      const authResult = await request<{ success: boolean; serverName?: string; onlineCount?: number }>(MSG.AUTH, { token: reconnectToken })
-      if (authResult.success) {
-        reconnectAttempts = 0
-        onReconnected?.(authResult.serverName, authResult.onlineCount)
-      }
-    } catch {
+  manuallyClosed = false
+  connectionUrl = url
+  clearReconnectTimer()
+
+  connectionPromise = new Promise((resolve, reject) => {
+    const nextSocket = new WebSocket(url)
+    socket = nextSocket
+    let settled = false
+
+    nextSocket.onopen = () => {
+      if (socket !== nextSocket) return
+      settled = true
+      onStatusChange?.(true)
+      resolve()
+    }
+
+    nextSocket.onmessage = handleIncomingMessage
+
+    nextSocket.onerror = () => {
+      if (!settled) reject(new Error("WebSocket 连接失败"))
+    }
+
+    nextSocket.onclose = () => {
+      if (socket === nextSocket) socket = null
+      connectionPromise = null
+      onStatusChange?.(false)
+      rejectPendingRequests(new Error("WebSocket 连接已断开"))
+      if (!settled) reject(new Error("WebSocket 连接失败"))
       scheduleReconnect()
     }
-  }, delay)
-}
-
-export function connect(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (ws?.readyState === WebSocket.OPEN) {
-      resolve()
-      return
-    }
-
-    reconnectUrl = url
-    ws = new WebSocket(url)
-
-    ws.onopen = () => {
-      onStatusChange?.(true)
-      reconnectAttempts = 0
-      resolve()
-    }
-
-    ws.onclose = () => {
-      onStatusChange?.(false)
-      for (const [, pending] of pendingRequests) {
-        pending.reject(new Error("WebSocket 连接已断开"))
-      }
-      pendingRequests.clear()
-      // 如果有 token，尝试自动重连
-      if (reconnectToken) {
-        scheduleReconnect()
-      }
-    }
-
-    ws.onerror = () => {
-      reject(new Error("WebSocket 连接失败"))
-    }
-
-    ws.onmessage = (event) => {
-      try {
-        const msg: WsMessage = JSON.parse(event.data)
-
-        if (msg.id && pendingRequests.has(msg.id)) {
-          const pending = pendingRequests.get(msg.id)
-          if (!pending) return
-          pendingRequests.delete(msg.id)
-          pending.resolve(msg.data)
-          return
-        }
-
-        const typeListeners = listeners.get(msg.type)
-        if (typeListeners) {
-          for (const handler of typeListeners) {
-            handler(msg)
-          }
-        }
-      } catch {
-        console.error("解析 WebSocket 消息失败:", event.data)
-      }
-    }
   })
+
+  return connectionPromise
 }
 
-export function disconnect() {
-  reconnectToken = null // 清除 token 阻止自动重连
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-  ws?.close()
-  ws = null
+export function disconnect(clearSession = true) {
+  manuallyClosed = true
+  authenticated = false
+  clearReconnectTimer()
+  rejectPendingRequests(new Error("WebSocket 连接已关闭"))
+  if (clearSession) persistResumeToken(null)
+  const current = socket
+  socket = null
+  connectionPromise = null
+  current?.close()
+  onStatusChange?.(false)
 }
 
-/** 发送请求并等待响应 */
 export function request<T = unknown>(type: string, data: unknown = {}): Promise<T> {
   return new Promise((resolve, reject) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       reject(new Error("WebSocket 未连接"))
       return
     }
 
     const id = nextId()
-    const msg: WsMessage = { type, id, data }
+    const timeout = setTimeout(() => {
+      const pending = pendingRequests.get(id)
+      if (!pending) return
+      pendingRequests.delete(id)
+      pending.reject(new Error(`请求超时: ${type}`))
+    }, REQUEST_TIMEOUT_MS)
 
     pendingRequests.set(id, {
       resolve: resolve as (data: unknown) => void,
       reject,
+      timeout,
     })
 
-    setTimeout(() => {
-      if (pendingRequests.has(id)) {
-        pendingRequests.delete(id)
-        reject(new Error(`请求超时: ${type}`))
-      }
-    }, 10000)
-
-    ws.send(JSON.stringify(msg))
+    try {
+      socket.send(JSON.stringify({ type, id, data } satisfies WsMessage))
+    } catch (error) {
+      clearTimeout(timeout)
+      pendingRequests.delete(id)
+      reject(error instanceof Error ? error : new Error("发送 WebSocket 消息失败"))
+    }
   })
 }
 
-/** 发送消息（不等待响应） */
 export function send(type: string, data: unknown = {}) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return
-  const msg: WsMessage = { type, id: nextId(), data }
-  ws.send(JSON.stringify(msg))
+  if (!socket || socket.readyState !== WebSocket.OPEN) return false
+  socket.send(JSON.stringify({ type, id: nextId(), data } satisfies WsMessage))
+  return true
 }
 
-/** 监听特定类型的消息 */
 export function on(type: string, handler: MessageHandler): () => void {
-  if (!listeners.has(type)) {
-    listeners.set(type, new Set())
+  const handlers = listeners.get(type) ?? new Set<MessageHandler>()
+  handlers.add(handler)
+  listeners.set(type, handlers)
+  return () => {
+    handlers.delete(handler)
+    if (handlers.size === 0) listeners.delete(type)
   }
-  listeners.get(type)!.add(handler)
-  return () => listeners.get(type)?.delete(handler)
 }
 
-// 便捷 API
+async function applyAuthResult(result: AuthSession): Promise<AuthSession> {
+  if (!result.success) throw new WsRequestError({ code: "AUTH_FAILED", message: result.message ?? "认证失败" })
+  authenticated = true
+  if (result.resumeToken) persistResumeToken(result.resumeToken)
+  return result
+}
+
+async function authenticateResume(): Promise<AuthSession> {
+  if (!resumeToken) throw new WsRequestError({ code: "INVALID_SESSION", message: "没有可恢复会话" })
+  return applyAuthResult(await request<AuthSession>(MSG.AUTH, { resumeToken }))
+}
+
 export const wsClient = {
   connect,
   disconnect,
@@ -182,26 +308,42 @@ export const wsClient = {
   setStatusChangeHandler,
   setReconnectedHandler,
   setReconnectFailedHandler,
+  setAuthenticationLostHandler,
+
+  hasResumeSession() {
+    return Boolean(resumeToken)
+  },
+
+  clearResumeSession() {
+    persistResumeToken(null)
+  },
 
   async auth(token: string) {
-    reconnectToken = token // 记录 token 用于自动重连
-    return request<{ success: boolean; permissions?: string[]; serverName?: string; onlineCount?: number }>(MSG.AUTH, { token })
+    const result = await applyAuthResult(await request<AuthSession>(MSG.AUTH, { token }))
+    reconnectAttempts = 0
+    return result
+  },
+
+  async resume() {
+    const result = await authenticateResume()
+    reconnectAttempts = 0
+    return result
   },
 
   async fileList(path?: string) {
-    return request<{ files: import("@/types").FileTreeNode[] }>(MSG.FILE_LIST, { path })
+    return request<{ files: FileTreeNode[] }>(MSG.FILE_LIST, { path })
   },
 
   async fileRead(path: string) {
-    return request<{ path: string; content: string }>(MSG.FILE_READ, { path })
+    return request<FileReadResult>(MSG.FILE_READ, { path })
   },
 
-  async fileWrite(path: string, content: string) {
-    return request<{ path: string; success: boolean }>(MSG.FILE_WRITE, { path, content })
+  async fileWrite(path: string, content: string, baseRevision: number, force = false) {
+    return request<FileWriteResult>(MSG.FILE_WRITE, { path, content, baseRevision, force })
   },
 
   async fileCreate(path: string, isDirectory = false) {
-    return request<{ path: string; success: boolean }>(MSG.FILE_CREATE, { path, isDirectory })
+    return request<{ path: string; success: boolean; revision?: number }>(MSG.FILE_CREATE, { path, isDirectory })
   },
 
   async fileDelete(path: string) {
@@ -214,5 +356,9 @@ export const wsClient = {
 
   async reload(module: string) {
     return request<{ module: string; success: boolean; message?: string }>(MSG.RELOAD, { module })
+  },
+
+  updatePresence(currentFile: string | null) {
+    send(MSG.PRESENCE_UPDATE, { currentFile })
   },
 }

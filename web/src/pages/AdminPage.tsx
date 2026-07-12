@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Ban, Check, Clock, Copy, Key, Plus, RefreshCw, RotateCcw, Shield } from "lucide-react"
+import { UpdateCard } from "@/features/admin/UpdateCard"
 
 interface License {
   license: string
@@ -11,6 +12,7 @@ interface License {
   createdAt: number
   expiresAt: number
   boundIps: string[]
+  maxServers: number
   remainingDays: number
 }
 
@@ -31,6 +33,7 @@ export function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [newOwner, setNewOwner] = useState("")
   const [newDays, setNewDays] = useState(30)
+  const [newMaxServers, setNewMaxServers] = useState(1)
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +78,7 @@ export function AdminPage() {
     if (!newOwner.trim()) return
     setCreating(true)
     try {
-      const response = await api(adminKey, "/license", "POST", { owner: newOwner.trim(), days: newDays })
+      const response = await api(adminKey, "/license", "POST", { owner: newOwner.trim(), days: newDays, maxServers: newMaxServers })
       if (response.ok) { setNewOwner(""); await load() }
     } finally {
       setCreating(false)
@@ -147,9 +150,12 @@ export function AdminPage() {
           <form className="create-license-form" onSubmit={handleCreate}>
             <div className="field-group"><label htmlFor="license-owner">用户名 / 备注</label><input id="license-owner" type="text" value={newOwner} onChange={(event) => setNewOwner(event.target.value)} placeholder="例如：生存服主节点" /></div>
             <div className="field-group"><label htmlFor="license-days">有效期</label><select id="license-days" value={newDays} onChange={(event) => setNewDays(Number(event.target.value))}><option value={7}>7 天</option><option value={30}>30 天</option><option value={90}>90 天</option><option value={180}>180 天</option><option value={365}>365 天</option><option value={0}>永久</option></select></div>
+            <div className="field-group"><label htmlFor="license-max-servers">服务器上限</label><select id="license-max-servers" value={newMaxServers} onChange={(event) => setNewMaxServers(Number(event.target.value))}><option value={1}>1 台</option><option value={3}>3 台</option><option value={5}>5 台</option><option value={10}>10 台</option></select></div>
             <button className="industrial-button industrial-button--primary" type="submit" disabled={creating || !newOwner.trim()}><Plus aria-hidden="true" />{creating ? "创建中…" : "创建"}</button>
           </form>
         </section>
+
+        <UpdateCard adminKey={adminKey} />
 
         <section className="industrial-panel license-section" aria-labelledby="license-list-title">
           <div className="section-heading"><Key aria-hidden="true" /><div><h2 id="license-list-title">License 列表</h2><p>共 {licenses.length} 条授权记录。</p></div></div>

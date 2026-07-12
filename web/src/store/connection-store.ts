@@ -1,47 +1,84 @@
 import { create } from "zustand"
+import type { CollaboratorPresence, AuthSession } from "@/lib/ws-client"
 
 interface ConnectionState {
   connected: boolean
   authenticated: boolean
   reconnecting: boolean
   token: string | null
+  workspaceId: string | null
+  browserId: string | null
+  playerName: string | null
   serverName: string | null
   onlineCount: number
+  collaborators: CollaboratorPresence[]
   error: string | null
 
   setConnected: (connected: boolean) => void
-  setAuthenticated: (authenticated: boolean, serverName?: string, onlineCount?: number) => void
+  setAuthenticated: (authenticated: boolean, session?: AuthSession) => void
   setReconnecting: (reconnecting: boolean) => void
   setToken: (token: string | null) => void
+  setCollaborators: (collaborators: CollaboratorPresence[]) => void
   setError: (error: string | null) => void
   reset: () => void
 }
 
-export const useConnectionStore = create<ConnectionState>((set, get) => ({
+const disconnectedState = {
   connected: false,
   authenticated: false,
   reconnecting: false,
   token: null,
+  workspaceId: null,
+  browserId: null,
+  playerName: null,
   serverName: null,
   onlineCount: 0,
+  collaborators: [] as CollaboratorPresence[],
   error: null,
+}
+
+export const useConnectionStore = create<ConnectionState>((set, get) => ({
+  ...disconnectedState,
 
   setConnected: (connected) => {
     if (connected) {
-      set({ connected, reconnecting: false, error: null })
-    } else {
-      // 断线时保留 authenticated（允许离线查看草稿），标记重连中
-      const { authenticated } = get()
-      set({
-        connected,
-        reconnecting: authenticated, // 只有之前已认证才尝试重连
-        error: "连接已断开",
-      })
+      set({ connected: true, reconnecting: false, error: null })
+      return
     }
+    const { authenticated } = get()
+    set({ connected: false, reconnecting: authenticated, error: "连接已断开" })
   },
-  setAuthenticated: (authenticated, serverName, onlineCount) => set({ authenticated, serverName: serverName ?? null, onlineCount: onlineCount ?? 0, reconnecting: false }),
+
+  setAuthenticated: (authenticated, session) => {
+    if (!authenticated) {
+      set({
+        authenticated: false,
+        reconnecting: false,
+        workspaceId: null,
+        browserId: null,
+        playerName: null,
+        serverName: null,
+        onlineCount: 0,
+        collaborators: [],
+      })
+      return
+    }
+    set({
+      authenticated: true,
+      reconnecting: false,
+      workspaceId: session?.workspaceId ?? get().workspaceId,
+      browserId: session?.browserId ?? get().browserId,
+      playerName: session?.playerName ?? get().playerName,
+      serverName: session?.serverName ?? get().serverName,
+      onlineCount: session?.onlineCount ?? get().onlineCount,
+      collaborators: session?.collaborators ?? get().collaborators,
+      error: null,
+    })
+  },
+
   setReconnecting: (reconnecting) => set({ reconnecting }),
   setToken: (token) => set({ token }),
+  setCollaborators: (collaborators) => set({ collaborators }),
   setError: (error) => set({ error }),
-  reset: () => set({ connected: false, authenticated: false, reconnecting: false, token: null, serverName: null, onlineCount: 0, error: null }),
+  reset: () => set({ ...disconnectedState, collaborators: [] }),
 }))

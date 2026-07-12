@@ -9,7 +9,8 @@ export interface WsMessage<T = unknown> {
 // ---- 前端 → 服务器 ----
 
 export interface AuthRequest {
-  token: string
+  token?: string
+  resumeToken?: string
 }
 
 export interface FileListRequest {
@@ -23,6 +24,8 @@ export interface FileReadRequest {
 export interface FileWriteRequest {
   path: string
   content: string
+  baseRevision: number
+  force?: boolean
 }
 
 export interface FileCreateRequest {
@@ -57,6 +60,11 @@ export interface AuthResult {
   success: boolean
   permissions?: string[]
   serverName?: string
+  onlineCount?: number
+  workspaceId?: string
+  browserId?: string
+  playerName?: string
+  resumeToken?: string
 }
 
 export interface FileTreeNode {
@@ -73,12 +81,31 @@ export interface FileTreeResponse {
 export interface FileContentResponse {
   path: string
   content: string
+  revision: number
 }
 
 export interface FileWrittenResponse {
   path: string
   success: boolean
+  revision?: number
   message?: string
+}
+
+export interface PresenceMember {
+  browserId: string
+  playerName: string
+  currentFile?: string | null
+  lastActiveAt: number
+}
+
+export interface PresenceUpdated {
+  members: PresenceMember[]
+}
+
+export interface FileChanged {
+  path: string
+  revision: number
+  browserId?: string
 }
 
 export interface ReloadResult {
@@ -113,6 +140,7 @@ export const MSG = {
   RELOAD: "reload",
   LOG_SUBSCRIBE: "log.subscribe",
   LOG_UNSUBSCRIBE: "log.unsubscribe",
+  PRESENCE_UPDATE: "presence.update",
 
   // 服务器 → 前端
   AUTH_RESULT: "auth.result",
@@ -122,5 +150,7 @@ export const MSG = {
   RELOAD_RESULT: "reload.result",
   LOG_ENTRY: "log.entry",
   SERVER_INFO: "server.info",
+  PRESENCE_UPDATED: "presence.updated",
+  FILE_CHANGED: "file.changed",
   ERROR: "error",
 } as const

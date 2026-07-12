@@ -1,0 +1,17 @@
+.card { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 12px; padding: 20px; display: grid; gap: 16px; background: color-mix(in srgb, currentColor 3%, transparent); }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.title { margin: 0; font-size: 1.1rem; }
+.subtitle { margin: 4px 0 0; opacity: .7; font-size: .9rem; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.grid div { padding: 10px; border-radius: 8px; background: color-mix(in srgb, currentColor 6%, transparent); min-width: 0; }
+.grid dt { font-size: .75rem; opacity: .65; }
+.grid dd { margin: 4px 0 0; font-weight: 650; overflow-wrap: anywhere; }
+.progress { width: 100%; accent-color: #35a56f; }
+.warning, .error { margin: 0; padding: 10px 12px; border-radius: 8px; }
+.warning { background: rgba(234, 179, 8, .14); color: #a16207; }
+.error { background: rgba(239, 68, 68, .12); color: #b91c1c; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.button { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 7px; padding: 8px 12px; background: transparent; color: inherit; cursor: pointer; }
+.primary { background: #18794e; border-color: #18794e; color: white; }
+.button:disabled { cursor: not-allowed; opacity: .5; }
+@media (max-width: 720px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .header { flex-direction: column; } }

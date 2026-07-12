@@ -1,34 +1,48 @@
 import { get, set, del, keys } from "idb-keyval"
+import { useConnectionStore } from "@/store/connection-store"
 
-const DRAFT_PREFIX = "draft:"
+const DRAFT_PREFIX = "draft:v2:"
 
-export async function saveDraft(path: string, content: string) {
-  await set(`${DRAFT_PREFIX}${path}`, {
+function currentWorkspaceId(): string {
+  return useConnectionStore.getState().workspaceId ?? "unbound"
+}
+
+function draftPrefix(workspaceId = currentWorkspaceId()): string {
+  return `${DRAFT_PREFIX}${workspaceId}:`
+}
+
+function draftKey(path: string, workspaceId = currentWorkspaceId()): string {
+  return `${draftPrefix(workspaceId)}${path}`
+}
+
+export async function saveDraft(path: string, content: string, workspaceId = currentWorkspaceId()) {
+  await set(draftKey(path, workspaceId), {
     content,
     savedAt: Date.now(),
+    workspaceId,
   })
 }
 
-export async function loadDraft(path: string): Promise<{ content: string; savedAt: number } | null> {
-  return await get(`${DRAFT_PREFIX}${path}`) ?? null
+export async function loadDraft(path: string, workspaceId = currentWorkspaceId()): Promise<{ content: string; savedAt: number } | null> {
+  return await get(draftKey(path, workspaceId)) ?? null
 }
 
-export async function deleteDraft(path: string) {
-  await del(`${DRAFT_PREFIX}${path}`)
+export async function deleteDraft(path: string, workspaceId = currentWorkspaceId()) {
+  await del(draftKey(path, workspaceId))
 }
 
-export async function listDrafts(): Promise<string[]> {
+export async function listDrafts(workspaceId = currentWorkspaceId()): Promise<string[]> {
+  const prefix = draftPrefix(workspaceId)
   const allKeys = await keys()
   return (allKeys as string[])
-    .filter((k) => k.startsWith(DRAFT_PREFIX))
-    .map((k) => k.slice(DRAFT_PREFIX.length))
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length))
 }
 
-export async function clearAllDrafts() {
+export async function clearAllDrafts(workspaceId = currentWorkspaceId()) {
+  const prefix = draftPrefix(workspaceId)
   const allKeys = await keys()
   for (const key of allKeys) {
-    if ((key as string).startsWith(DRAFT_PREFIX)) {
-      await del(key)
-    }
+    if ((key as string).startsWith(prefix)) await del(key)
   }
 }

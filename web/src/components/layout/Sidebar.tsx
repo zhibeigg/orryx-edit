@@ -34,6 +34,7 @@ function TreeNode({ node, depth = 0, onAction }: {
         path: node.path,
         name: node.name,
         content: res.content,
+        revision: res.revision,
         configType: getConfigType(node.path),
         ...(hasDraft ? { draft: content } : {}),
       })

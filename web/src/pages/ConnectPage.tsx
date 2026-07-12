@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { AlertCircle, Check, KeyRound, Unlink } from "lucide-react"
-import { wsClient } from "@/lib/ws-client"
+import { wsClient, type AuthSession } from "@/lib/ws-client"
 import { useConnectionStore } from "@/store/connection-store"
 import { useFileStore } from "@/store/file-store"
+
+function extractAndScrubUrlToken(): string | null {
+  const url = new URL(window.location.href)
+  const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash)
+  const token = hashParams.get("token") ?? url.searchParams.get("token")
+  if (!token) return null
+
+  // 认证网络请求开始前即清除地址栏中的一次性凭据，避免进入历史记录、截图或复制链接。
+  hashParams.delete("token")
+  url.searchParams.delete("token")
+  url.hash = hashParams.toString() ? `#${hashParams.toString()}` : ""
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`)
+  return token
+}
 
 export function ConnectPage() {
   const { setConnected, setAuthenticated, setToken, setError, error } = useConnectionStore()
@@ -15,57 +29,92 @@ export function ConnectPage() {
   const [unbindStatus, setUnbindStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null)
   const [unbinding, setUnbinding] = useState(false)
 
+  const loadWorkspace = useCallback(async () => {
+    setLoading(true)
+    try {
+      const fileResult = await wsClient.fileList()
+      setFileTree(fileResult.files)
+    } finally {
+      setLoading(false)
+    }
+  }, [setFileTree, setLoading])
+
+  const applySession = useCallback((session: AuthSession) => {
+    setAuthenticated(true, session)
+    setToken(null)
+  }, [setAuthenticated, setToken])
+
+  const configureClient = useCallback(() => {
+    wsClient.setStatusChangeHandler(setConnected)
+    wsClient.setReconnectedHandler((session) => {
+      applySession(session)
+      void loadWorkspace()
+    })
+    wsClient.setReconnectFailedHandler(() => {
+      useConnectionStore.getState().setReconnecting(false)
+      setError("重连失败，请刷新页面重试")
+    })
+    wsClient.setAuthenticationLostHandler((authError) => {
+      setAuthenticated(false)
+      setError(`会话已失效：${authError.message}`)
+    })
+  }, [applySession, loadWorkspace, setAuthenticated, setConnected, setError])
+
+  const connectSocket = useCallback(async () => {
+    configureClient()
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+    const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`
+    await wsClient.connect(wsUrl)
+  }, [configureClient])
+
   const handleConnect = useCallback(async (token?: string) => {
-    const value = token ?? tokenInput
-    if (!value.trim()) return
+    const value = (token ?? tokenInput).trim()
+    if (!value) return
     setConnecting(true)
     setError(null)
 
     try {
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-      const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`
-      wsClient.setStatusChangeHandler(setConnected)
-      wsClient.setReconnectedHandler((serverName, onlineCount) => setAuthenticated(true, serverName, onlineCount))
-      wsClient.setReconnectFailedHandler(() => {
-        useConnectionStore.getState().setReconnecting(false)
-        setError("重连失败，请刷新页面重试")
-      })
-      await wsClient.connect(wsUrl)
-      setConnected(true)
-      setToken(value)
-
-      const authResult = await wsClient.auth(value)
-      if (!authResult.success) {
-        setError("认证失败：Token 无效或已过期")
-        wsClient.disconnect()
-        return
-      }
-
-      setAuthenticated(true, authResult.serverName, authResult.onlineCount)
-      const url = new URL(window.location.href)
-      if (url.searchParams.has("token")) {
-        url.searchParams.delete("token")
-        window.history.replaceState({}, "", url.toString())
-      }
-      setLoading(true)
-      const fileResult = await wsClient.fileList()
-      setFileTree(fileResult.files)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "连接失败")
+      await connectSocket()
+      const session = await wsClient.auth(value)
+      applySession(session)
+      setTokenInput("")
+      await loadWorkspace()
+    } catch (connectError) {
+      wsClient.disconnect(false)
+      setError(connectError instanceof Error ? connectError.message : "连接失败")
     } finally {
       setConnecting(false)
     }
-  }, [tokenInput, setConnected, setAuthenticated, setToken, setError, setLoading, setFileTree])
+  }, [applySession, connectSocket, loadWorkspace, setError, tokenInput])
+
+  const handleResume = useCallback(async () => {
+    setConnecting(true)
+    setError(null)
+    try {
+      await connectSocket()
+      const session = await wsClient.resume()
+      applySession(session)
+      await loadWorkspace()
+    } catch {
+      wsClient.clearResumeSession()
+      wsClient.disconnect(false)
+      setAuthenticated(false)
+    } finally {
+      setConnecting(false)
+    }
+  }, [applySession, connectSocket, loadWorkspace, setAuthenticated, setError])
 
   useEffect(() => {
     if (autoConnectTriggered.current) return
-    const urlToken = new URLSearchParams(window.location.search).get("token")
+    autoConnectTriggered.current = true
+    const urlToken = extractAndScrubUrlToken()
     if (urlToken) {
-      autoConnectTriggered.current = true
       setTokenInput(urlToken)
       void handleConnect(urlToken)
+    } else if (wsClient.hasResumeSession()) {
+      void handleResume()
     }
-  }, [handleConnect])
+  }, [handleConnect, handleResume])
 
   const handleUnbind = async () => {
     if (!unbindKey.trim()) return
@@ -80,8 +129,8 @@ export function ConnectPage() {
         setUnbindStatus({ type: "success", msg: "IP 已解绑；插件下次连接时会绑定新的服务器 IP。" })
         setUnbindKey("")
       } else {
-        const text = await response.text()
-        setUnbindStatus({ type: "error", msg: text || "解绑失败，请检查 License Key。" })
+        const payload = await response.json().catch(() => null) as { message?: string } | null
+        setUnbindStatus({ type: "error", msg: payload?.message ?? "解绑失败，请检查 License Key。" })
       }
     } catch {
       setUnbindStatus({ type: "error", msg: "网络错误，请稍后重试。" })
@@ -115,7 +164,7 @@ export function ConnectPage() {
         <form className="industrial-form" onSubmit={submitConnect}>
           <div className="field-group">
             <label htmlFor="connection-token">一次性 Token</label>
-            <input id="connection-token" type="text" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)}
+            <input id="connection-token" type="password" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)}
               placeholder="输入 Token" autoComplete="off" spellCheck={false} disabled={connecting} />
           </div>
           {error && <div className="status-message status-message--error" role="alert"><AlertCircle aria-hidden="true" />{error}</div>}
@@ -134,7 +183,7 @@ export function ConnectPage() {
               <p className="consequence-copy">解绑会移除当前服务器 IP。旧服务器将失去绑定，新服务器上的插件在下次连接时会自动占用该绑定。</p>
               <div className="field-group">
                 <label htmlFor="unbind-license"><KeyRound aria-hidden="true" />License Key</label>
-                <input id="unbind-license" type="text" value={unbindKey} onChange={(event) => setUnbindKey(event.target.value)}
+                <input id="unbind-license" type="password" value={unbindKey} onChange={(event) => setUnbindKey(event.target.value)}
                   placeholder="输入 License Key" autoComplete="off" spellCheck={false} disabled={unbinding} />
               </div>
               <button className="industrial-button industrial-button--warning" type="submit" disabled={unbinding || !unbindKey.trim()}>

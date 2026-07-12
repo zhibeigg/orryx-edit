@@ -1,4 +1,4 @@
-import { X, Upload, Terminal, ChevronDown, ChevronUp, MoreHorizontal, Keyboard } from "lucide-react"
+import { X, Upload, Terminal, ChevronDown, ChevronUp, MoreHorizontal, Keyboard, AlertTriangle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useEditorStore } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
@@ -22,7 +22,7 @@ import { LogConsole } from "@/components/visualizer/LogConsole"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { wsClient } from "@/lib/ws-client"
+import { saveEditorFile } from "@/lib/file-save"
 
 import type { OpenFile } from "@/store/editor-store"
 
@@ -127,6 +127,7 @@ export function EditorPage() {
                   boxShadow: isActive ? 'var(--md-elevation-1)' : 'none',
                   color: isActive ? 'var(--md-dark-text-primary)' : 'var(--md-dark-text-secondary)',
                 }}
+                title={file.externalRevision ? "服务器上的文件已被其他协作者修改；保存时会进行版本检查" : undefined}
                 onClick={() => setActiveFile(file.path)}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -153,6 +154,7 @@ export function EditorPage() {
                     style={{ background: 'var(--md-dark-accent-primary)' }}
                   />
                 )}
+                {file.externalRevision && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" aria-label="存在外部修改" />}
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -188,8 +190,7 @@ export function EditorPage() {
                 for (const f of store.openFiles.filter(f => f.dirty)) {
                   try {
                     const content = f.draft ?? f.content
-                    await wsClient.fileWrite(f.path, content)
-                    store.markSaved(f.path, content)
+                    await saveEditorFile(f, content)
                   } catch { /* skip */ }
                 }
                 store.closeAllFiles()

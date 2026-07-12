@@ -1,142 +1,91 @@
 package com.orryx.editor.license
 
-import com.orryx.editor.security.normalizeIpAddress
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.io.File
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import java.time.Clock
 
 @Serializable
 data class LicenseEntry(
     val license: String,
     val owner: String,
-    val createdAt: Long = System.currentTimeMillis(),
+    val createdAt: Long,
     val expiresAt: Long = 0L,
     val boundIps: List<String> = emptyList(),
-    val serverKey: String = UUID.randomUUID().toString().replace("-", ""),
-    val enabled: Boolean = true
+    val serverKey: String,
+    val enabled: Boolean = true,
+    val maxServers: Int = 1
 ) {
-    fun isExpired(): Boolean = expiresAt > 0 && System.currentTimeMillis() > expiresAt
+    fun isExpired(): Boolean = expiresAt > 0 && System.currentTimeMillis() >= expiresAt
+
     fun remainingDays(): Long {
         if (expiresAt <= 0) return -1
         val remaining = expiresAt - System.currentTimeMillis()
         return if (remaining > 0) remaining / 86_400_000 else 0
     }
-    fun isIpAllowed(ip: String): Boolean {
-        if (boundIps.isEmpty()) return true
-        if (ip.isEmpty()) return true
-        return ip in boundIps
-    }
+
+    fun isIpAllowed(ip: String): Boolean = boundIps.isEmpty() || ip.isEmpty() || ip in boundIps
 }
 
-class LicenseManager(private val dataDir: File) {
+/**
+ * 兼容现有 HTTP/WebSocket 调用的挂起 facade。
+ *
+ * 生产环境必须显式传入基于 PostgreSQL 的 [LicenseService]；File 构造器仅保留到主线完成接线，
+ * 不会读取 JSON，也不会回退到内存持久化。
+ */
+class LicenseManager(
+    private val service: LicenseService,
+    private val clock: Clock = Clock.systemUTC()
+) {
+    @Deprecated("主线需改为注入 LicenseService(PostgresLicenseRepository(database))")
+    constructor(@Suppress("UNUSED_PARAMETER") dataDir: File) : this(
+        LicenseService(UnconfiguredLicenseRepository)
+    )
 
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
-    private val licenses = ConcurrentHashMap<String, LicenseEntry>()
-    private val file = File(dataDir, "licenses.json")
-    private val ioExecutor = Executors.newSingleThreadExecutor()
+    suspend fun createLicense(owner: String, days: Int = 0, maxServers: Int = 1): LicenseEntry =
+        service.create(CreateLicenseCommand(owner = owner, days = days, maxBoundIps = maxServers)).toEntry()
 
-    init {
-        dataDir.mkdirs()
-        load()
+    suspend fun validate(license: String, connectIp: String = ""): LicenseEntry? =
+        service.validate(license, connectIp)?.toEntry()
+
+    suspend fun renew(license: String, days: Int): Boolean = service.renew(license, days)
+
+    suspend fun addIp(license: String, ip: String): Boolean = when (service.addIp(license, ip)) {
+        AddIpResult.ADDED, AddIpResult.ALREADY_BOUND -> true
+        AddIpResult.LICENSE_NOT_FOUND, AddIpResult.LIMIT_REACHED -> false
     }
 
-    private fun load() {
-        if (!file.exists()) return
-        try {
-            val list = json.decodeFromString<List<LicenseEntry>>(file.readText())
-            list.forEach { licenses[it.license] = it }
-        } catch (e: Exception) {
-            println("加载 licenses.json 失败: ${e.message}")
-        }
-    }
+    suspend fun removeIp(license: String, ip: String): Boolean = service.removeIp(license, ip)
+    suspend fun clearIps(license: String): Boolean = service.clearIps(license)
+    suspend fun revoke(license: String): Boolean = service.revoke(license)
+    suspend fun enable(license: String): Boolean = service.enable(license)
+    suspend fun get(license: String): LicenseEntry? = service.get(license)?.toEntry()
+    suspend fun list(): List<LicenseEntry> = service.list().map { it.toEntry() }
 
-    private fun save() {
-        ioExecutor.submit {
-            try {
-                file.writeText(json.encodeToString(
-                    kotlinx.serialization.builtins.ListSerializer(LicenseEntry.serializer()),
-                    licenses.values.toList()
-                ))
-            } catch (e: Exception) {
-                println("保存 licenses.json 失败: ${e.message}")
-            }
-        }
-    }
+    fun shutdown() = Unit
 
-    fun createLicense(owner: String, days: Int = 0): LicenseEntry {
-        val license = UUID.randomUUID().toString().replace("-", "").take(20)
-        val expiresAt = if (days > 0) System.currentTimeMillis() + days * 86_400_000L else 0L
-        val entry = LicenseEntry(license = license, owner = owner, expiresAt = expiresAt)
-        licenses[license] = entry
-        save()
-        return entry
-    }
+    private fun License.toEntry(): LicenseEntry = LicenseEntry(
+        license = license,
+        owner = owner,
+        createdAt = createdAt.toEpochMilli(),
+        expiresAt = expiresAt?.toEpochMilli() ?: 0L,
+        boundIps = boundIps,
+        serverKey = serverKey,
+        enabled = enabled,
+        maxServers = maxBoundIps
+    )
+}
 
-    fun validate(license: String, connectIp: String = ""): LicenseEntry? {
-        val entry = licenses[license] ?: return null
-        if (!entry.enabled) return null
-        if (entry.isExpired()) return null
-        if (!entry.isIpAllowed(connectIp)) return null
-        return entry
-    }
+private object UnconfiguredLicenseRepository : LicenseRepository {
+    private fun unavailable(): Nothing = throw IllegalStateException(
+        "PostgreSQL 持久层尚未接线：请注入 LicenseService(PostgresLicenseRepository(database))"
+    )
 
-    fun renew(license: String, days: Int): Boolean {
-        val entry = licenses[license] ?: return false
-        val base = if (entry.expiresAt > System.currentTimeMillis()) entry.expiresAt else System.currentTimeMillis()
-        licenses[license] = entry.copy(expiresAt = base + days * 86_400_000L)
-        save()
-        return true
-    }
-
-    /** 绑定 IP（替换旧的，一个 key 只绑一个 IP） */
-    fun addIp(license: String, ip: String): Boolean {
-        val entry = licenses[license] ?: return false
-        val normalizedIp = normalizeIpAddress(ip) ?: return false
-        if (entry.boundIps == listOf(normalizedIp)) return true
-        licenses[license] = entry.copy(boundIps = listOf(normalizedIp))
-        save()
-        return true
-    }
-
-    /** 从允许列表移除一个 IP */
-    fun removeIp(license: String, ip: String): Boolean {
-        val entry = licenses[license] ?: return false
-        val normalizedIp = normalizeIpAddress(ip) ?: return false
-        licenses[license] = entry.copy(boundIps = entry.boundIps - normalizedIp)
-        save()
-        return true
-    }
-
-    /** 清空所有绑定 IP */
-    fun clearIps(license: String): Boolean {
-        val entry = licenses[license] ?: return false
-        licenses[license] = entry.copy(boundIps = emptyList())
-        save()
-        return true
-    }
-
-    fun revoke(license: String): Boolean {
-        val entry = licenses[license] ?: return false
-        licenses[license] = entry.copy(enabled = false)
-        save()
-        return true
-    }
-
-    fun enable(license: String): Boolean {
-        val entry = licenses[license] ?: return false
-        licenses[license] = entry.copy(enabled = true)
-        save()
-        return true
-    }
-
-    fun get(license: String): LicenseEntry? = licenses[license]
-
-    fun shutdown() {
-        ioExecutor.shutdown()
-    }
-
-    fun list(): List<LicenseEntry> = licenses.values.toList()
+    override suspend fun create(license: License): License = unavailable()
+    override suspend fun find(licenseKey: String): License? = unavailable()
+    override suspend fun list(): List<License> = unavailable()
+    override suspend fun renew(licenseKey: String, days: Int, now: java.time.Instant): License? = unavailable()
+    override suspend fun setEnabled(licenseKey: String, enabled: Boolean, now: java.time.Instant): Boolean = unavailable()
+    override suspend fun addBoundIp(licenseKey: String, ip: String, now: java.time.Instant): AddIpResult = unavailable()
+    override suspend fun removeBoundIp(licenseKey: String, ip: String, now: java.time.Instant): Boolean = unavailable()
+    override suspend fun clearBoundIps(licenseKey: String, now: java.time.Instant): Boolean = unavailable()
 }

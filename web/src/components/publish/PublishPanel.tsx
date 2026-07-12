@@ -2,12 +2,13 @@ import { useEditorStore, type OpenFile } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
 import { wsClient } from "@/lib/ws-client"
 import { deleteDraft } from "@/lib/draft-storage"
+import { saveEditorFile } from "@/lib/file-save"
 import { useState } from "react"
 import { Upload, RotateCcw, Check, AlertCircle, Eye, Undo2 } from "lucide-react"
 import { DiffView } from "@/components/editor/DiffView"
 
 export function PublishPanel() {
-  const { openFiles, markSaved, updateDraft } = useEditorStore()
+  const { openFiles, updateDraft } = useEditorStore()
   const connected = useConnectionStore((s) => s.connected)
   const dirtyFiles = openFiles.filter((f) => f.dirty)
   const [publishing, setPublishing] = useState(false)
@@ -24,12 +25,8 @@ export function PublishPanel() {
       if (!file?.draft) continue
 
       try {
-        const res = await wsClient.fileWrite(path, file.draft)
-        newResults.push({ path, success: res.success })
-        if (res.success) {
-          markSaved(path, file.draft)
-          await deleteDraft(path)
-        }
+        const success = await saveEditorFile(file, file.draft)
+        newResults.push({ path, success, message: success ? undefined : "检测到服务器版本冲突" })
       } catch (err) {
         newResults.push({ path, success: false, message: err instanceof Error ? err.message : "未知错误" })
       }

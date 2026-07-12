@@ -6,8 +6,16 @@ export interface OpenFile {
   name: string
   content: string
   configType: ConfigType
+  revision: number
+  externalRevision?: number
   draft?: string // 草稿内容（与 content 不同时表示有未保存的修改）
   dirty: boolean
+}
+
+export interface SaveConflict {
+  path: string
+  attemptedContent: string
+  currentRevision: number
 }
 
 interface EditorState {
@@ -17,14 +25,17 @@ interface EditorState {
   recentlyClosed: OpenFile[]
   /** 所有已加载文件的内容缓存（path → content），用于交叉引用分析 */
   fileContents: Map<string, string>
+  saveConflict: SaveConflict | null
 
-  openFile: (file: Omit<OpenFile, "dirty">) => void
+  openFile: (file: Omit<OpenFile, "dirty" | "revision"> & { revision?: number }) => void
   closeFile: (path: string) => void
   closeAllFiles: () => void
   closeSavedFiles: () => void
   setActiveFile: (path: string) => void
   updateDraft: (path: string, draft: string) => void
-  markSaved: (path: string, content: string) => void
+  markSaved: (path: string, content: string, revision?: number) => void
+  markExternalChange: (path: string, revision: number) => void
+  setSaveConflict: (conflict: SaveConflict | null) => void
   /** 重新打开最近关闭的标签页 */
   reopenLastClosed: () => OpenFile | null
   /** 批量缓存文件内容（用于交叉引用分析） */
@@ -37,32 +48,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeFilePath: null,
   recentlyClosed: [],
   fileContents: new Map(),
+  saveConflict: null,
 
   openFile: (file) => {
+    const normalizedFile = { ...file, revision: file.revision ?? 0 }
     const { openFiles } = get()
-    const existing = openFiles.find((f) => f.path === file.path)
+    const existing = openFiles.find((f) => f.path === normalizedFile.path)
     if (existing) {
       // 已打开：更新服务端内容，保留草稿
       set({
         openFiles: openFiles.map((f) => {
-          if (f.path !== file.path) return f
-          const effectiveDraft = file.draft ?? f.draft
-          const isDirty = effectiveDraft != null && effectiveDraft !== file.content
+          if (f.path !== normalizedFile.path) return f
+          const effectiveDraft = normalizedFile.draft ?? f.draft
+          const isDirty = effectiveDraft != null && effectiveDraft !== normalizedFile.content
           return {
             ...f,
-            content: file.content,
+            content: normalizedFile.content,
+            revision: normalizedFile.revision,
+            externalRevision: undefined,
             draft: isDirty ? effectiveDraft : undefined,
             dirty: isDirty,
           }
         }),
-        activeFilePath: file.path,
+        activeFilePath: normalizedFile.path,
       })
       return
     }
-    const isDirty = !!file.draft && file.draft !== file.content
+    const isDirty = !!normalizedFile.draft && normalizedFile.draft !== normalizedFile.content
     set({
-      openFiles: [...openFiles, { ...file, draft: isDirty ? file.draft : undefined, dirty: isDirty }],
-      activeFilePath: file.path,
+      openFiles: [...openFiles, { ...normalizedFile, draft: isDirty ? normalizedFile.draft : undefined, dirty: isDirty }],
+      activeFilePath: normalizedFile.path,
     })
   },
 
@@ -107,15 +122,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }))
   },
 
-  markSaved: (path, content) => {
+  markSaved: (path, content, revision) => {
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
-        f.path === path ? { ...f, content, draft: undefined, dirty: false } : f
+        f.path === path
+          ? { ...f, content, revision: revision ?? f.revision, externalRevision: undefined, draft: undefined, dirty: false }
+          : f
       ),
+      saveConflict: state.saveConflict?.path === path ? null : state.saveConflict,
     }))
     // 同步更新缓存
     get().cacheFileContent(path, content)
   },
+
+  markExternalChange: (path, revision) => {
+    set((state) => ({
+      openFiles: state.openFiles.map((file) =>
+        file.path === path && revision > file.revision
+          ? { ...file, externalRevision: revision }
+          : file
+      ),
+    }))
+  },
+
+  setSaveConflict: (saveConflict) => set({ saveConflict }),
 
   reopenLastClosed: () => {
     const { recentlyClosed, openFiles } = get()
