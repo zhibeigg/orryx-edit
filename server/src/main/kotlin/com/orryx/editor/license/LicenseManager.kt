@@ -1,5 +1,6 @@
 package com.orryx.editor.license
 
+import com.orryx.editor.security.normalizeIpAddress
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -93,8 +94,9 @@ class LicenseManager(private val dataDir: File) {
     /** 绑定 IP（替换旧的，一个 key 只绑一个 IP） */
     fun addIp(license: String, ip: String): Boolean {
         val entry = licenses[license] ?: return false
-        if (entry.boundIps == listOf(ip)) return true
-        licenses[license] = entry.copy(boundIps = listOf(ip))
+        val normalizedIp = normalizeIpAddress(ip) ?: return false
+        if (entry.boundIps == listOf(normalizedIp)) return true
+        licenses[license] = entry.copy(boundIps = listOf(normalizedIp))
         save()
         return true
     }
@@ -102,7 +104,8 @@ class LicenseManager(private val dataDir: File) {
     /** 从允许列表移除一个 IP */
     fun removeIp(license: String, ip: String): Boolean {
         val entry = licenses[license] ?: return false
-        licenses[license] = entry.copy(boundIps = entry.boundIps - ip)
+        val normalizedIp = normalizeIpAddress(ip) ?: return false
+        licenses[license] = entry.copy(boundIps = entry.boundIps - normalizedIp)
         save()
         return true
     }

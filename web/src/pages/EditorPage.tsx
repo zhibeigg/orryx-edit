@@ -22,6 +22,7 @@ import { LogConsole } from "@/components/visualizer/LogConsole"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { wsClient } from "@/lib/ws-client"
 
 import type { OpenFile } from "@/store/editor-store"
 
@@ -184,7 +185,6 @@ export function EditorPage() {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => {
                 const store = useEditorStore.getState()
-                const { wsClient } = await import("@/lib/ws-client")
                 for (const f of store.openFiles.filter(f => f.dirty)) {
                   try {
                     const content = f.draft ?? f.content

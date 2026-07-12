@@ -2,6 +2,9 @@ package com.orryx.editor.plugins
 
 import com.orryx.editor.relay.RelayHandler
 import com.orryx.editor.relay.ServerEndpoint
+import com.orryx.editor.security.SecuritySettings
+import com.orryx.editor.security.resolveClientIp
+import io.ktor.http.HttpHeaders
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -9,7 +12,8 @@ import io.ktor.websocket.*
 
 fun Application.configureWebSockets(
     relayHandler: RelayHandler,
-    serverEndpoint: ServerEndpoint
+    serverEndpoint: ServerEndpoint,
+    securitySettings: SecuritySettings = SecuritySettings()
 ) {
     install(WebSockets) {
         pingPeriodMillis = 15_000
@@ -36,9 +40,12 @@ fun Application.configureWebSockets(
         }
 
         webSocket("/ws/server") {
-            // 获取连接方 IP（支持反代 X-Forwarded-For）
-            val remoteIp = call.request.headers["X-Forwarded-For"]?.split(",")?.firstOrNull()?.trim()
-                ?: call.request.local.remoteAddress
+            val remoteIp = resolveClientIp(
+                remoteAddress = call.request.local.remoteAddress,
+                forwardedHeader = call.request.headers[HttpHeaders.Forwarded],
+                xForwardedForHeader = call.request.headers[HttpHeaders.XForwardedFor],
+                trustedProxies = securitySettings.trustedProxies
+            )
             log.info("插件端已连接: $remoteIp")
             serverEndpoint.onServerConnect(this, remoteIp)
             try {

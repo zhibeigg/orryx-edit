@@ -17,7 +17,7 @@ import { normalizeSchema } from "@/types/schema"
 
 // 加载真实 schema
 const rawSchema = JSON.parse(
-  readFileSync(resolve(__dirname, "../../../../actions-schema.json"), "utf-8")
+  readFileSync(resolve(__dirname, "../../../../schemas/actions-schema.json"), "utf-8")
 )
 const schema: ActionsSchemaV2 = normalizeSchema(rawSchema)
 

@@ -1,156 +1,199 @@
-/**
- * Material Design 3 Design Tokens
- * Based on Google's Material Design 3 specification
+/* Orryx industrial editor tokens.
+ * The --md-* names below are compatibility aliases for older editor components;
+ * all values resolve to this single dark semantic system.
  */
 
 :root {
-  /* ===== Primary Colors ===== */
-  --md-sys-color-primary: #6750A4;
-  --md-sys-color-on-primary: #FFFFFF;
-  --md-sys-color-primary-container: #EADDFF;
-  --md-sys-color-on-primary-container: #21005D;
+  color-scheme: dark;
 
-  /* ===== Secondary Colors ===== */
-  --md-sys-color-secondary: #625B71;
-  --md-sys-color-on-secondary: #FFFFFF;
-  --md-sys-color-secondary-container: #E8DEF8;
-  --md-sys-color-on-secondary-container: #1D192B;
+  /* Core surfaces: slightly steel-tinted neutrals, never pure black/white. */
+  --surface-canvas: oklch(16.5% 0.008 252);
+  --surface-base: oklch(20.5% 0.009 252);
+  --surface-raised: oklch(24.5% 0.011 252);
+  --surface-hover: oklch(28.5% 0.012 252);
+  --surface-active: oklch(32% 0.014 252);
+  --surface-input: oklch(13.5% 0.007 252);
 
-  /* ===== Tertiary Colors ===== */
-  --md-sys-color-tertiary: #7D5260;
-  --md-sys-color-on-tertiary: #FFFFFF;
-  --md-sys-color-tertiary-container: #FFD8E4;
-  --md-sys-color-on-tertiary-container: #31111D;
+  --text-primary: oklch(93% 0.008 245);
+  --text-secondary: oklch(76% 0.012 245);
+  --text-muted: oklch(65% 0.012 245);
 
-  /* ===== Error Colors ===== */
-  --md-sys-color-error: #B3261E;
-  --md-sys-color-on-error: #FFFFFF;
-  --md-sys-color-error-container: #F9DEDC;
-  --md-sys-color-on-error-container: #410E0B;
+  --border-subtle: oklch(34% 0.012 252);
+  --border-strong: oklch(47% 0.014 252);
 
-  /* ===== Surface Colors ===== */
-  --md-sys-color-surface: #FFFBFE;
-  --md-sys-color-surface-dim: #DED8E1;
-  --md-sys-color-surface-bright: #FFFBFE;
-  --md-sys-color-surface-container-lowest: #FFFFFF;
-  --md-sys-color-surface-container-low: #F7F2FA;
-  --md-sys-color-surface-container: #F3EDF7;
-  --md-sys-color-surface-container-high: #ECE6F0;
-  --md-sys-color-surface-container-highest: #E6E0E9;
-  --md-sys-color-surface-variant: #E7E0EC;
-  --md-sys-color-on-surface: #1C1B1F;
-  --md-sys-color-on-surface-variant: #49454F;
+  --accent-primary: oklch(64% 0.12 238);
+  --accent-primary-strong: oklch(56% 0.125 238);
+  --accent-success: oklch(72% 0.11 155);
+  --accent-warning: oklch(78% 0.11 82);
+  --accent-danger: oklch(70% 0.13 25);
+  --focus-ring: oklch(78% 0.105 238);
 
-  /* ===== Background Colors ===== */
-  --md-sys-color-background: #FFFBFE;
-  --md-sys-color-on-background: #1C1B1F;
+  --industrial-bg: var(--surface-canvas);
+  --industrial-surface: var(--surface-base);
+  --industrial-surface-raised: var(--surface-raised);
+  --industrial-border: var(--border-subtle);
+  --industrial-border-strong: var(--border-strong);
+  --industrial-text: var(--text-primary);
+  --industrial-muted: var(--text-secondary);
+  --industrial-accent: var(--accent-primary);
+  --industrial-accent-hover: var(--focus-ring);
+  --industrial-success: var(--accent-success);
+  --industrial-warning: var(--accent-warning);
+  --industrial-danger: var(--accent-danger);
 
-  /* ===== Outline Colors ===== */
-  --md-sys-color-outline: #79747E;
-  --md-sys-color-outline-variant: #CAC4D0;
+  /* 4pt semantic spacing scale. */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
 
-  /* ===== Spacing System ===== */
-  --md-spacing-0: 0px;
-  --md-spacing-xs: 4px;
-  --md-spacing-sm: 8px;
-  --md-spacing-md: 16px;
-  --md-spacing-lg: 24px;
-  --md-spacing-xl: 32px;
-  --md-spacing-2xl: 48px;
-  --md-spacing-3xl: 64px;
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-round: 9999px;
 
-  /* ===== Border Radius ===== */
-  --md-radius-none: 0px;
-  --md-radius-xs: 2px;
-  --md-radius-sm: 4px;
-  --md-radius-md: 8px;
-  --md-radius-lg: 12px;
-  --md-radius-xl: 16px;
-  --md-radius-2xl: 28px;
-  --md-radius-full: 9999px;
+  --font-ui: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-code: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
+  --font-weight-normal: 400;
+  --font-weight-medium: 550;
+  --font-weight-semibold: 650;
+  --font-weight-bold: 750;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.55;
+  --line-height-loose: 1.7;
 
-  /* ===== Elevation/Shadow ===== */
-  --md-elevation-0: none;
-  --md-elevation-1: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
-  --md-elevation-2: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
-  --md-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px rgba(0, 0, 0, 0.3);
-  --md-elevation-4: 0px 6px 10px 4px rgba(0, 0, 0, 0.15), 0px 2px 3px rgba(0, 0, 0, 0.3);
-  --md-elevation-5: 0px 8px 12px 6px rgba(0, 0, 0, 0.15), 0px 4px 4px rgba(0, 0, 0, 0.3);
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-slow: 260ms;
 
-  /* ===== Typography ===== */
-  --md-font-family: 'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  --md-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --elevation-0: none;
+  --elevation-1: 0 1px 2px oklch(6% 0.01 252 / 0.32);
+  --elevation-2: 0 8px 24px oklch(6% 0.01 252 / 0.34);
 
-  /* ===== Font Sizes ===== */
-  --md-font-size-xs: 0.625rem;  /* 10px */
-  --md-font-size-sm: 0.75rem;   /* 12px */
-  --md-font-size-md: 0.875rem;  /* 14px */
-  --md-font-size-lg: 1rem;       /* 16px */
-  --md-font-size-xl: 1.25rem;    /* 20px */
-  --md-font-size-2xl: 1.5rem;    /* 24px */
-  --md-font-size-3xl: 2rem;      /* 32px */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  --z-skip-link: 700;
 
-  /* ===== Line Heights ===== */
-  --md-line-height-tight: 1.2;
-  --md-line-height-normal: 1.5;
-  --md-line-height-loose: 1.75;
+  /* Compatibility aliases used by existing editor components. */
+  --md-sys-color-primary: var(--accent-primary);
+  --md-sys-color-on-primary: var(--text-primary);
+  --md-sys-color-primary-container: oklch(31% 0.06 238);
+  --md-sys-color-on-primary-container: oklch(90% 0.035 238);
+  --md-sys-color-secondary: var(--text-secondary);
+  --md-sys-color-on-secondary: var(--surface-canvas);
+  --md-sys-color-secondary-container: var(--surface-hover);
+  --md-sys-color-on-secondary-container: var(--text-primary);
+  --md-sys-color-tertiary: var(--accent-warning);
+  --md-sys-color-on-tertiary: var(--surface-canvas);
+  --md-sys-color-tertiary-container: oklch(31% 0.04 82);
+  --md-sys-color-on-tertiary-container: oklch(91% 0.04 82);
+  --md-sys-color-error: var(--accent-danger);
+  --md-sys-color-on-error: var(--text-primary);
+  --md-sys-color-error-container: oklch(29% 0.055 25);
+  --md-sys-color-on-error-container: oklch(91% 0.035 25);
 
-  /* ===== Font Weights ===== */
-  --md-font-weight-normal: 400;
-  --md-font-weight-medium: 500;
-  --md-font-weight-semibold: 600;
-  --md-font-weight-bold: 700;
+  --md-sys-color-surface: var(--surface-base);
+  --md-sys-color-surface-dim: var(--surface-canvas);
+  --md-sys-color-surface-bright: var(--surface-raised);
+  --md-sys-color-surface-container-lowest: var(--surface-input);
+  --md-sys-color-surface-container-low: var(--surface-base);
+  --md-sys-color-surface-container: var(--surface-raised);
+  --md-sys-color-surface-container-high: var(--surface-hover);
+  --md-sys-color-surface-container-highest: var(--surface-active);
+  --md-sys-color-surface-variant: var(--surface-hover);
+  --md-sys-color-on-surface: var(--text-primary);
+  --md-sys-color-on-surface-variant: var(--text-secondary);
+  --md-sys-color-background: var(--surface-canvas);
+  --md-sys-color-on-background: var(--text-primary);
+  --md-sys-color-outline: var(--border-strong);
+  --md-sys-color-outline-variant: var(--border-subtle);
 
-  /* ===== Transition Durations ===== */
-  --md-transition-fast: 150ms;
-  --md-transition-normal: 250ms;
-  --md-transition-slow: 350ms;
+  --md-spacing-0: 0;
+  --md-spacing-xs: var(--space-2xs);
+  --md-spacing-sm: var(--space-xs);
+  --md-spacing-md: var(--space-md);
+  --md-spacing-lg: var(--space-lg);
+  --md-spacing-xl: var(--space-xl);
+  --md-spacing-2xl: var(--space-2xl);
+  --md-spacing-3xl: var(--space-3xl);
 
-  /* ===== Z-Index Scale ===== */
-  --md-z-index-dropdown: 1000;
-  --md-z-index-modal: 1100;
-  --md-z-index-popover: 1200;
-  --md-z-index-tooltip: 1300;
-  --md-z-index-toast: 1400;
+  --md-radius-none: 0;
+  --md-radius-xs: var(--radius-xs);
+  --md-radius-sm: var(--radius-sm);
+  --md-radius-md: var(--radius-md);
+  --md-radius-lg: var(--radius-lg);
+  --md-radius-xl: var(--radius-lg);
+  --md-radius-2xl: var(--radius-lg);
+  --md-radius-full: var(--radius-round);
 
-  /* ===== Dark Mode Overrides ===== */
-  /* Note: This project currently uses a dark theme (VS Code-like)
-   * so we also define dark mode variants
-   */
-  --md-dark-bg-primary: #1e1e1e;
-  --md-dark-bg-secondary: #252526;
-  --md-dark-bg-tertiary: #2d2d2d;
-  --md-dark-bg-hover: #2a2d2e;
-  --md-dark-bg-active: #37373d;
+  --md-elevation-0: var(--elevation-0);
+  --md-elevation-1: var(--elevation-1);
+  --md-elevation-2: var(--elevation-2);
+  --md-elevation-3: var(--elevation-2);
+  --md-elevation-4: var(--elevation-2);
+  --md-elevation-5: var(--elevation-2);
 
-  --md-dark-text-primary: #cccccc;
-  --md-dark-text-secondary: #969696;
-  --md-dark-text-muted: #858585;
+  --md-font-family: var(--font-ui);
+  --md-font-mono: var(--font-code);
+  --md-font-size-xs: 0.625rem;
+  --md-font-size-sm: 0.75rem;
+  --md-font-size-md: 0.875rem;
+  --md-font-size-lg: 1rem;
+  --md-font-size-xl: 1.25rem;
+  --md-font-size-2xl: 1.5rem;
+  --md-font-size-3xl: 2rem;
+  --md-line-height-tight: var(--line-height-tight);
+  --md-line-height-normal: var(--line-height-normal);
+  --md-line-height-loose: var(--line-height-loose);
+  --md-font-weight-normal: var(--font-weight-normal);
+  --md-font-weight-medium: var(--font-weight-medium);
+  --md-font-weight-semibold: var(--font-weight-semibold);
+  --md-font-weight-bold: var(--font-weight-bold);
+  --md-transition-fast: var(--motion-fast);
+  --md-transition-normal: var(--motion-normal);
+  --md-transition-slow: var(--motion-slow);
+  --md-z-index-dropdown: var(--z-dropdown);
+  --md-z-index-modal: var(--z-modal);
+  --md-z-index-popover: var(--z-modal);
+  --md-z-index-tooltip: var(--z-tooltip);
+  --md-z-index-toast: var(--z-toast);
 
-  --md-dark-border: #3c3c3c;
-  --md-dark-border-active: #007acc;
+  --md-dark-bg-primary: var(--surface-canvas);
+  --md-dark-bg-secondary: var(--surface-base);
+  --md-dark-bg-tertiary: var(--surface-raised);
+  --md-dark-bg-hover: var(--surface-hover);
+  --md-dark-bg-active: var(--surface-active);
+  --md-dark-text-primary: var(--text-primary);
+  --md-dark-text-secondary: var(--text-secondary);
+  --md-dark-text-muted: var(--text-muted);
+  --md-dark-border: var(--border-subtle);
+  --md-dark-border-active: var(--accent-primary);
+  --md-dark-accent-primary: var(--accent-primary-strong);
+  --md-dark-accent-success: var(--accent-success);
+  --md-dark-accent-warning: var(--accent-warning);
+  --md-dark-accent-error: var(--accent-danger);
 
-  --md-dark-accent-primary: #007acc;
-  --md-dark-accent-success: #4ec9b0;
-  --md-dark-accent-warning: #dcdcaa;
-  --md-dark-accent-error: #f44747;
-
-  /* ===== Semantic Colors for VS Code Dark Theme ===== */
-  --color-bg-primary: var(--md-dark-bg-primary);
-  --color-bg-secondary: var(--md-dark-bg-secondary);
-  --color-bg-tertiary: var(--md-dark-bg-tertiary);
-  --color-bg-hover: var(--md-dark-bg-hover);
-  --color-bg-active: var(--md-dark-bg-active);
-
-  --color-text-primary: var(--md-dark-text-primary);
-  --color-text-secondary: var(--md-dark-text-secondary);
-  --color-text-muted: var(--md-dark-text-muted);
-
-  --color-border: var(--md-dark-border);
-  --color-border-active: var(--md-dark-border-active);
-
-  --color-accent-primary: var(--md-dark-accent-primary);
-  --color-accent-success: var(--md-dark-accent-success);
-  --color-accent-warning: var(--md-dark-accent-warning);
-  --color-accent-error: var(--md-dark-accent-error);
+  --color-bg-primary: var(--surface-canvas);
+  --color-bg-secondary: var(--surface-base);
+  --color-bg-tertiary: var(--surface-raised);
+  --color-bg-hover: var(--surface-hover);
+  --color-bg-active: var(--surface-active);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border-subtle);
+  --color-border-active: var(--accent-primary);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-success: var(--accent-success);
+  --color-accent-warning: var(--accent-warning);
+  --color-accent-error: var(--accent-danger);
 }

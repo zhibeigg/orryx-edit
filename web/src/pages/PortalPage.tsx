@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react"
-import { Key, MapPin, Clock, Server, LogOut, Unlink } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
+import { Clock, Key, LogOut, MapPin, Server, Unlink } from "lucide-react"
 
 interface LicenseInfo {
   license: string
@@ -24,130 +24,169 @@ export function PortalPage() {
   const [info, setInfo] = useState<LicenseInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [unbinding, setUnbinding] = useState(false)
+  const [confirmingUnbind, setConfirmingUnbind] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const res = await licenseApi(license, "/info")
-      if (!res.ok) { setError("License 无效"); setAuthed(false); return }
-      setInfo(await res.json())
+      const response = await licenseApi(license, "/info")
+      if (!response.ok) {
+        setError("License 无效或已被禁用。")
+        setAuthed(false)
+        return
+      }
+      setInfo(await response.json())
       setError(null)
       setAuthed(true)
       sessionStorage.setItem("portalLicense", license)
-    } catch { setError("连接失败") }
+    } catch {
+      setError("连接失败，请稍后重试。")
+    }
   }, [license])
 
-  const handleLogin = async () => { if (license.trim()) await load() }
-  useEffect(() => { if (license) handleLogin() }, []) // eslint-disable-line
+  useEffect(() => {
+    if (license) void load()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLogin = (event: FormEvent) => {
+    event.preventDefault()
+    if (license.trim()) void load()
+  }
 
   const handleUnbindIp = async () => {
     setUnbinding(true)
+    setStatus(null)
     try {
-      await licenseApi(license, "/ip", "DELETE")
+      const response = await licenseApi(license, "/ip", "DELETE")
+      if (!response.ok) throw new Error("unbind failed")
       await load()
-    } finally { setUnbinding(false) }
+      setStatus("IP 已解绑。新服务器上的插件可在下次连接时绑定此 License。")
+      setConfirmingUnbind(false)
+    } catch {
+      setStatus("解绑失败，请稍后重试。")
+    } finally {
+      setUnbinding(false)
+    }
   }
 
   if (!authed) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
-        <div className="card-elevated w-full max-w-sm p-8 space-y-6">
-          <div className="text-center space-y-3">
-            <Key className="w-12 h-12 mx-auto text-[#007acc]" />
-            <h1 className="text-headline-large text-white">Orryx License</h1>
-            <p className="text-body-small text-[#858585]">输入 License 查看授权信息</p>
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-label-medium text-[#858585]">License</label>
-              <input type="text" value={license} onChange={(e) => setLicense(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className="input-filled w-full rounded-sm font-mono text-sm"
-                placeholder="输入 License..." />
+      <main id="main-content" className="access-shell">
+        <section className="access-card" aria-labelledby="portal-login-title">
+          <header className="access-header">
+            <div className="product-mark" aria-hidden="true"><Key /></div>
+            <div><p className="eyebrow">LICENSE PORTAL</p><h1 id="portal-login-title">License 门户</h1><p>查看授权状态、有效期和服务器 IP 绑定。</p></div>
+          </header>
+          <form className="industrial-form" onSubmit={handleLogin}>
+            <div className="field-group">
+              <label htmlFor="portal-license">License Key</label>
+              <input id="portal-license" type="text" value={license} onChange={(event) => setLicense(event.target.value)}
+                placeholder="输入 License" autoComplete="off" spellCheck={false} />
             </div>
-            {error && <p className="text-body-small text-red-400">{error}</p>}
-            <button onClick={handleLogin} className="btn btn-filled w-full">查看</button>
-          </div>
-        </div>
-      </div>
+            {error && <p className="status-message status-message--error" role="alert">{error}</p>}
+            <button className="industrial-button industrial-button--primary" type="submit" disabled={!license.trim()}>查看授权信息</button>
+          </form>
+        </section>
+      </main>
     )
   }
 
   if (!info) return null
-
-  const expiryColor = info.expiresAt === 0 ? "text-[#cccccc]"
-    : info.remainingDays <= 0 ? "text-red-400"
-    : info.remainingDays <= 7 ? "text-red-400"
-    : info.remainingDays <= 30 ? "text-yellow-400"
-    : "text-[#cccccc]"
-
-  const expiryText = info.expiresAt === 0 ? "永久有效"
-    : info.remainingDays <= 0 ? "已过期"
-    : `剩余 ${info.remainingDays} 天 (${new Date(info.expiresAt).toLocaleDateString("zh-CN")} 到期)`
+  const expiryClass = info.expiresAt !== 0 && info.remainingDays <= 7 ? "state-danger" : info.remainingDays <= 30 ? "state-warning" : ""
+  const expiryText = info.expiresAt === 0 ? "永久有效" : info.remainingDays <= 0 ? "已过期" : `剩余 ${info.remainingDays} 天 · ${new Date(info.expiresAt).toLocaleDateString("zh-CN")} 到期`
 
   return (
-    <div className="h-screen flex items-center justify-center bg-[#1e1e1e]">
-      <div className="card-elevated w-full max-w-md p-6 space-y-6">
-        <div className="flex items-center justify-between border-b border-[#3c3c3c] pb-4">
-          <div className="flex items-center gap-3">
-            <Key className="w-6 h-6 text-[#007acc]" />
-            <span className="text-title-large text-white">License 信息</span>
-          </div>
-          <button onClick={() => { setAuthed(false); sessionStorage.removeItem("portalLicense") }}
-            className="btn btn-text flex items-center gap-2 text-[#858585] hover:text-white">
-            <LogOut className="w-4 h-4" />退出
+    <main id="main-content" className="portal-shell">
+      <section className="portal-panel" aria-labelledby="portal-title">
+        <header className="portal-header">
+          <div><p className="eyebrow">LICENSE PORTAL</p><h1 id="portal-title">授权信息</h1><p>{info.owner || "未设置授权所有者"}</p></div>
+          <button className="industrial-button industrial-button--quiet" type="button" onClick={() => { setAuthed(false); sessionStorage.removeItem("portalLicense") }}>
+            <LogOut aria-hidden="true" />退出
           </button>
-        </div>
+        </header>
 
-        <div className="space-y-4">
-          <div className="card-filled p-4 space-y-3">
-            <Row icon={Key} label="License" value={info.license} mono />
-            <Row icon={Server} label="状态">
-              {info.enabled ? (
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${info.online ? "bg-green-400" : "bg-zinc-600"}`} />
-                  <span className="text-body-medium">{info.online ? "在线" : "离线"}</span>
-                </span>
-              ) : (
-                <span className="text-body-medium text-red-400">已禁用</span>
-              )}
-            </Row>
-            <Row icon={Clock} label="有效期">
-              <span className={`text-body-medium ${expiryColor}`}>{expiryText}</span>
-            </Row>
-          </div>
+        <dl className="detail-grid">
+          <Detail icon={<Key />} label="License"><code>{info.license}</code></Detail>
+          <Detail icon={<Server />} label="运行状态">
+            <span className={`state-label ${!info.enabled ? "state-danger" : info.online ? "state-success" : ""}`}>
+              {!info.enabled ? "已禁用" : info.online ? "服务器在线" : "服务器离线"}
+            </span>
+          </Detail>
+          <Detail icon={<Clock />} label="有效期"><span className={expiryClass}>{expiryText}</span></Detail>
+        </dl>
 
-          <div className="card-filled p-4 space-y-3">
-            <div className="flex items-center gap-2 text-label-medium text-[#858585]">
-              <MapPin className="w-4 h-4" />绑定 IP
-            </div>
-            {info.boundIps.length > 0 ? (
-              <div className="flex items-center justify-between">
-                <code className="text-body-medium text-zinc-200 font-mono">{info.boundIps.join(", ")}</code>
-                <button onClick={handleUnbindIp} disabled={unbinding}
-                  className="btn btn-outlined text-yellow-400 text-xs px-3 py-1.5">
-                  <Unlink className="w-3 h-3" />{unbinding ? "解绑中..." : "解绑"}
-                </button>
-              </div>
-            ) : (
-              <p className="text-body-small text-[#858585]">未绑定，插件下次连接时将自动绑定服务器 IP</p>
-            )}
-            <p className="text-label-small text-zinc-600">更换服务器时，先解绑旧 IP，再启动新服务器的插件即可自动绑定。</p>
-          </div>
-        </div>
-      </div>
-    </div>
+        <section className="binding-panel" aria-labelledby="binding-title">
+          <div className="section-heading"><MapPin aria-hidden="true" /><div><h2 id="binding-title">服务器 IP 绑定</h2><p>一个 License 的当前服务器身份。</p></div></div>
+          {info.boundIps.length > 0 ? (
+            <>
+              <code className="long-value">{info.boundIps.join(", ")}</code>
+              <p className="consequence-copy">解绑后，当前服务器不再拥有此 License 的 IP 绑定；新服务器插件下次连接时可自动绑定。</p>
+              <button className="industrial-button industrial-button--warning" type="button" onClick={() => setConfirmingUnbind(true)}>
+                <Unlink aria-hidden="true" />解绑当前 IP
+              </button>
+            </>
+          ) : <p className="empty-copy">尚未绑定。插件下次成功连接时会自动绑定服务器 IP。</p>}
+          {status && <p className="status-message" role="status" aria-live="polite">{status}</p>}
+        </section>
+      </section>
+
+      {confirmingUnbind && (
+        <UnbindConfirm
+          unbinding={unbinding}
+          onCancel={() => setConfirmingUnbind(false)}
+          onConfirm={() => void handleUnbindIp()}
+        />
+      )}
+    </main>
   )
 }
 
-function Row({ icon: Icon, label, value, mono, children }: {
-  icon: typeof Key; label: string; value?: string; mono?: boolean; children?: React.ReactNode
+function Detail({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return <div className="detail-item"><dt>{icon}<span>{label}</span></dt><dd>{children}</dd></div>
+}
+
+function UnbindConfirm({
+  unbinding,
+  onCancel,
+  onConfirm,
+}: {
+  unbinding: boolean
+  onCancel: () => void
+  onConfirm: () => void
 }) {
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    cancelRef.current?.focus()
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !unbinding) onCancel()
+    }
+    window.addEventListener("keydown", handleEscape)
+    return () => window.removeEventListener("keydown", handleEscape)
+  }, [onCancel, unbinding])
+
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-label-medium text-[#858585]">
-        <Icon className="w-4 h-4" />{label}
-      </div>
-      {children ?? <span className={`text-body-medium text-zinc-200 ${mono ? "font-mono text-label-medium" : ""}`}>{value}</span>}
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="unbind-confirm-title"
+        aria-describedby="unbind-confirm-description"
+      >
+        <h2 id="unbind-confirm-title">解绑当前服务器 IP？</h2>
+        <p id="unbind-confirm-description">
+          当前服务器将立即失去此 License 的 IP 绑定。请只在准备迁移到新服务器时执行此操作。
+        </p>
+        <div className="dialog-actions">
+          <button ref={cancelRef} className="industrial-button industrial-button--quiet" type="button" onClick={onCancel} disabled={unbinding}>
+            保留当前绑定
+          </button>
+          <button className="industrial-button industrial-button--danger" type="button" onClick={onConfirm} disabled={unbinding}>
+            {unbinding ? "正在解绑…" : "解绑服务器 IP"}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }

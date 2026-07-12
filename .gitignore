@@ -1,13 +1,27 @@
 .narrafork/
+.opencode/
 .worktrees/
 
 # Frontend
 web/node_modules/
 web/dist/
+web/coverage/
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/screenshots/
+web/traces/
+
+# Generated test and browser artifacts
+coverage/
+test-results/
+playwright-report/
+blob-report/
 
 # Server
 server/.gradle/
 server/build/
+server/build/audit-screenshots/
 server/.kotlin/
 server/src/main/resources/static/
 
@@ -20,8 +34,10 @@ server/src/main/resources/static/
 .DS_Store
 Thumbs.db
 
-# Orryx data (contains sensitive config)
-Orryx/
+# Orryx runtime data at the repository root (contains sensitive config).
+# The leading slash is required on case-insensitive Windows filesystems so this
+# rule does not hide source packages such as server/**/com/orryx/**.
+/Orryx/
 
 # Runtime data
 data/

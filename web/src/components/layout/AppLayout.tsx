@@ -10,11 +10,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="editor-shell h-screen flex flex-col">
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main id="main-content" className="flex-1 overflow-hidden">{children}</main>
       </div>
     </div>
   )

@@ -23,6 +23,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
+      <a className="skip-link" href="#main-content">跳到主要内容</a>
       <App />
     </ErrorBoundary>
   </StrictMode>
