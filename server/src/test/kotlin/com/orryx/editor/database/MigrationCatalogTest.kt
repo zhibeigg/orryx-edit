@@ -24,10 +24,12 @@ class MigrationCatalogTest {
         val sql = MigrationCatalog.migrations.flatMap { it.statements }.joinToString("\n")
         listOf(
             "licenses", "license_bound_ips", "editor_sessions", "system_audit_events",
-            "update_jobs", "legacy_imports"
+            "update_jobs", "legacy_imports", "kether_docs_cache", "kether_docs_sync_state"
         ).forEach { assertTrue(sql.contains("CREATE TABLE $it")) }
-        listOf("workspace_id", "server_key", "server_id", "player_name", "browser_id", "instance_id", "lease_expires_at")
-            .forEach { assertTrue(sql.contains(it)) }
+        listOf(
+            "workspace_id", "server_key", "server_id", "player_name", "browser_id", "instance_id", "lease_expires_at",
+            "release_id", "schema_sha256", "schema_json", "last_success_at", "next_attempt_at"
+        ).forEach { assertTrue(sql.contains(it)) }
         assertTrue(MigrationCatalog.migrations.zipWithNext().all { it.first.version < it.second.version })
     }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Ban, Check, Clock, Copy, Key, Plus, RefreshCw, RotateCcw, Shield } from "lucide-react"
+import { KetherDocsCard } from "@/features/admin/KetherDocsCard"
 import { UpdateCard } from "@/features/admin/UpdateCard"
 
 interface License {
@@ -155,6 +156,7 @@ export function AdminPage() {
           </form>
         </section>
 
+        <KetherDocsCard adminKey={adminKey} />
         <UpdateCard adminKey={adminKey} />
 
         <section className="industrial-panel license-section" aria-labelledby="license-list-title">

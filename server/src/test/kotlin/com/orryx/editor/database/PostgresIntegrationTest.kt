@@ -1,6 +1,9 @@
 package com.orryx.editor.database
 
 import com.orryx.editor.config.DatabaseConfig
+import com.orryx.editor.ketherdocs.CachedKetherDocs
+import com.orryx.editor.ketherdocs.PostgresKetherDocsRepository
+import com.orryx.editor.ketherdocs.StoredKetherDocsSyncState
 import com.orryx.editor.license.CreateLicenseCommand
 import com.orryx.editor.license.LicenseService
 import com.orryx.editor.license.PostgresLicenseRepository
@@ -100,6 +103,32 @@ class PostgresIntegrationTest {
             updateStore.update(job.copy(status = UpdateJobStatus.SUCCEEDED, progress = 100, updatedAt = now + 1))
             assertNull(updateStore.active())
             assertEquals(UpdateJobStatus.SUCCEEDED, updateStore.get(job.id)?.status)
+
+            val ketherDocs = PostgresKetherDocsRepository(database)
+            val docsNow = java.time.Instant.now()
+            val schemaJson = "{\"version\":2}"
+            val cache = CachedKetherDocs(
+                channel = "stable",
+                releaseId = "Orryx@2.43.114+${"a".repeat(40)}",
+                pluginVersion = "2.43.114",
+                commit = "a".repeat(40),
+                schemaVersion = 3,
+                schemaSha256 = sha256(schemaJson),
+                schemaBytes = schemaJson.toByteArray().size.toLong(),
+                schemaJson = schemaJson,
+                publishedAt = docsNow,
+                syncedAt = docsNow
+            )
+            val syncState = StoredKetherDocsSyncState(
+                channel = "stable",
+                lastAttemptAt = docsNow,
+                lastSuccessAt = docsNow,
+                nextAttemptAt = docsNow.plusSeconds(43_200),
+                errorCode = null
+            )
+            ketherDocs.saveSuccess(cache, syncState)
+            assertEquals(cache.releaseId, ketherDocs.load("stable")?.releaseId)
+            assertEquals(syncState.nextAttemptAt, ketherDocs.loadState("stable")?.nextAttemptAt)
         } finally {
             database.closeAsync()
         }

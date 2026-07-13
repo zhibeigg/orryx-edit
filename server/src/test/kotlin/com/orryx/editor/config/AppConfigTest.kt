@@ -28,6 +28,8 @@ class AppConfigTest {
         assertEquals(12, config.database.maxPoolSize)
         assertEquals(3000, config.database.acquireTimeout.toMillis())
         assertEquals(Paths.get("build/legacy/licenses.json").toAbsolutePath().normalize(), config.legacyLicensesFile)
+        assertEquals(12, config.ketherDocs.syncInterval.toHours())
+        assertEquals(true, config.ketherDocs.enabled)
     }
 
     @Test
@@ -39,6 +41,15 @@ class AppConfigTest {
                     "DATABASE_URL" to "postgresql://localhost/orryx",
                     "DATABASE_POOL_INITIAL_SIZE" to "5",
                     "DATABASE_POOL_MAX_SIZE" to "2"
+                )
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(
+                mapOf(
+                    "ADMIN_KEY" to "0123456789abcdef",
+                    "DATABASE_URL" to "postgresql://localhost/orryx",
+                    "KETHER_DOCS_SYNC_INTERVAL_HOURS" to "0"
                 )
             )
         }

@@ -47,13 +47,18 @@ export interface SchemaProvide {
 export type FlowType = "normal" | "branch" | "loop" | "container"
 
 export interface SchemaAction {
+  id?: string
   name: string
   aliases?: string[]
   category: string
   namespace: string
   description: string
   example?: string
+  examples?: string[]
+  syntax?: string
   builtin?: boolean
+  suspends?: boolean
+  requirements?: string[]
   inputs: SchemaInput[]
   output: SchemaOutput | null
   flow: FlowType
@@ -62,19 +67,28 @@ export interface SchemaAction {
 }
 
 export interface SchemaSelector {
+  id?: string
   name: string
   aliases?: string[]
   description: string
+  syntax?: string
+  examples?: string[]
   params: { name: string; key: string; type: string; default?: unknown }[]
 }
 
 export interface ActionsSchemaV2 {
   version: 2
+  schemaVersion?: number
+  pluginId?: string
+  pluginVersion?: string
+  commit?: string
+  generatedAt?: string
   types: Record<string, SchemaType>
   categories: Record<string, SchemaCategory>
   actions: SchemaAction[]
   selectors: SchemaSelector[]
   triggers?: unknown[]
+  properties?: unknown[]
 }
 
 // ============ v1 → v2 兼容层 ============
@@ -135,9 +149,23 @@ interface V1Schema {
   triggers?: unknown[]
 }
 
-/** 将 v1 或 v2 schema 统一转为 v2 格式 */
+/** 将 v1 或 v2 schema 统一转为编辑器使用的 v2 兼容格式 */
 export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV2 {
-  if (raw?.version === 2) return raw as ActionsSchemaV2
+  if (raw?.version === 2) {
+    const schema = raw as ActionsSchemaV2
+    if (schema.schemaVersion !== 3) return schema
+    return {
+      ...schema,
+      actions: schema.actions.map(action => ({
+        ...action,
+        inputs: action.inputs.map(input => ({
+          ...input,
+          // v3 用 p0/p1 表示位置；编辑器旧的 YAML/向导状态以展示名作为稳定键。
+          key: !input.keyword && /^p\d+$/.test(input.key) ? input.name : input.key,
+        })),
+      })),
+    }
+  }
 
   // v1 → v2
   const actions: SchemaAction[] = (raw?.actions ?? []).map((a: V1Action) => {

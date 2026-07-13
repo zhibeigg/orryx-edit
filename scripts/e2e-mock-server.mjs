@@ -18,10 +18,30 @@ const server = createServer(async (request, response) => {
     if (request.headers.authorization !== `Bearer ${adminKey}`) return json(response, 401, { code: "UNAUTHORIZED" })
     if (url.pathname === "/api/admin/licenses") return json(response, 200, [])
     if (url.pathname === "/api/admin/stats") return json(response, 200, { servers: 0, browsers: 0, tokens: 0, licenses: 0 })
-    if (url.pathname === "/api/admin/update/status") return json(response, 200, { currentVersion: "0.3.1", deployment: "source", launcherManaged: false, updateAvailable: false, activeUsers: 0 })
+    if (url.pathname === "/api/admin/update/status") return json(response, 200, { currentVersion: "0.4.1", deployment: "source", launcherManaged: false, updateAvailable: false, activeUsers: 0 })
+    if (url.pathname === "/api/admin/kether-docs/status" || url.pathname === "/api/admin/kether-docs/sync") return json(response, 200, {
+      enabled: true,
+      syncing: false,
+      health: "UP_TO_DATE",
+      source: "CACHE",
+      channel: "stable",
+      releaseId: "Orryx@2.43.114+94753d2f39461748ae64b84da7287740cedd514e",
+      pluginVersion: "2.43.114",
+      commit: "94753d2f39461748ae64b84da7287740cedd514e",
+      schemaVersion: 3,
+      schemaSha256: "0".repeat(64),
+      schemaBytes: 948429,
+      lastSuccessAt: Date.now(),
+      nextAttemptAt: Date.now() + 43_200_000,
+    })
     return json(response, 404, { code: "NOT_FOUND" })
   }
-  if (url.pathname === "/health/ready") return json(response, 200, { status: "UP", version: "0.3.1" })
+  if (url.pathname === "/health/ready") return json(response, 200, { status: "UP", version: "0.4.1" })
+  if (url.pathname === "/api/actions-schema") {
+    response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
+    response.end(await readFile(resolve(root, "actions-schema.json")))
+    return
+  }
 
   const relative = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html"
   const candidate = resolve(root, relative)

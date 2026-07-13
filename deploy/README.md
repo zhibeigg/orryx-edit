@@ -12,7 +12,7 @@ sudo install -d -o orryx -g orryx -m 0750 /opt/orryx-editor /var/lib/orryx-edito
 2. 将发布包中的 JAR、`start.sh` 放入 `/opt/orryx-editor`：
 
 ```bash
-sudo install -o orryx -g orryx -m 0640 orryx-editor-0.3.1.jar /opt/orryx-editor/orryx-editor.jar
+sudo install -o orryx -g orryx -m 0640 orryx-editor-0.4.1.jar /opt/orryx-editor/orryx-editor.jar
 sudo install -o orryx -g orryx -m 0750 start.sh /opt/orryx-editor/start.sh
 ```
 
@@ -56,6 +56,19 @@ docker compose ps
 docker compose pull
 docker compose up -d
 ```
+
+## Kether 文档同步
+
+默认启用 Orryx 官方 stable 文档同步：
+
+```text
+KETHER_DOCS_SYNC_ENABLED=true
+KETHER_DOCS_SYNC_INTERVAL_HOURS=12
+KETHER_DOCS_REQUEST_TIMEOUT_SECONDS=20
+KETHER_DOCS_MAX_SCHEMA_BYTES=4194304
+```
+
+服务端只连接 `https://zhibeigg.github.io/Orryx/kether/`，不需要 GitHub Token。远端不可用时继续提供 PostgreSQL 中最后一次通过校验的 Schema；数据库无缓存时使用 JAR 内置基线。生产防火墙需要允许访问 `zhibeigg.github.io:443`。
 
 ## 反向代理
 

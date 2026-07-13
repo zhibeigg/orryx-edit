@@ -32,7 +32,7 @@ val generateBuildInfo by tasks.registering {
             buildType=release
             deployment=source
             launcherManaged=false
-            databaseSchemaVersion=2
+            databaseSchemaVersion=3
             """.trimIndent() + "\n"
         )
     }

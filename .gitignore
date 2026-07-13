@@ -13,6 +13,7 @@ web/screenshots/
 web/traces/
 
 # Generated test and browser artifacts
+/build/
 coverage/
 test-results/
 playwright-report/

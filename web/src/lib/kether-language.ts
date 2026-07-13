@@ -5,9 +5,10 @@ export const KETHER_LANGUAGE_ID = "kether"
 // ---- Schema 类型 ----
 interface ActionParam {
   name: string
+  key?: string
   type: string
   required: boolean
-  default?: string
+  default?: unknown
   description?: string
   options?: string[]
   keyword?: string
@@ -20,14 +21,16 @@ interface ActionDef {
   description: string
   returnType?: string
   params?: ActionParam[]
+  inputs?: ActionParam[]
+  output?: { type: string; description?: string } | null
   syntax: string
   examples?: string[]
   deprecated?: boolean
 }
 
 interface ActionsSchema {
-  version: string
-  pluginVersion: string
+  version: string | number
+  pluginVersion?: string
   actions: ActionDef[]
   triggers?: TriggerDef[]
   selectors?: SelectorDef[]
@@ -68,7 +71,7 @@ let deprecatedKeywords: Set<string> = new Set()
 export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema> {
   const url = baseUrl || `${window.location.origin}/api/actions-schema`
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { cache: "no-cache" })
     if (res.ok) {
       cachedSchema = await res.json()
       rebuildFromSchema()
@@ -82,6 +85,14 @@ export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema
 /** 获取已加载的 schema（供其他组件使用） */
 export function getActionsSchema(): ActionsSchema | null {
   return cachedSchema
+}
+
+function getActionParams(action: ActionDef): ActionParam[] {
+  return action.params ?? action.inputs ?? []
+}
+
+function formatParamDefault(value: unknown): string {
+  return value === undefined || value === null ? "" : ` = ${String(value)}`
 }
 
 function rebuildFromSchema() {
@@ -266,7 +277,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
           }
 
           // 构建参数占位符
-          const params = action.params || []
+          const params = getActionParams(action)
           if (params.length > 0) {
             const paramSnippets = params.map((p, idx) => {
               const tabIdx = allNames.length > 1 ? idx + 2 : idx + 1
@@ -296,7 +307,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
         // 上下文 enum 参数补全
         const contextAction = findContextAction(textBeforeCursor)
         if (contextAction) {
-          for (const param of contextAction.params || []) {
+          for (const param of getActionParams(contextAction)) {
             if (param.type === "enum" && param.options) {
               for (const opt of param.options) {
                 items.push({
@@ -378,6 +389,7 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
       })
 
       if (!action) return null
+      const params = getActionParams(action)
 
       return {
         range: {
@@ -390,9 +402,9 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
           { value: `**${action.name}**` },
           { value: `\`${action.syntax}\`` },
           { value: action.description },
-          ...(action.params?.length ? [{
-            value: "参数:\n" + action.params.map(p =>
-              `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${p.description ? ": " + p.description : ""}${p.default ? " = " + p.default : ""}`
+          ...(params.length ? [{
+            value: "参数:\n" + params.map(p =>
+              `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${p.description ? ": " + p.description : ""}${formatParamDefault(p.default)}`
             ).join("\n")
           }] : []),
           ...(action.examples?.length ? [{
@@ -570,9 +582,10 @@ function registerDiagnostics(monaco: typeof import("monaco-editor")) {
 
 function buildDoc(action: ActionDef): string {
   let doc = `**${action.name}**\n\n\`${action.syntax}\`\n\n${action.description}`
-  if (action.params?.length) {
-    doc += "\n\n参数:\n" + action.params.map(p =>
-      `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${p.default ? " = " + p.default : ""}`
+  const params = getActionParams(action)
+  if (params.length) {
+    doc += "\n\n参数:\n" + params.map(p =>
+      `- \`${p.name}\` (${p.type}${p.required ? "" : "?"})${formatParamDefault(p.default)}`
     ).join("\n")
   }
   if (action.examples?.length) {
@@ -680,7 +693,7 @@ function isNumericCompatible(token: string): boolean {
       return first === token.toLowerCase() || (a.aliases ?? []).some(al => al.toLowerCase() === token.toLowerCase())
     })
     if (action) {
-      const rt = (action.returnType ?? "").toLowerCase()
+      const rt = (action.returnType ?? action.output?.type ?? "").toLowerCase()
       return rt.includes("number") || rt.includes("int") || rt.includes("double") || rt.includes("any") || rt === ""
     }
   }
@@ -752,10 +765,11 @@ function validateActionParams(
     // 查找行首 action
     const firstToken = tokens[0].text.toLowerCase()
     const action = actionLookup.get(firstToken)
-    if (!action || !action.params?.length) continue
+    if (!action) continue
+    const params = getActionParams(action)
+    if (!params.length) continue
 
     // 按 schema 参数定义检查类型
-    const params = action.params
     const positional = params.filter(p => !p.keyword)
     let posIdx = 0
     let tokenIdx = 1 // 跳过 action 名

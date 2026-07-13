@@ -104,6 +104,35 @@ object MigrationCatalog {
                 "ALTER TABLE update_jobs ADD COLUMN lease_expires_at TIMESTAMPTZ NULL",
                 "CREATE INDEX update_jobs_lease_idx ON update_jobs (status, lease_expires_at, created_at)"
             )
+        ),
+        Migration(
+            version = 3,
+            description = "verified Kether documentation cache and sync state",
+            statements = listOf(
+                """
+                CREATE TABLE kether_docs_cache (
+                    channel VARCHAR(16) PRIMARY KEY CHECK (channel = 'stable'),
+                    release_id VARCHAR(256) NOT NULL,
+                    plugin_version VARCHAR(64) NOT NULL,
+                    commit_sha CHAR(40) NOT NULL,
+                    schema_version INTEGER NOT NULL CHECK (schema_version > 0),
+                    schema_sha256 CHAR(64) NOT NULL,
+                    schema_bytes BIGINT NOT NULL CHECK (schema_bytes > 0),
+                    schema_json TEXT NOT NULL,
+                    published_at TIMESTAMPTZ NOT NULL,
+                    synced_at TIMESTAMPTZ NOT NULL
+                )
+                """.trimIndent(),
+                """
+                CREATE TABLE kether_docs_sync_state (
+                    channel VARCHAR(16) PRIMARY KEY CHECK (channel = 'stable'),
+                    last_attempt_at TIMESTAMPTZ NULL,
+                    last_success_at TIMESTAMPTZ NULL,
+                    next_attempt_at TIMESTAMPTZ NULL,
+                    error_code VARCHAR(100) NULL
+                )
+                """.trimIndent()
+            )
         )
     )
 

@@ -9,12 +9,13 @@
 - 持久化：PostgreSQL、R2DBC PostgreSQL、R2DBC Pool
 - 协议：HTTP JSON + WebSocket JSON
 
-## 0.3.1 架构
+## 0.4.1 架构
 
 ```text
 浏览器 ── /ws ──> Orryx Editor Server <── /ws/server ── Minecraft 插件
                        │
                        ├── PostgreSQL / R2DBC
+                       ├── Orryx Kether stable 文档（官方 GitHub Pages）
                        └── 私有 GitHub Release（仅后端访问）
 ```
 
@@ -25,6 +26,8 @@
 - 浏览器请求 ID 会在 relay 内改写，插件响应只返回发起请求的浏览器。
 - 文件写入携带 `baseRevision`；过期 revision 返回 `REVISION_CONFLICT`，不会静默覆盖。
 - 在线更新只接受稳定版、精确资产、HTTPS allowlist 和匹配的 SHA-256/manifest。
+- Kether Schema 只从 Orryx 官方 `stable` 通道同步；服务端校验不可变路径、契约、字节数与 SHA-256 后原子写入 PostgreSQL，失败继续使用 last-known-good 缓存。
+- 浏览器只请求本机 `/api/actions-schema`，新会话采用新 Schema，已经打开的编辑会话不会中途切换。
 
 ## 环境要求
 
@@ -54,6 +57,10 @@ DEPLOYMENT_MODE=source|launcher|container
 UPDATE_ENABLED=false
 UPDATE_GITHUB_REPOSITORY=zhibeigg/orryx-edit
 UPDATE_GITHUB_TOKEN=<private repo read-only token>
+KETHER_DOCS_SYNC_ENABLED=true
+KETHER_DOCS_SYNC_INTERVAL_HOURS=12
+KETHER_DOCS_REQUEST_TIMEOUT_SECONDS=20
+KETHER_DOCS_MAX_SCHEMA_BYTES=4194304
 ```
 
 完整配置见 `.env.example`。GitHub Token 只存在于服务端环境和 GitHub Authorization 请求头，不会进入前端、响应或日志。
@@ -67,7 +74,8 @@ UPDATE_GITHUB_TOKEN=<private repo read-only token>
 3. 在事务中获取 PostgreSQL advisory lock。
 4. 校验 `schema_migrations` checksum 并执行待应用迁移。
 5. 尝试一次性导入旧 `licenses.json`。
-6. 启动 HTTP、WebSocket 和会话清理任务。
+6. 校验并恢复 PostgreSQL 中的 Kether Schema 缓存；没有缓存时读取 JAR 内置基线。
+7. 启动 HTTP、WebSocket、会话清理和 Kether stable 同步任务。
 
 迁移不使用 Flyway、JDBC 或阻塞数据库 API。数据库不可用、checksum 不匹配或迁移失败时服务拒绝启动。
 
@@ -127,6 +135,19 @@ Admin 后台可以检查、下载、校验并暂存 Release。应用请求重启
 
 `container` 模式不会在容器内替换 JAR，只允许检查新版本。
 
+## Kether 文档自动同步
+
+服务端启动后立即读取 `https://zhibeigg.github.io/Orryx/kether/channels/stable.json`，之后默认每 12 小时轮询。它只接受 Orryx 官方同源 HTTPS URL，并依次验证 channel、不可变 Release manifest、Schema v3、资源字节数、4 MiB 大小预算、SHA-256、稳定 ID 和类型引用。
+
+同步成功后 Schema 与状态原子保存到 PostgreSQL；失败时不会覆盖当前可用版本。管理后台显示 `UP_TO_DATE`、`DEGRADED` 或 `FAILED`，并可手动触发 stable 同步。公共入口：
+
+- `GET /api/actions-schema`
+- `GET /actions-schema.json`（兼容入口）
+- `GET /api/admin/kether-docs/status`
+- `POST /api/admin/kether-docs/sync`
+
+详细契约、响应头和回退语义见 [`ACTIONS_SCHEMA.md`](ACTIONS_SCHEMA.md)。
+
 ## CI/CD 与发布
 
 `.github/workflows/ci.yml` 在 Pull Request 和 `master` push 上执行。前端关键解析模块当前覆盖率基线为语句 60%、分支 40%、函数 55%、行 60%，CI 会拒绝低于基线的变更：
@@ -159,7 +180,7 @@ cd ../server
 ## 健康检查
 
 - `GET /health/live`：进程存活和版本。
-- `GET /health/ready`：真实 PostgreSQL 可用性、迁移完成状态和版本。
+- `GET /health/ready`：真实 PostgreSQL 可用性、迁移完成状态、可用 Kether Schema 和版本；缓存降级仍为 ready，三种来源均不可用时返回 not-ready。
 
 ## 页面与管理 API
 
@@ -170,5 +191,8 @@ cd ../server
 - `GET /api/admin/update/status`
 - `POST /api/admin/update/jobs`
 - `GET /api/admin/update/jobs/{id}`
+- `GET /api/admin/kether-docs/status`
+- `POST /api/admin/kether-docs/sync`
+- `GET /api/actions-schema`
 
 管理 API 使用 `Authorization: Bearer <ADMIN_KEY>`。详细插件 WebSocket 协议见 `PLUGIN_API.md`。

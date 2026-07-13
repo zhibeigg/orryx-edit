@@ -4,6 +4,12 @@ import com.orryx.editor.audit.PostgresAuditRepository
 import com.orryx.editor.config.AppConfig
 import com.orryx.editor.database.DatabaseMigrator
 import com.orryx.editor.database.R2dbcDatabase
+import com.orryx.editor.ketherdocs.BundledKetherDocsLoader
+import com.orryx.editor.ketherdocs.KetherDocsHealth
+import com.orryx.editor.ketherdocs.KetherDocsRemoteClient
+import com.orryx.editor.ketherdocs.KetherDocsService
+import com.orryx.editor.ketherdocs.KetherDocsValidator
+import com.orryx.editor.ketherdocs.PostgresKetherDocsRepository
 import com.orryx.editor.license.LegacyLicenseImporter
 import com.orryx.editor.license.LicenseManager
 import com.orryx.editor.license.LicenseService
@@ -95,6 +101,18 @@ suspend fun main() {
             }
         )
 
+        val ketherDocsValidator = KetherDocsValidator(config.ketherDocs)
+        val bundledKetherDocs = BundledKetherDocsLoader(ketherDocsValidator)
+        val ketherDocsService = KetherDocsService(
+            config = config.ketherDocs,
+            repository = PostgresKetherDocsRepository(database),
+            source = KetherDocsRemoteClient(updateHttpClient, config.ketherDocs, ketherDocsValidator),
+            validator = ketherDocsValidator,
+            bundledLoader = bundledKetherDocs::load
+        )
+        ketherDocsService.initialize()
+        applicationScope.launch { ketherDocsService.runScheduler() }
+
         val pendingUpdate = UpdateStartupReconciler(config.updates.dataDirectory).reconcile()
 
         println("=== Orryx Editor Server ${config.buildInfo.version} ===")
@@ -103,6 +121,7 @@ suspend fun main() {
         println("  数据库: PostgreSQL / R2DBC")
         println("  旧 License 导入: ${legacyResult::class.simpleName}")
         println("  部署模式: ${config.buildInfo.deployment}")
+        println("  Kether 文档: ${ketherDocsService.status().health} / ${ketherDocsService.status().source}")
         if (pendingUpdate != null) println("  更新状态: 待 launcher 应用 ${pendingUpdate.version}")
         println("====================================")
 
@@ -114,8 +133,9 @@ suspend fun main() {
                 securitySettings = config.security,
                 auditRepository = auditRepository,
                 buildInfo = config.buildInfo,
-                readinessCheck = database::ping,
-                updateService = updateService
+                readinessCheck = { database.ping() && ketherDocsService.status().health != KetherDocsHealth.FAILED },
+                updateService = updateService,
+                ketherDocsService = ketherDocsService
             )
             configureWebSockets(relayHandler, serverEndpoint, config.security)
 

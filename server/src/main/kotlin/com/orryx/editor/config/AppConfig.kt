@@ -1,6 +1,7 @@
 package com.orryx.editor.config
 
 import com.orryx.editor.build.BuildInfo
+import com.orryx.editor.ketherdocs.KetherDocsConfig
 import com.orryx.editor.security.SecuritySettings
 import com.orryx.editor.security.loadSecuritySettings
 import com.orryx.editor.security.requireSecureAdminKey
@@ -35,6 +36,7 @@ data class AppConfig(
     val security: SecuritySettings,
     val sessions: SessionConfig,
     val updates: UpdateConfig,
+    val ketherDocs: KetherDocsConfig,
     val buildInfo: BuildInfo
 ) {
     companion object {
@@ -96,6 +98,7 @@ data class AppConfig(
                     relayRequestTimeout = Duration.ofSeconds(environment.longValue("RELAY_REQUEST_TIMEOUT_SECONDS", 15, 5L..120L))
                 ),
                 updates = UpdateConfig.fromEnvironment(environment),
+                ketherDocs = KetherDocsConfig.fromEnvironment(environment),
                 buildInfo = BuildInfo.load(environment = environment)
             )
         }

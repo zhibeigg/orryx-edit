@@ -11,7 +11,13 @@ const [dockerfile, compose, service, ci, release] = await Promise.all([
 for (const expected of ["USER 10001:10001", "DEPLOYMENT_MODE=container", "HEALTHCHECK"]) {
   if (!dockerfile.includes(expected)) throw new Error(`Dockerfile 缺少 ${expected}`)
 }
-for (const expected of ["read_only: true", "no-new-privileges:true", "condition: service_healthy"]) {
+for (const expected of [
+  "read_only: true",
+  "no-new-privileges:true",
+  "condition: service_healthy",
+  "KETHER_DOCS_SYNC_ENABLED",
+  "KETHER_DOCS_SYNC_INTERVAL_HOURS",
+]) {
   if (!compose.includes(expected)) throw new Error(`docker-compose.yml 缺少 ${expected}`)
 }
 for (const expected of ["NoNewPrivileges=true", "ProtectSystem=strict", "ReadWritePaths="]) {

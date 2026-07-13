@@ -144,7 +144,7 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
   let i = 0
   for (const input of inputs) {
     if (i >= tokens.length) break
-    if (!input.required && !input.keyword) continue // 可选参数第二遍处理
+    if (!input.required) continue // 所有可选参数统一在第二遍按标识符处理
 
     const tok = tokens[i]
     const lower = tok.toLowerCase()
@@ -182,30 +182,34 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
     }
   }
 
-  // 第二遍：处理可选参数（无 keyword 的 required=false）
-  // 可选参数的 key 作为标识符，可以以任意顺序出现在剩余 token 中
-  const optionalInputs = inputs.filter(inp => !inp.required && !inp.keyword)
+  // 第二遍：处理全部可选参数。它们可以按任意顺序出现，不能依赖 Schema 注册顺序。
+  const optionalInputs = inputs.filter(inp => !inp.required)
   if (optionalInputs.length > 0) {
-    // 构建可选参数的 key 查找表
     const optKeyMap = new Map<string, SchemaInput>()
     for (const inp of optionalInputs) {
-      optKeyMap.set(inp.key.toLowerCase(), inp)
+      const markers = inp.keyword ? inp.keyword.toLowerCase().split("/") : [inp.key.toLowerCase()]
+      for (const marker of markers) optKeyMap.set(marker, inp)
     }
 
     while (i < tokens.length) {
       const tok = tokens[i]
-      const lower = tok.toLowerCase()
-      const optInput = optKeyMap.get(lower)
-      if (optInput) {
-        i++ // consume key 标识符
-        if (i < tokens.length) {
-          const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
-          values[optInput.key] = value
-          i = nextIndex
-        }
-      } else {
-        // 不认识的 token，跳过
+      const optInput = optKeyMap.get(tok.toLowerCase())
+      if (!optInput) {
         i++
+        continue
+      }
+
+      if (optInput.type === "keyword") {
+        values[optInput.key] = tok
+        i++
+        continue
+      }
+
+      i++ // consume keyword/key 标识符
+      if (i < tokens.length) {
+        const { value, nextIndex } = consumeExpression(tokens, i, actionLookup)
+        values[optInput.key] = value
+        i = nextIndex
       }
     }
   }

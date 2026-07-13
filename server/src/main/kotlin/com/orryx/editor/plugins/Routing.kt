@@ -3,6 +3,9 @@ package com.orryx.editor.plugins
 import com.orryx.editor.audit.AuditEvent
 import com.orryx.editor.audit.AuditRepository
 import com.orryx.editor.build.BuildInfo
+import com.orryx.editor.ketherdocs.KetherDocsService
+import com.orryx.editor.ketherdocs.ketherDocsAdminRoutes
+import com.orryx.editor.ketherdocs.respondKetherDocsSchema
 import com.orryx.editor.license.LicenseEntry
 import com.orryx.editor.license.LicenseManager
 import com.orryx.editor.relay.SessionRegistry
@@ -80,7 +83,8 @@ fun Application.configureRouting(
     auditRepository: AuditRepository? = null,
     buildInfo: BuildInfo = BuildInfo("unknown", "source", false),
     readinessCheck: suspend () -> Boolean = { true },
-    updateService: UpdateService? = null
+    updateService: UpdateService? = null,
+    ketherDocsService: KetherDocsService? = null
 ) {
     install(ContentNegotiation) { json() }
 
@@ -131,8 +135,13 @@ fun Application.configureRouting(
             else call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("NOT_READY", buildInfo.version))
         }
 
+        if (ketherDocsService != null) {
+            get("/actions-schema.json") { call.respondKetherDocsSchema(ketherDocsService) }
+            get("/api/actions-schema") { call.respondKetherDocsSchema(ketherDocsService) }
+        } else {
+            get("/api/actions-schema") { call.respondRedirect("/actions-schema.json", permanent = false) }
+        }
         staticResources("/", "static") { default("index.html") }
-        get("/api/actions-schema") { call.respondRedirect("/actions-schema.json", permanent = false) }
 
         route("/api/admin") {
             suspend fun authorized(call: ApplicationCall): Boolean = checkAdmin(
@@ -223,6 +232,7 @@ fun Application.configureRouting(
                 updateAdminRoutes(service, ::authorized)
                 route("/system") { updateAdminRoutes(service, ::authorized) }
             }
+            ketherDocsService?.let { service -> ketherDocsAdminRoutes(service, ::authorized) }
         }
 
         route("/api/license") {
