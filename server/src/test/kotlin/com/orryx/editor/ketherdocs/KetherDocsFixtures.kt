@@ -15,7 +15,6 @@ internal fun validSchemaBytes(): ByteArray = """
       "pluginId": "Orryx",
       "pluginVersion": "$TEST_PLUGIN_VERSION",
       "commit": "$TEST_COMMIT",
-      "generatedAt": "2026-03-20T00:00:00Z",
       "types": { "text": { "widget": "text", "color": "#aaa" } },
       "categories": { "test": { "color": "#aaa", "icon": "test" } },
       "actions": [

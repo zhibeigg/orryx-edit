@@ -72,7 +72,6 @@ Authorization: Bearer <ADMIN_KEY>
   "pluginId": "Orryx",
   "pluginVersion": "2.43.114",
   "commit": "40-character-git-sha",
-  "generatedAt": "RFC3339 UTC",
   "types": {},
   "categories": {},
   "actions": [],
@@ -88,13 +87,14 @@ Authorization: Bearer <ADMIN_KEY>
 | `schemaVersion` | `3` | 动态发布契约版本；当前编辑器只接受 v3 |
 | `pluginVersion` | string | 生成 Schema 的 Orryx 插件版本 |
 | `commit` | string | 生成来源的完整 40 位 Git SHA |
-| `generatedAt` | string | 与不可变发布清单一致的 RFC3339 时间 |
 | `types` | object | 参数/输出类型定义 |
 | `categories` | object | action 分类定义 |
 | `actions` | array | 完整运行时 action 注册表 |
 | `selectors` | array | 完整 selector 注册表 |
 | `triggers` | array | 完整 trigger 注册表 |
 | `properties` | array | 完整 property 注册表 |
+
+发布时间不属于 `actions-schema.json` 本体：远程同步以 stable channel 的 `publishedAt` 与不可变 release manifest 的 `generatedAt` 为可信来源；仅使用内置基线且尚无远程缓存时，管理状态中的 `publishedAt` 为 `null`。
 
 ## 稳定 ID
 

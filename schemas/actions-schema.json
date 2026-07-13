@@ -3,12 +3,12 @@
     "version": 2,
     "schemaVersion": 3,
     "pluginId": "Orryx",
-    "pluginVersion": "2.43.114",
-    "commit": "94753d2f39461748ae64b84da7287740cedd514e",
+    "pluginVersion": "2.44.116",
+    "commit": "025679491d7bc7bd4f5d178bde1d66f78dcd6186",
     "plugin": {
         "id": "Orryx",
-        "version": "2.43.114",
-        "commit": "94753d2f39461748ae64b84da7287740cedd514e"
+        "version": "2.44.116",
+        "commit": "025679491d7bc7bd4f5d178bde1d66f78dcd6186"
     },
     "types": {
         "number": {

@@ -1,6 +1,8 @@
 package com.orryx.editor.ketherdocs
 
 import com.orryx.editor.database.sha256
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,6 +58,16 @@ class KetherDocsValidatorTest {
         val fetched = validator.validateRemoteSchema(schema, channel, manifest)
         assertEquals(TEST_RELEASE_ID, fetched.releaseId)
         assertEquals(3, fetched.schemaVersion)
+        assertEquals(channel.publishedAt, fetched.publishedAt)
+    }
+
+    @Test
+    fun `accepts tracked bundled schema without release timestamp`() {
+        val bytes = Files.readAllBytes(Path.of("..", "schemas", "actions-schema.json"))
+        val bundled = validator.validateBundled(bytes)
+
+        assertEquals(KetherDocsSource.BUNDLED, bundled.source)
+        assertEquals(null, bundled.publishedAt)
     }
 
     @Test

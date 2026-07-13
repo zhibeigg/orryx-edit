@@ -100,7 +100,6 @@ internal class KetherDocsValidator(private val config: KetherDocsConfig) {
             expectedCommit = pointer.commit,
             expectedSchemaVersion = manifest.schemaVersion
         )
-        ensure(parsed.generatedAt == pointer.publishedAt, KetherDocsErrorCode.SCHEMA_INVALID)
         return FetchedKetherDocs(
             releaseId = pointer.releaseId,
             pluginVersion = parsed.pluginVersion,
@@ -144,7 +143,7 @@ internal class KetherDocsValidator(private val config: KetherDocsConfig) {
             schemaVersion = parsed.schemaVersion,
             schemaSha256 = sha256(bytes),
             schemaBytes = bytes,
-            publishedAt = parsed.generatedAt,
+            publishedAt = null,
             syncedAt = null
         )
     }
@@ -216,8 +215,7 @@ internal class KetherDocsValidator(private val config: KetherDocsConfig) {
         ParsedSchema(
             pluginVersion = pluginVersion,
             commit = commit,
-            schemaVersion = schemaVersion,
-            generatedAt = Instant.parse(root.requiredString("generatedAt"))
+            schemaVersion = schemaVersion
         )
     }
 
@@ -305,8 +303,7 @@ internal class KetherDocsValidator(private val config: KetherDocsConfig) {
     private data class ParsedSchema(
         val pluginVersion: String,
         val commit: String,
-        val schemaVersion: Int,
-        val generatedAt: Instant
+        val schemaVersion: Int
     )
 
     private companion object {
