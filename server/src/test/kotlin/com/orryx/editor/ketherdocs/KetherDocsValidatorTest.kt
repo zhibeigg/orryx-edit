@@ -63,7 +63,9 @@ class KetherDocsValidatorTest {
 
     @Test
     fun `accepts tracked bundled schema without release timestamp`() {
-        val bytes = Files.readAllBytes(Path.of("..", "schemas", "actions-schema.json"))
+        val bytes = javaClass.classLoader.getResourceAsStream("static/actions-schema.json")
+            ?.use { it.readBytes() }
+            ?: Files.readAllBytes(Path.of("..", "schemas", "actions-schema.json"))
         val bundled = validator.validateBundled(bytes)
 
         assertEquals(KetherDocsSource.BUNDLED, bundled.source)
