@@ -66,7 +66,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.1")
-    implementation("org.postgresql:r2dbc-postgresql:1.0.7.RELEASE")
+    implementation("org.postgresql:r2dbc-postgresql:1.1.2.RELEASE")
     implementation("io.r2dbc:r2dbc-pool:1.0.2.RELEASE")
     implementation("ch.qos.logback:logback-classic:1.5.18")
 
