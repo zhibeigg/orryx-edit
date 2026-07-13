@@ -9,7 +9,7 @@
 - 持久化：PostgreSQL、R2DBC PostgreSQL、R2DBC Pool
 - 协议：HTTP JSON + WebSocket JSON
 
-## 0.4.2 架构
+## 0.4.3 架构
 
 ```text
 浏览器 ── /ws ──> Orryx Editor Server <── /ws/server ── Minecraft 插件

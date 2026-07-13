@@ -9,6 +9,9 @@ class DatabaseMigrator(
 ) {
     suspend fun migrate() {
         database.inTransaction { connection ->
+            queryAll(
+                connection.createStatement("SELECT pg_advisory_xact_lock($1)").bind(0, advisoryLockKey)
+            ) { _, _ -> Unit }
             connection.executeFully(
                 """
                 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -19,9 +22,6 @@ class DatabaseMigrator(
                 )
                 """.trimIndent()
             )
-            queryAll(
-                connection.createStatement("SELECT pg_advisory_xact_lock($1)").bind(0, advisoryLockKey)
-            ) { _, _ -> Unit }
             val applied = queryAll(
                 connection.createStatement("SELECT version, checksum FROM schema_migrations ORDER BY version")
             ) { row, _ -> row.get("version", java.lang.Long::class.java)!!.toLong() to row.get("checksum", String::class.java)!! }
