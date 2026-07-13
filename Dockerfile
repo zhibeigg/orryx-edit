@@ -5,6 +5,7 @@ COPY web/package.json web/package-lock.json ./web/
 RUN --mount=type=cache,target=/root/.npm cd web && npm ci
 COPY web ./web
 COPY schemas ./schemas
+COPY scripts ./scripts
 COPY server ./server
 RUN cd web && npm run lint && npm run typecheck && npm run test:ci && npm run build && npm run check:bundle && npm run check:secrets
 

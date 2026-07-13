@@ -8,7 +8,7 @@ const [dockerfile, compose, service, ci, release] = await Promise.all([
   read(".github/workflows/ci.yml"), read(".github/workflows/release.yml"),
 ])
 
-for (const expected of ["USER 10001:10001", "DEPLOYMENT_MODE=container", "HEALTHCHECK"]) {
+for (const expected of ["COPY scripts ./scripts", "USER 10001:10001", "DEPLOYMENT_MODE=container", "HEALTHCHECK"]) {
   if (!dockerfile.includes(expected)) throw new Error(`Dockerfile 缺少 ${expected}`)
 }
 for (const expected of [
