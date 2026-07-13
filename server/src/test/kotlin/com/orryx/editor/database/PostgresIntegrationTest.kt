@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import java.security.MessageDigest
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -105,7 +106,7 @@ class PostgresIntegrationTest {
             assertEquals(UpdateJobStatus.SUCCEEDED, updateStore.get(job.id)?.status)
 
             val ketherDocs = PostgresKetherDocsRepository(database)
-            val docsNow = java.time.Instant.now()
+            val docsNow = java.time.Instant.now().truncatedTo(ChronoUnit.MICROS)
             val schemaJson = "{\"version\":2}"
             val cache = CachedKetherDocs(
                 channel = "stable",
