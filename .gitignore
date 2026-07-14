@@ -14,6 +14,7 @@ web/traces/
 
 # Generated test and browser artifacts
 /build/
+/artifacts/
 coverage/
 test-results/
 playwright-report/

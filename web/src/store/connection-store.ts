@@ -5,7 +5,6 @@ interface ConnectionState {
   connected: boolean
   authenticated: boolean
   reconnecting: boolean
-  token: string | null
   workspaceId: string | null
   browserId: string | null
   playerName: string | null
@@ -17,7 +16,6 @@ interface ConnectionState {
   setConnected: (connected: boolean) => void
   setAuthenticated: (authenticated: boolean, session?: AuthSession) => void
   setReconnecting: (reconnecting: boolean) => void
-  setToken: (token: string | null) => void
   setCollaborators: (collaborators: CollaboratorPresence[]) => void
   setError: (error: string | null) => void
   reset: () => void
@@ -27,7 +25,6 @@ const disconnectedState = {
   connected: false,
   authenticated: false,
   reconnecting: false,
-  token: null,
   workspaceId: null,
   browserId: null,
   playerName: null,
@@ -77,7 +74,6 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   },
 
   setReconnecting: (reconnecting) => set({ reconnecting }),
-  setToken: (token) => set({ token }),
   setCollaborators: (collaborators) => set({ collaborators }),
   setError: (error) => set({ error }),
   reset: () => set({ ...disconnectedState, collaborators: [] }),

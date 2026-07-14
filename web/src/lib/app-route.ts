@@ -1,5 +1,7 @@
 export type AppRoute =
-  | { kind: "editor" }
+  | { kind: "home" }
+  | { kind: "register" }
+  | { kind: "connect" }
   | { kind: "portal" }
   | { kind: "admin" }
   | { kind: "workbench"; workspaceId: string; serverInstanceId: string }
@@ -15,6 +17,9 @@ function decodeSegment(value: string): string | null {
 
 export function parseAppRoute(pathname: string): AppRoute {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname
+  if (normalized === "/") return { kind: "home" }
+  if (normalized === "/register") return { kind: "register" }
+  if (normalized === "/connect") return { kind: "connect" }
   if (normalized === "/portal") return { kind: "portal" }
   if (normalized === "/admin") return { kind: "admin" }
 
@@ -25,7 +30,7 @@ export function parseAppRoute(pathname: string): AppRoute {
     if (workspaceId && serverInstanceId) return { kind: "workbench", workspaceId, serverInstanceId }
   }
 
-  return { kind: "editor" }
+  return { kind: "home" }
 }
 
 export function workbenchPath(workspaceId: string, serverInstanceId: string): string {

@@ -10,6 +10,7 @@ export interface CollaboratorPresence {
 
 export interface AuthSession {
   success: boolean
+  code?: string
   permissions?: string[]
   serverName?: string
   onlineCount?: number
@@ -288,7 +289,7 @@ export function on(type: string, handler: MessageHandler): () => void {
 }
 
 async function applyAuthResult(result: AuthSession): Promise<AuthSession> {
-  if (!result.success) throw new WsRequestError({ code: "AUTH_FAILED", message: result.message ?? "认证失败" })
+  if (!result.success) throw new WsRequestError({ code: result.code ?? "AUTH_FAILED", message: result.message ?? "认证失败" })
   authenticated = true
   if (result.resumeToken) persistResumeToken(result.resumeToken)
   return result

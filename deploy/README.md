@@ -12,7 +12,7 @@ sudo install -d -o orryx -g orryx -m 0750 /opt/orryx-editor /var/lib/orryx-edito
 2. 将发布包中的 JAR、`start.sh` 放入 `/opt/orryx-editor`：
 
 ```bash
-sudo install -o orryx -g orryx -m 0640 orryx-editor-0.8.8.jar /opt/orryx-editor/orryx-editor.jar
+sudo install -o orryx -g orryx -m 0640 orryx-editor-0.9.8.jar /opt/orryx-editor/orryx-editor.jar
 sudo install -o orryx -g orryx -m 0750 start.sh /opt/orryx-editor/start.sh
 ```
 
@@ -72,7 +72,7 @@ KETHER_DOCS_MAX_SCHEMA_BYTES=4194304
 
 ## 账户注册
 
-账户 API 默认关闭。需要开放 `/portal` 邮箱注册与登录时，必须在 Compose 环境中显式启用，并保持 HTTPS Cookie：
+账户 API 默认关闭。需要开放 `/register` 邮箱注册和 `/portal` 登录时，必须在 Compose 环境中显式启用，并保持 HTTPS Cookie：
 
 ```text
 ACCOUNTS_ENABLED=true
@@ -82,6 +82,8 @@ ACCOUNT_COOKIE_DOMAIN=
 ```
 
 `ACCOUNT_COOKIE_DOMAIN` 留空时使用当前站点的 host-only Cookie，通常更安全。`docker-compose.yml` 会显式透传这些变量；若未设置 `ACCOUNTS_ENABLED=true`，服务端不会注册 `/api/v2/auth/*` 路由。
+
+公开页面由 SPA fallback 提供：`/` 为插件门户，`/register` 为注册页，`/portal` 为账户控制台，`/connect#token=...` 为一次性服务器连接页。Fragment 不会发送给 Nginx/Ktor；前端读取后会立即清除。旧 `/#token=...` 只在浏览器内迁移到 `/connect#token=...`，`?token=` 会被拒绝，不应写入反向代理兼容规则。
 
 ## AI 工作台与私有 Runner
 

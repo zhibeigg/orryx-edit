@@ -6,13 +6,51 @@ async function expectNoPageOverflow(page: import("@playwright/test").Page) {
   expect(overflow).toBeLessThanOrEqual(1)
 }
 
-test("连接页无严重无障碍问题且不会保留 URL token", async ({ page }) => {
-  await page.goto("/#token=e2e-token-not-registered")
-  await expect(page).toHaveURL(/^(?!.*token=)/)
-  await expect(page.getByRole("heading", { name: "连接 Orryx Editor" })).toBeVisible()
-  await expectNoPageOverflow(page)
+async function expectNoSeriousAxeViolations(page: import("@playwright/test").Page) {
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([])
+}
+
+test("插件门户首页在所有视口保持可读和可操作", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByRole("heading", { name: "把复杂技能系统，交给一条可审核的生产链。" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "创建账户" }).first()).toHaveAttribute("href", "/register")
+  await expect(page.getByText("/orryx edit").first()).toBeVisible()
+  await expectNoPageOverflow(page)
+  await expectNoSeriousAxeViolations(page)
+})
+
+test("独立注册页使用账户表单并链接回 Portal", async ({ page }) => {
+  await page.goto("/register")
+  await expect(page.getByRole("heading", { name: "创建 Orryx 账户" })).toBeVisible()
+  await page.getByLabel("显示名称").focus()
+  await expect(page.getByLabel("显示名称")).toBeFocused()
+  await expect(page.getByRole("link", { name: "登录 Portal" })).toHaveAttribute("href", "/portal")
+  await expectNoPageOverflow(page)
+  await expectNoSeriousAxeViolations(page)
+})
+
+test("连接页清除 Fragment token 且不保留凭据", async ({ page }) => {
+  await page.goto("/connect#token=e2e-token-not-registered")
+  await expect(page).toHaveURL(/\/connect$/)
+  await expect(page.getByRole("heading", { name: "连接 Orryx Editor" })).toBeVisible()
+  await expectNoPageOverflow(page)
+  await expectNoSeriousAxeViolations(page)
+})
+
+test("旧根路径 token 链接迁移到独立连接页", async ({ page }) => {
+  await page.goto("/#token=e2e-legacy-token")
+  await expect(page).toHaveURL(/\/connect$/)
+  await expect(page.getByRole("heading", { name: "连接 Orryx Editor" })).toBeVisible()
+  await expect(page.url()).not.toContain("token=")
+})
+
+test("查询参数 token 被拒绝并从地址栏移除", async ({ page }) => {
+  await page.goto("/connect?token=e2e-unsafe-token")
+  await expect(page).toHaveURL(/\/connect$/)
+  await expect(page.getByRole("alert")).toContainText("已拒绝查询参数中的 Token")
+  await expect(page.url()).not.toContain("token=")
+  await expectNoPageOverflow(page)
 })
 
 test("Admin 可认证并在所有视口保持可用", async ({ page }) => {
@@ -23,14 +61,14 @@ test("Admin 可认证并在所有视口保持可用", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "License 管理" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "在线更新" })).toBeVisible()
   await expectNoPageOverflow(page)
-  const results = await new AxeBuilder({ page }).analyze()
-  expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([])
+  await expectNoSeriousAxeViolations(page)
 })
 
 test("Portal 登录表单保持键盘和移动端语义", async ({ page }) => {
   await page.goto("/portal")
-  await expect(page.getByRole("heading", { name: "License 门户" })).toBeVisible()
-  await page.getByLabel("License Key").focus()
-  await expect(page.getByLabel("License Key")).toBeFocused()
+  await expect(page.getByRole("heading", { name: "Orryx 账户控制台" })).toBeVisible()
+  await page.getByLabel("邮箱").focus()
+  await expect(page.getByLabel("邮箱")).toBeFocused()
+  await expect(page.getByRole("link", { name: "创建 Orryx 账户" })).toHaveAttribute("href", "/register")
   await expectNoPageOverflow(page)
 })

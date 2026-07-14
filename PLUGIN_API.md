@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.8.8）
+# Orryx Editor 插件端协议（0.9.8）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
@@ -110,10 +110,10 @@
 向玩家返回的 URL 必须使用 fragment：
 
 ```text
-https://editor.example.com/#token=<token>
+https://editor.example.com/connect#token=<token>
 ```
 
-旧 `?token=` 暂时兼容，但前端会在发起认证请求前清除地址栏凭据。
+前端必须在联网前读取并通过 `history.replaceState` 清除 Fragment。`?token=` 查询参数不再支持；连接页会拒绝该凭据、清理地址栏并要求玩家重新执行 `/orryx edit`。
 
 撤销：
 

@@ -7,6 +7,8 @@ const source = (relativePath: string) => readFileSync(resolve(__dirname, relativ
 describe("可恢复 WebSocket 会话", () => {
   const client = source("../ws-client.ts")
   const connectPage = source("../../pages/ConnectPage.tsx")
+  const connectionCredential = source("../connection-credential.ts")
+  const connectionStore = source("../../store/connection-store.ts")
 
   it("一次性 token 与 resume token 分离且认证后才重置重试次数", () => {
     expect(client).toContain('const RESUME_TOKEN_KEY = "orryx.resumeToken"')
@@ -21,10 +23,21 @@ describe("可恢复 WebSocket 会话", () => {
     expect(client).toContain("rejectPendingRequests")
   })
 
-  it("优先读取 fragment token 并在联网前清除 URL 凭据", () => {
-    expect(connectPage).toContain('hashParams.get("token")')
-    expect(connectPage).toContain("window.history.replaceState")
-    expect(connectPage.indexOf("extractAndScrubUrlToken()")).toBeLessThan(connectPage.indexOf("handleConnect(urlToken)"))
+  it("只读取 fragment token，并在联网前清除地址栏凭据", () => {
+    expect(connectionCredential).toContain('hashParams.get("token")')
+    expect(connectionCredential).toContain("window.history.replaceState")
+    expect(connectionCredential).toContain("url.hash = \"\"")
+    expect(connectionCredential).not.toContain('url.searchParams.get("token")')
+    expect(connectPage.indexOf("const credential = extractAndScrubUrlToken()")).toBeLessThan(connectPage.indexOf("void handleConnect(credential.token)"))
+  })
+
+  it("查询参数 token 被拒绝，且一次性 token 不进入全局 store 或输入框", () => {
+    expect(connectionCredential).toContain('url.searchParams.has("token")')
+    expect(connectionCredential).toContain("rejectedQueryToken ? null : fragmentToken")
+    expect(connectPage).not.toContain("tokenInput")
+    expect(connectPage).not.toContain("setToken")
+    expect(connectionStore).not.toMatch(/\btoken:/)
+    expect(connectionStore).not.toContain("setToken")
   })
 })
 

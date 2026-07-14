@@ -9,12 +9,22 @@ describe("前端路由隔离", () => {
   const editorRoute = source("../../routes/EditorRoute.tsx")
   const authenticatedEditor = source("../../routes/AuthenticatedEditor.tsx")
 
-  it("App 只懒加载并分发三个顶层路由", () => {
+  it("App 懒加载门户、注册、控制台、工作台和连接路由", () => {
+    expect(app).toContain('lazy(() => import("@/pages/HomePage")')
+    expect(app).toContain('lazy(() => import("@/pages/RegisterPage")')
     expect(app).toContain('lazy(() => import("@/pages/AdminPage")')
     expect(app).toContain('lazy(() => import("@/pages/PortalPage")')
     expect(app).toContain('lazy(() => import("@/routes/EditorRoute")')
     expect(app).not.toMatch(/useDraftSync|useKeyboardShortcuts|useCrossRefLoader/)
     expect(app).not.toMatch(/Monaco|FlowEditor|three/)
+  })
+
+  it("旧根路径 Fragment 链接只迁移到独立连接路由", () => {
+    const migration = source("../legacy-connection-link.ts")
+    expect(app).toContain("migrateLegacyConnectionLink()")
+    expect(migration).toContain('window.location.pathname !== "/"')
+    expect(migration).toContain('window.location.replace(`/connect${window.location.hash}`)')
+    expect(migration).not.toContain("searchParams.get")
   })
 
   it("未认证与窄屏路由不会静态导入编辑器 hooks 或重型页面", () => {
@@ -31,20 +41,31 @@ describe("前端路由隔离", () => {
   })
 })
 
-describe("登录表单语义", () => {
-  it.each(["../../pages/AdminPage.tsx", "../../pages/PortalPage.tsx", "../../pages/ConnectPage.tsx"])("%s 使用真实表单和关联标签", (file) => {
+describe("账户与连接表单语义", () => {
+  const accountForm = source("../../components/AccountAuthForm.tsx")
+  const registerPage = source("../../pages/RegisterPage.tsx")
+  const portalPage = source("../../pages/PortalPage.tsx")
+  const connectPage = source("../../pages/ConnectPage.tsx")
+
+  it.each(["../../pages/AdminPage.tsx", "../../components/AccountAuthForm.tsx", "../../pages/ConnectPage.tsx"])('%s 使用真实表单和关联标签', (file) => {
     const page = source(file)
     expect(page).toContain("<form")
     expect(page).toMatch(/<label htmlFor=/)
-    expect(page).toMatch(/<main id="main-content"/)
-    expect(page).toMatch(/<h1/)
   })
 
-  it("错误和账户加载状态具有可访问语义", () => {
+  it("注册页与 Portal 复用固定模式账户表单", () => {
+    expect(registerPage).toContain('<AccountAuthForm mode="register"')
+    expect(portalPage).toContain('<AccountAuthForm mode="login"')
+    expect(portalPage).toContain('href="/register"')
+    expect(portalPage).not.toContain("auth-mode-switch")
+  })
+
+  it("错误、提交和加载状态具有可访问语义", () => {
     expect(source("../../pages/AdminPage.tsx")).toMatch(/role="alert"[^>]*aria-live="assertive"/)
-    const portal = source("../../pages/PortalPage.tsx")
-    expect(portal).toMatch(/role="alert"[^>]*aria-live="assertive"/)
-    expect(portal).toContain('aria-busy={submitting}')
-    expect(portal).toContain('aria-live="polite"')
+    expect(accountForm).toMatch(/role="alert"[^>]*aria-live="assertive"/)
+    expect(accountForm).toContain("aria-busy={submitting}")
+    expect(registerPage).toContain('aria-live="polite"')
+    expect(connectPage).toContain('aria-busy="true"')
+    expect(connectPage).toContain('role="alert"')
   })
 })

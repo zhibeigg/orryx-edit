@@ -6,16 +6,15 @@ import {
   Cloud,
   Gift,
   KeyRound,
-  LogIn,
   LogOut,
   RefreshCw,
   ReceiptText,
   Server,
   ShieldCheck,
   ShoppingCart,
-  UserPlus,
   WalletCards,
 } from "lucide-react"
+import { AccountAuthForm } from "@/components/AccountAuthForm"
 import { ApiError, apiErrorMessage, apiRequest } from "@/lib/api-client"
 import { workbenchPath } from "@/lib/app-route"
 import { resolveBillingOrders, resolveWalletLedger, workbenchApi, type BillingOrderHistory, type WalletLedgerEntry } from "@/lib/workbench-api"
@@ -27,8 +26,6 @@ import {
   type BillingSummary,
   type WorkspaceSummary,
 } from "@/lib/account-api"
-
-type AuthMode = "login" | "register"
 
 interface LegacyLicenseInfo {
   license: string
@@ -183,31 +180,6 @@ export function PortalPage() {
 }
 
 function AccountAccessCard({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [mode, setMode] = useState<AuthMode>("login")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [displayName, setDisplayName] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    setSubmitting(true)
-    setError(null)
-    try {
-      if (mode === "register") {
-        await accountApi.register({ email: email.trim(), password, displayName: displayName.trim() })
-      } else {
-        await accountApi.login({ email: email.trim(), password })
-      }
-      onAuthenticated()
-    } catch (cause) {
-      setError(apiErrorMessage(cause, mode === "register" ? "注册失败。" : "登录失败。"))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
     <section className="access-card portal-access-card" aria-labelledby="account-access-title">
       <header className="access-header">
@@ -215,39 +187,11 @@ function AccountAccessCard({ onAuthenticated }: { onAuthenticated: () => void })
         <div>
           <p className="eyebrow">ACCOUNT CONTROL PLANE</p>
           <h1 id="account-access-title">Orryx 账户控制台</h1>
-          <p>使用邮箱账户管理授权、服务器、云草稿与 AI 权益。</p>
+          <p>登录后管理授权、服务器、云草稿与 AI Editor 权益。</p>
         </div>
       </header>
-
-      <div className="auth-mode-switch" role="group" aria-label="选择登录或注册">
-        <button className={`industrial-button ${mode === "login" ? "industrial-button--primary" : "industrial-button--quiet"}`} type="button" onClick={() => { setMode("login"); setError(null) }} aria-pressed={mode === "login"}>
-          <LogIn aria-hidden="true" />登录
-        </button>
-        <button className={`industrial-button ${mode === "register" ? "industrial-button--primary" : "industrial-button--quiet"}`} type="button" onClick={() => { setMode("register"); setError(null) }} aria-pressed={mode === "register"}>
-          <UserPlus aria-hidden="true" />注册
-        </button>
-      </div>
-
-      <form className="industrial-form" onSubmit={(event) => void submit(event)} aria-busy={submitting}>
-        {mode === "register" && (
-          <div className="field-group">
-            <label htmlFor="portal-display-name">显示名称</label>
-            <input id="portal-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required maxLength={80} />
-          </div>
-        )}
-        <div className="field-group">
-          <label htmlFor="portal-email">邮箱</label>
-          <input id="portal-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-        </div>
-        <div className="field-group">
-          <label htmlFor="portal-password">密码</label>
-          <input id="portal-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} required minLength={8} />
-        </div>
-        {error && <p className="status-message status-message--error" role="alert" aria-live="assertive">{error}</p>}
-        <button className="industrial-button industrial-button--primary" type="submit" disabled={submitting || !email.trim() || password.length < 8 || (mode === "register" && !displayName.trim())}>
-          {submitting ? "正在提交…" : mode === "register" ? "创建账户" : "登录控制台"}
-        </button>
-      </form>
+      <AccountAuthForm mode="login" onAuthenticated={onAuthenticated} />
+      <p className="auth-route-link">还没有账户？<a href="/register">创建 Orryx 账户</a></p>
       <p className="access-footer">账户会话仅由服务端 HttpOnly Cookie 管理，浏览器存储中不会保存 session token。</p>
     </section>
   )

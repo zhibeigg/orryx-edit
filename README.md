@@ -2,7 +2,7 @@
 
 面向 Minecraft 服主与 Orryx 开发者的商业化配置变更控制平台。浏览器通过 Ktor 服务管理账户、服务器实例、云端草稿、AI Job、审核、签名发布和不可变历史；Orryx 插件负责最终的签名验证、文件事务、主线程激活、Readiness 与崩溃恢复。
 
-当前版本：`0.8.8`，数据库 Schema：`12`，Editor 协议：V1/V2。
+当前版本：`0.9.8`，数据库 Schema：`12`，Editor 协议：V1/V2。
 
 ## 核心边界
 
@@ -35,20 +35,23 @@ Web 使用 React 19、TypeScript、Vite、Monaco、React Flow 和 Three.js。服
 
 ## 用户流程
 
-1. 在 `/portal` 注册或登录邮箱账户。
-2. 认领已有 License，并等待插件注册稳定的 `serverInstance`。
-3. 从 Server Snapshot 创建云端 Draft。
-4. 在工作台选择 `GENERATE`、`VALIDATE` 或 `PLAN`，AI Job 经 Provider 与私有 Runner 生成不可变 Draft Version。
-5. 在 Monaco Diff 中审核文件、diagnostics、checks、references 与 requirements。
-6. 用户显式发布当前已审核版本。
-7. 服务端签名完整目标 Manifest，插件执行 prepare → commit → readiness。
-8. 成功生成 Release Snapshot；失败自动回滚或进入 `RECOVERY_REQUIRED`。
-9. 从历史恢复时创建新草稿，再次走审核与发布。
+1. 从插件门户 `/` 进入独立注册页 `/register` 创建邮箱账户，或在 `/portal` 登录。
+2. 玩家在游戏内执行 `/orryx edit`，点击 5 分钟内有效的一次性 `/connect#token=...` 链接打开实时服务器工作区。
+3. 认领已有 License，并等待插件注册稳定的 `serverInstance`。
+4. 从 Server Snapshot 创建云端 Draft。
+5. 在工作台选择 `GENERATE`、`VALIDATE` 或 `PLAN`，AI Job 经 Provider 与私有 Runner 生成不可变 Draft Version。
+6. 在 Monaco Diff 中审核文件、diagnostics、checks、references 与 requirements。
+7. 用户显式发布当前已审核版本。
+8. 服务端签名完整目标 Manifest，插件执行 prepare → commit → readiness。
+9. 成功生成 Release Snapshot；失败自动回滚或进入 `RECOVERY_REQUIRED`。
+10. 从历史恢复时创建新草稿，再次走审核与发布。
 
 ## 页面
 
-- `/`：兼容的实时 Editor 连接入口。
-- `/portal`：账户、License 认领、服务器、钱包、订单与工作台入口。
+- `/`：Orryx 插件门户介绍页。
+- `/register`：独立邮箱账户注册页。
+- `/portal`：账户登录、License 认领、服务器、钱包、订单与工作台入口。
+- `/connect`：玩家命令生成的一次性实时 Editor 连接入口；凭据只接受 URL Fragment。
 - `/workspaces/{workspaceId}/servers/{serverInstanceId}`：AI 三栏工作台、审核发布和历史。
 - `/admin`：License、更新、Kether 文档、AI Provider 与商业运行状态。
 
