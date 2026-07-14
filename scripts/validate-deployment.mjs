@@ -17,6 +17,10 @@ for (const expected of [
   "condition: service_healthy",
   "KETHER_DOCS_SYNC_ENABLED",
   "KETHER_DOCS_SYNC_INTERVAL_HOURS",
+  "ACCOUNTS_ENABLED",
+  "ACCOUNT_SESSION_TTL_HOURS",
+  "ACCOUNT_COOKIE_SECURE",
+  "ACCOUNT_COOKIE_DOMAIN",
 ]) {
   if (!compose.includes(expected)) throw new Error(`docker-compose.yml 缺少 ${expected}`)
 }

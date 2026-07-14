@@ -12,7 +12,7 @@ sudo install -d -o orryx -g orryx -m 0750 /opt/orryx-editor /var/lib/orryx-edito
 2. 将发布包中的 JAR、`start.sh` 放入 `/opt/orryx-editor`：
 
 ```bash
-sudo install -o orryx -g orryx -m 0640 orryx-editor-0.8.7.jar /opt/orryx-editor/orryx-editor.jar
+sudo install -o orryx -g orryx -m 0640 orryx-editor-0.8.8.jar /opt/orryx-editor/orryx-editor.jar
 sudo install -o orryx -g orryx -m 0750 start.sh /opt/orryx-editor/start.sh
 ```
 
@@ -69,6 +69,19 @@ KETHER_DOCS_MAX_SCHEMA_BYTES=4194304
 ```
 
 服务端只连接 `https://zhibeigg.github.io/Orryx/kether/`，不需要 GitHub Token。远端不可用时继续提供 PostgreSQL 中最后一次通过校验的 Schema；数据库无缓存时使用 JAR 内置基线。生产防火墙需要允许访问 `zhibeigg.github.io:443`。
+
+## 账户注册
+
+账户 API 默认关闭。需要开放 `/portal` 邮箱注册与登录时，必须在 Compose 环境中显式启用，并保持 HTTPS Cookie：
+
+```text
+ACCOUNTS_ENABLED=true
+ACCOUNT_SESSION_TTL_HOURS=168
+ACCOUNT_COOKIE_SECURE=true
+ACCOUNT_COOKIE_DOMAIN=
+```
+
+`ACCOUNT_COOKIE_DOMAIN` 留空时使用当前站点的 host-only Cookie，通常更安全。`docker-compose.yml` 会显式透传这些变量；若未设置 `ACCOUNTS_ENABLED=true`，服务端不会注册 `/api/v2/auth/*` 路由。
 
 ## AI 工作台与私有 Runner
 
