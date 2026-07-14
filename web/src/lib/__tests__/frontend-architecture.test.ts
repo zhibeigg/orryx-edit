@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 const source = (relativePath: string) => readFileSync(resolve(__dirname, relativePath), "utf8")
@@ -17,6 +17,16 @@ describe("前端路由隔离", () => {
     expect(app).toContain('lazy(() => import("@/routes/EditorRoute")')
     expect(app).not.toMatch(/useDraftSync|useKeyboardShortcuts|useCrossRefLoader/)
     expect(app).not.toMatch(/Monaco|FlowEditor|three/)
+  })
+
+  it("门户使用正式 Orryx 像素图标并同步浏览器图标", () => {
+    const brandMark = source("../../components/BrandMark.tsx")
+    const indexHtml = source("../../../index.html")
+    expect(brandMark).toContain('import orryxMarkUrl from "@/assets/orryx.png"')
+    expect(brandMark).toContain("src={orryxMarkUrl}")
+    expect(brandMark).toContain('alt=""')
+    expect(indexHtml).toContain('type="image/png" href="/src/assets/orryx.png"')
+    expect(existsSync(resolve(__dirname, "../../assets/orryx.png"))).toBe(true)
   })
 
   it("旧根路径 Fragment 链接只迁移到独立连接路由", () => {

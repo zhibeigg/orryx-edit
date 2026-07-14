@@ -70,18 +70,13 @@
 }
 
 .brand-mark {
-  width: 58px;
-  height: 38px;
+  width: 88px;
+  height: 44px;
   flex: 0 0 auto;
+  object-fit: contain;
+  object-position: left center;
+  image-rendering: pixelated;
 }
-
-.brand-mark__flame { fill: var(--portal-lava); }
-.brand-mark__tail { fill: var(--portal-rust); }
-.brand-mark__body { fill: var(--portal-vermilion); }
-.brand-mark__plate { fill: var(--portal-panel-high); }
-.brand-mark__jaw { fill: var(--portal-line-strong); }
-.brand-mark__eye { fill: var(--portal-cream); }
-.brand-mark__detail { stroke: var(--portal-canvas); stroke-width: 1.5; }
 
 .portal-home {
   min-height: 100vh;
@@ -339,7 +334,7 @@
 .machine-output div:last-child { border-right: 0; }
 .machine-output span { color: var(--portal-warm); font-family: var(--font-code); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; }
 .machine-output strong { overflow-wrap: anywhere; color: var(--portal-warm); font-family: var(--font-code); font-size: 0.62rem; }
-.machine-emblem { position: absolute; right: -12px; bottom: -24px; width: 112px; height: auto; opacity: 0.13; pointer-events: none; }
+.machine-emblem { position: absolute; right: -18px; bottom: -20px; width: 148px; height: auto; opacity: 0.16; image-rendering: pixelated; pointer-events: none; }
 
 .home-section {
   width: min(100% - 32px, 1280px);
@@ -503,7 +498,7 @@
 .connect-route-nav a { min-height: 44px; display: inline-flex; align-items: center; color: var(--portal-warm); text-decoration: none; font-size: 0.78rem; }
 .connect-card.access-card { position: relative; z-index: 1; width: min(100%, 620px); padding: clamp(20px, 5vw, 32px); border-color: var(--portal-line-strong); background: var(--portal-floor); }
 .connect-header { align-items: center; border-color: var(--portal-line-strong); }
-.connect-brand-mark { width: 72px; height: 48px; }
+.connect-brand-mark { width: 104px; height: 53px; }
 .connect-header h1 { font-family: var(--portal-font-display); letter-spacing: -0.025em; }
 .connect-state { display: grid; gap: var(--space-lg); margin-top: var(--space-lg); }
 .connect-command { display: grid; gap: var(--space-xs); padding: var(--space-lg); border: 1px solid var(--portal-line-strong); background: var(--portal-input); }
@@ -599,7 +594,7 @@
 @media (max-width: 520px) {
   .brand-link small { display: none; }
   .site-header .brand-mark,
-  .register-header .brand-mark { width: 48px; }
+  .register-header .brand-mark { width: 68px; height: 35px; }
   .register-back-link { font-size: 0; }
   .register-back-link svg { width: 20px; height: 20px; }
   .home-actions .home-button { width: 100%; }
