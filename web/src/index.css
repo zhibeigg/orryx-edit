@@ -491,17 +491,17 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .access-header > div:last-child, .page-heading > div:first-child, .portal-header > div:first-child { min-width: 0; }
 .access-header h1, .portal-header h1, .page-heading h1 { margin: 2px 0 5px; color: var(--industrial-text); font-size: clamp(1.35rem, 4vw, 1.75rem); line-height: 1.2; }
 .access-header p:last-child, .portal-header p:last-child, .page-heading p:last-child, .section-heading p { margin: 0; color: var(--industrial-muted); font-size: 0.875rem; line-height: 1.55; }
-.eyebrow { margin: 0; color: #86bde5; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; }
+.eyebrow { margin: 0; color: var(--accent-primary); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; }
 .product-mark {
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
   display: grid;
   place-items: center;
-  border: 1px solid #4d7695;
+  border: 1px solid color-mix(in oklch, var(--accent-primary) 58%, var(--border-strong));
   border-radius: 3px;
-  color: #d9efff;
-  background: #17334a;
+  color: var(--text-primary);
+  background: color-mix(in oklch, var(--accent-primary-strong) 24%, var(--surface-raised));
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -512,7 +512,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .industrial-form { display: grid; gap: 16px; margin-top: 22px; }
 .compact-form { margin-top: 14px; }
 .field-group { display: grid; gap: 7px; min-width: 0; }
-.field-group label { display: inline-flex; align-items: center; gap: 7px; color: #cbd1d8; font-size: 0.8rem; font-weight: 650; }
+.field-group label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 0.8rem; font-weight: 650; }
 .field-group label svg { width: 15px; height: 15px; }
 .field-group input, .field-group select, .create-license-form input, .create-license-form select {
   width: 100%;
@@ -522,10 +522,10 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   border-radius: 2px;
   padding: 9px 11px;
   color: var(--industrial-text);
-  background: #0e1014;
+  background: var(--surface-input);
 }
-.field-group input::placeholder, .create-license-form input::placeholder { color: #7f8894; }
-.field-group input:hover, .field-group select:hover { border-color: #788290; }
+.field-group input::placeholder, .create-license-form input::placeholder { color: var(--text-muted); }
+.field-group input:hover, .field-group select:hover { border-color: var(--accent-primary); }
 
 .industrial-button {
   min-height: 44px;
@@ -543,43 +543,43 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   font-weight: 650;
 }
 .industrial-button svg { width: 16px; height: 16px; }
-.industrial-button:hover:not(:disabled) { border-color: #788290; background: #292e36; }
+.industrial-button:hover:not(:disabled) { border-color: var(--accent-primary); background: var(--surface-hover); }
 .industrial-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.industrial-button--primary { border-color: #3f91cc; background: #1f6fa9; color: #fff; }
-.industrial-button--primary:hover:not(:disabled) { border-color: #67b5ec; background: #277fba; }
+.industrial-button--primary { border-color: var(--accent-primary-strong); background: var(--accent-primary); color: oklch(14% 0.03 30); }
+.industrial-button--primary:hover:not(:disabled) { border-color: var(--focus-ring); background: var(--focus-ring); }
 .industrial-button--quiet { background: transparent; }
-.industrial-button--warning { border-color: #94753e; color: #ffe0a5; background: #3d301c; }
-.industrial-button--danger { border-color: #a94d4d; color: #fff; background: #873b3b; }
-.industrial-button--danger-quiet { border-color: #7c4848; color: #ffaaaa; background: transparent; }
-.industrial-button--success { border-color: #3e8061; color: #9de6be; background: #173b2b; }
+.industrial-button--warning { border-color: color-mix(in oklch, var(--accent-warning) 58%, var(--border-strong)); color: oklch(92% 0.06 78); background: color-mix(in oklch, var(--accent-warning) 15%, var(--surface-raised)); }
+.industrial-button--danger { border-color: var(--accent-danger); color: var(--text-primary); background: color-mix(in oklch, var(--accent-danger) 62%, var(--surface-raised)); }
+.industrial-button--danger-quiet { border-color: color-mix(in oklch, var(--accent-danger) 58%, var(--border-strong)); color: oklch(84% 0.09 28); background: transparent; }
+.industrial-button--success { border-color: color-mix(in oklch, var(--accent-success) 42%, var(--border-strong)); color: var(--accent-success); background: color-mix(in oklch, var(--accent-success) 9%, var(--surface-raised)); }
 
 .access-secondary { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--industrial-border); }
 .access-secondary > .industrial-button { width: 100%; justify-content: flex-start; }
 .access-footer { margin-top: 22px; color: #858e9a; font-size: 0.75rem; text-align: center; }
 .consequence-copy, .empty-copy { margin: 0; color: var(--industrial-muted); font-size: 0.82rem; line-height: 1.55; }
-.status-message { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 11px; border: 1px solid var(--industrial-border); border-radius: 2px; color: #dce1e6; background: #20242a; font-size: 0.82rem; line-height: 1.45; }
+.status-message { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 11px; border: 1px solid var(--industrial-border); border-radius: 2px; color: var(--text-primary); background: var(--surface-raised); font-size: 0.82rem; line-height: 1.45; }
 .status-message svg { width: 17px; height: 17px; flex: 0 0 auto; }
-.status-message--error { border-color: #7c4545; color: #ffb4b4; background: #321f22; }
-.status-message--success { border-color: #396d54; color: #a5e4c0; background: #172d23; }
+.status-message--error { border-color: color-mix(in oklch, var(--accent-danger) 58%, var(--border-strong)); color: oklch(86% 0.08 28); background: color-mix(in oklch, var(--accent-danger) 12%, var(--surface-base)); }
+.status-message--success { border-color: color-mix(in oklch, var(--accent-success) 40%, var(--border-strong)); color: var(--accent-success); background: color-mix(in oklch, var(--accent-success) 8%, var(--surface-base)); }
 
 .admin-shell, .admin-access-shell {
-  --surface-canvas: oklch(14.5% 0.012 155);
-  --surface-base: oklch(18.5% 0.014 155);
-  --surface-raised: oklch(22.5% 0.016 155);
-  --surface-hover: oklch(27% 0.019 155);
-  --surface-active: oklch(31% 0.022 155);
-  --surface-input: oklch(12% 0.01 155);
-  --text-primary: oklch(93% 0.012 110);
-  --text-secondary: oklch(76% 0.016 125);
-  --text-muted: oklch(64% 0.016 135);
-  --border-subtle: oklch(31% 0.018 155);
-  --border-strong: oklch(44% 0.025 150);
-  --accent-primary: oklch(72% 0.13 135);
-  --accent-primary-strong: oklch(61% 0.12 137);
-  --accent-success: oklch(74% 0.13 145);
-  --accent-warning: oklch(79% 0.12 82);
-  --accent-danger: oklch(68% 0.14 28);
-  --focus-ring: oklch(84% 0.105 135);
+  --surface-canvas: oklch(13.5% 0.014 30);
+  --surface-base: oklch(17.5% 0.021 29);
+  --surface-raised: oklch(22% 0.032 28);
+  --surface-hover: oklch(27% 0.05 27);
+  --surface-active: oklch(31.5% 0.07 27);
+  --surface-input: oklch(11.5% 0.012 31);
+  --text-primary: oklch(95% 0.028 82);
+  --text-secondary: oklch(80% 0.04 68);
+  --text-muted: oklch(66% 0.045 50);
+  --border-subtle: oklch(31% 0.055 28);
+  --border-strong: oklch(45% 0.095 28);
+  --accent-primary: oklch(70% 0.215 42);
+  --accent-primary-strong: oklch(57% 0.215 28);
+  --accent-success: oklch(90% 0.08 88);
+  --accent-warning: oklch(79% 0.16 62);
+  --accent-danger: oklch(63% 0.23 27);
+  --focus-ring: oklch(85% 0.14 58);
   --industrial-bg: var(--surface-canvas);
   --industrial-surface: var(--surface-base);
   --industrial-surface-raised: var(--surface-raised);
@@ -599,7 +599,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .admin-access-shell .product-mark, .admin-shell .product-mark { border-color: color-mix(in oklch, var(--accent-primary) 55%, var(--border-strong)); color: var(--accent-primary); background: color-mix(in oklch, var(--accent-primary) 12%, var(--surface-raised)); }
 .admin-access-shell .field-group input, .admin-shell .field-group input, .admin-shell .field-group select, .admin-shell .create-license-form input, .admin-shell .create-license-form select { border-color: var(--border-strong); background: var(--surface-input); }
 .admin-access-shell .field-group input::placeholder, .admin-shell .field-group input::placeholder, .admin-shell .create-license-form input::placeholder { color: var(--text-muted); }
-.admin-access-shell .industrial-button--primary, .admin-shell .industrial-button--primary { border-color: var(--accent-primary-strong); color: oklch(14% 0.025 145); background: var(--accent-primary); }
+.admin-access-shell .industrial-button--primary, .admin-shell .industrial-button--primary { border-color: var(--accent-primary-strong); color: oklch(13% 0.025 30); background: var(--accent-primary); }
 .admin-access-shell .industrial-button--primary:hover:not(:disabled), .admin-shell .industrial-button--primary:hover:not(:disabled) { border-color: var(--focus-ring); background: var(--focus-ring); }
 .admin-shell { min-height: 100vh; color: var(--industrial-text); background: var(--industrial-bg); }
 .admin-header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px clamp(16px, 4vw, 36px); border-bottom: 1px solid var(--industrial-border); background: var(--industrial-surface); }
@@ -618,7 +618,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .admin-shell .status-strip { border-color: var(--border-strong); background: var(--surface-base); }
 .admin-shell .status-strip > div { background: var(--surface-base); }
 .admin-shell .status-strip > div:nth-child(2) dd { color: var(--accent-success); }
-.admin-shell .status-strip > div:nth-child(3) dd { color: oklch(75% 0.08 220); }
+.admin-shell .status-strip > div:nth-child(3) dd { color: oklch(76% 0.13 50); }
 .admin-shell .status-strip > div:nth-child(4) dd { color: var(--accent-warning); }
 .admin-shell .industrial-panel { border-color: var(--border-subtle); background: var(--surface-base); }
 .admin-shell .section-heading > svg { color: var(--accent-primary); }

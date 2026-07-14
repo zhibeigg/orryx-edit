@@ -7,26 +7,26 @@
   color-scheme: dark;
 
   /* Core surfaces: slightly steel-tinted neutrals, never pure black/white. */
-  --surface-canvas: oklch(16.5% 0.008 252);
-  --surface-base: oklch(20.5% 0.009 252);
-  --surface-raised: oklch(24.5% 0.011 252);
-  --surface-hover: oklch(28.5% 0.012 252);
-  --surface-active: oklch(32% 0.014 252);
-  --surface-input: oklch(13.5% 0.007 252);
+  --surface-canvas: oklch(15% 0.012 32);
+  --surface-base: oklch(19% 0.016 30);
+  --surface-raised: oklch(23% 0.022 29);
+  --surface-hover: oklch(27.5% 0.03 28);
+  --surface-active: oklch(32% 0.042 28);
+  --surface-input: oklch(12.5% 0.01 32);
 
-  --text-primary: oklch(93% 0.008 245);
-  --text-secondary: oklch(76% 0.012 245);
-  --text-muted: oklch(65% 0.012 245);
+  --text-primary: oklch(94% 0.024 82);
+  --text-secondary: oklch(79% 0.035 70);
+  --text-muted: oklch(66% 0.035 55);
 
-  --border-subtle: oklch(34% 0.012 252);
-  --border-strong: oklch(47% 0.014 252);
+  --border-subtle: oklch(33% 0.045 28);
+  --border-strong: oklch(47% 0.075 29);
 
-  --accent-primary: oklch(64% 0.12 238);
-  --accent-primary-strong: oklch(56% 0.125 238);
-  --accent-success: oklch(72% 0.11 155);
-  --accent-warning: oklch(78% 0.11 82);
-  --accent-danger: oklch(70% 0.13 25);
-  --focus-ring: oklch(78% 0.105 238);
+  --accent-primary: oklch(69% 0.205 42);
+  --accent-primary-strong: oklch(58% 0.205 29);
+  --accent-success: oklch(88% 0.075 88);
+  --accent-warning: oklch(78% 0.155 62);
+  --accent-danger: oklch(63% 0.22 28);
+  --focus-ring: oklch(84% 0.135 58);
 
   --industrial-bg: var(--surface-canvas);
   --industrial-surface: var(--surface-base);
@@ -72,8 +72,8 @@
   --motion-slow: 260ms;
 
   --elevation-0: none;
-  --elevation-1: 0 1px 2px oklch(6% 0.01 252 / 0.32);
-  --elevation-2: 0 8px 24px oklch(6% 0.01 252 / 0.34);
+  --elevation-1: 0 1px 2px oklch(6% 0.01 32 / 0.32);
+  --elevation-2: 0 8px 24px oklch(6% 0.01 32 / 0.34);
 
   --z-dropdown: 100;
   --z-sticky: 200;
@@ -86,8 +86,8 @@
   /* Compatibility aliases used by existing editor components. */
   --md-sys-color-primary: var(--accent-primary);
   --md-sys-color-on-primary: var(--text-primary);
-  --md-sys-color-primary-container: oklch(31% 0.06 238);
-  --md-sys-color-on-primary-container: oklch(90% 0.035 238);
+  --md-sys-color-primary-container: oklch(31% 0.06 42);
+  --md-sys-color-on-primary-container: oklch(90% 0.035 42);
   --md-sys-color-secondary: var(--text-secondary);
   --md-sys-color-on-secondary: var(--surface-canvas);
   --md-sys-color-secondary-container: var(--surface-hover);
