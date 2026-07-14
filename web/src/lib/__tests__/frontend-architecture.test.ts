@@ -58,6 +58,8 @@ describe("账户与连接表单语义", () => {
     expect(portalPage).toContain('<AccountAuthForm mode="login"')
     expect(portalPage).toContain('href="/register"')
     expect(portalPage).not.toContain("auth-mode-switch")
+    expect(portalPage).not.toContain("LegacyLicenseMigrationCard")
+    expect(portalPage).not.toContain("/api/license/info")
   })
 
   it("错误、提交和加载状态具有可访问语义", () => {

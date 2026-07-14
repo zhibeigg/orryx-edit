@@ -15,7 +15,7 @@ import {
   WalletCards,
 } from "lucide-react"
 import { AccountAuthForm } from "@/components/AccountAuthForm"
-import { ApiError, apiErrorMessage, apiRequest } from "@/lib/api-client"
+import { ApiError, apiErrorMessage } from "@/lib/api-client"
 import { workbenchPath } from "@/lib/app-route"
 import { resolveBillingOrders, resolveWalletLedger, workbenchApi, type BillingOrderHistory, type WalletLedgerEntry } from "@/lib/workbench-api"
 import {
@@ -26,16 +26,6 @@ import {
   type BillingSummary,
   type WorkspaceSummary,
 } from "@/lib/account-api"
-
-interface LegacyLicenseInfo {
-  license: string
-  owner: string
-  enabled: boolean
-  online: boolean
-  expiresAt: number
-  boundIps: string[]
-  remainingDays: number
-}
 
 function permanentAiEnabled(summary: BillingSummary | null) {
   if (!summary) return false
@@ -135,10 +125,7 @@ export function PortalPage() {
   if (!account) {
     return (
       <main id="main-content" className="portal-shell portal-shell--guest">
-        <div className="portal-guest-grid">
-          <AccountAccessCard onAuthenticated={() => void loadSession()} />
-          <LegacyLicenseMigrationCard />
-        </div>
+        <AccountAccessCard onAuthenticated={() => void loadSession()} />
         {error && <p className="status-message status-message--error portal-global-status" role="alert">{error}</p>}
       </main>
     )
@@ -364,54 +351,6 @@ function AccountConsole({
         </section>
       </section>
     </main>
-  )
-}
-
-function LegacyLicenseMigrationCard() {
-  const [license, setLicense] = useState("")
-  const [info, setInfo] = useState<LegacyLicenseInfo | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const lookup = async (event: FormEvent) => {
-    event.preventDefault()
-    setLoading(true)
-    setError(null)
-    setInfo(null)
-    try {
-      const result = await apiRequest<LegacyLicenseInfo>("/api/license/info", {
-        headers: { Authorization: `Bearer ${license.trim()}` },
-      })
-      setInfo(result)
-    } catch (cause) {
-      setError(apiErrorMessage(cause, "License 查询失败。"))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <section className="access-card migration-card" aria-labelledby="legacy-license-title">
-      <header className="access-header">
-        <div className="product-mark" aria-hidden="true"><KeyRound /></div>
-        <div><p className="eyebrow">LEGACY MIGRATION</p><h2 id="legacy-license-title">旧 License 门户</h2><p>仅用于迁移前核对，不会保存 License，也不能替代账户会话。</p></div>
-      </header>
-      <form className="industrial-form" onSubmit={(event) => void lookup(event)} aria-busy={loading}>
-        <div className="field-group">
-          <label htmlFor="legacy-license">License Key</label>
-          <input id="legacy-license" value={license} onChange={(event) => setLicense(event.target.value)} autoComplete="off" spellCheck={false} required minLength={8} />
-        </div>
-        {error && <p className="status-message status-message--error" role="alert">{error}</p>}
-        <button className="industrial-button industrial-button--quiet" type="submit" disabled={loading || license.trim().length < 8}>{loading ? "正在查询…" : "临时查看授权"}</button>
-      </form>
-      {info && (
-        <dl className="legacy-license-result">
-          <Detail icon={<KeyRound />} label="所有者">{info.owner || "未设置"}</Detail>
-          <Detail icon={<Server />} label="状态"><span className={info.enabled ? info.online ? "state-success" : "" : "state-danger"}>{!info.enabled ? "已禁用" : info.online ? "服务器在线" : "服务器离线"}</span></Detail>
-          <Detail icon={<BadgeCheck />} label="有效期">{info.expiresAt === 0 ? "永久有效" : `${Math.max(0, info.remainingDays)} 天`}</Detail>
-        </dl>
-      )}
-    </section>
   )
 }
 

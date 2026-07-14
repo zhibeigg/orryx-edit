@@ -70,5 +70,7 @@ test("Portal 登录表单保持键盘和移动端语义", async ({ page }) => {
   await page.getByLabel("邮箱").focus()
   await expect(page.getByLabel("邮箱")).toBeFocused()
   await expect(page.getByRole("link", { name: "创建 Orryx 账户" })).toHaveAttribute("href", "/register")
+  await expect(page.getByLabel("License Key")).toHaveCount(0)
+  await expect(page.getByText("旧 License 门户")).toHaveCount(0)
   await expectNoPageOverflow(page)
 })

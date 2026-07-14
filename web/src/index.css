@@ -671,12 +671,9 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .binding-panel .section-heading { margin: 0; }
 .binding-panel > .industrial-button { justify-self: start; }
 .portal-shell--guest { align-content: center; }
-.portal-guest-grid { width: min(100%, 980px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 18px; }
-.portal-access-card, .migration-card { width: 100%; }
-.migration-card .access-header { align-items: flex-start; }
-.migration-card h2 { margin: 2px 0 5px; color: var(--industrial-text); font-size: clamp(1.15rem, 3vw, 1.4rem); }
+.portal-access-card { width: min(100%, 460px); }
 .auth-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
-.portal-global-status { width: min(100%, 980px); box-sizing: border-box; margin-top: 14px; }
+.portal-global-status { width: min(100%, 460px); box-sizing: border-box; margin-top: 14px; }
 .portal-panel--wide { width: min(100%, 1120px); }
 .portal-header-actions { display: flex; gap: 8px; }
 .portal-section-status { margin-top: 16px; }
@@ -718,7 +715,6 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .portal-dense-table th { padding: 8px 9px; border-bottom: 1px solid var(--industrial-border); color: var(--industrial-muted); background: #111419; text-align: left; }
 .portal-dense-table td { max-width: 180px; padding: 9px; border-bottom: 1px solid #30353d; overflow-wrap: anywhere; vertical-align: top; }
 .portal-dense-table tr:last-child td { border-bottom: 0; }
-.legacy-license-result { display: grid; grid-template-columns: 1fr; gap: 1px; margin: 18px 0 0; border: 1px solid var(--industrial-border); background: var(--industrial-border); }
 .dialog-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 72%); }
 .confirm-dialog { width: min(100%, 440px); padding: 20px; }
 .confirm-dialog > p { color: var(--industrial-muted); line-height: 1.55; }
@@ -743,7 +739,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 760px) {
   .access-shell, .portal-shell { place-items: start center; padding: 14px; }
   .access-card, .portal-panel { padding: 18px; }
-  .portal-guest-grid, .portal-control-grid, .workspace-grid, .portal-billing-grid { grid-template-columns: 1fr; }
+  .portal-control-grid, .workspace-grid, .portal-billing-grid { grid-template-columns: 1fr; }
   .access-header { align-items: flex-start; }
   .page-heading, .portal-header { align-items: flex-start; flex-direction: column; }
   .page-heading > .industrial-button, .portal-header > .industrial-button { width: 100%; }

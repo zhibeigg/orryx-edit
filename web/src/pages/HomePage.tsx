@@ -186,7 +186,7 @@ export function HomePage() {
           <a href="/connect">连接页</a>
           <a href="https://o0vvjwgpeju.feishu.cn/wiki/Syzzw7aQwixJ4YkXoOAcyYkfnOg" target="_blank" rel="noreferrer">文档</a>
         </nav>
-        <p><Code2 aria-hidden="true" />Editor 0.9.9 · Protocol V1/V2</p>
+        <p><Code2 aria-hidden="true" />Editor 0.9.10 · Protocol V1/V2</p>
       </footer>
     </div>
   )
