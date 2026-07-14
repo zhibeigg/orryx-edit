@@ -99,6 +99,26 @@ class DraftServiceTest {
     }
 
     @Test
+    fun `restoring snapshot creates a new open draft without mutating snapshot`() = runTest {
+        val fixture = fixture()
+        val before = fixture.snapshots.get(fixture.snapshotId)
+        val restored = fixture.drafts.createDraft(
+            CreateDraftCommand(
+                accountId = "account-restore",
+                serverInstanceId = "server-1",
+                baseSnapshotId = fixture.snapshotId,
+                title = "Restore point",
+                createdAt = NOW.plusSeconds(10)
+            )
+        )
+
+        assertEquals(DraftStatus.OPEN, restored.status)
+        assertEquals(0, restored.currentVersion)
+        assertEquals(fixture.snapshotId, restored.baseSnapshotId)
+        assertEquals(before, fixture.snapshots.get(fixture.snapshotId))
+    }
+
+    @Test
     fun `postgres repository mappings remain loadable`() {
         assertEquals("PostgresDraftRepository", PostgresDraftRepository::class.simpleName)
         assertEquals("PostgresSnapshotRepository", com.orryx.editor.snapshot.PostgresSnapshotRepository::class.simpleName)

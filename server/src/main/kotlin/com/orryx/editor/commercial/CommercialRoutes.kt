@@ -2,8 +2,12 @@ package com.orryx.editor.commercial
 
 import com.orryx.editor.ai.AiJob
 import com.orryx.editor.ai.AiJobErrorCode
+import com.orryx.editor.ai.AiJobEvent
 import com.orryx.editor.ai.AiJobException
+import com.orryx.editor.ai.AiJobQuery
+import com.orryx.editor.ai.AiJobStatus
 import com.orryx.editor.ai.AiOperation
+import com.orryx.editor.ai.AiProviderCatalogEntry
 import com.orryx.editor.ai.AiProviderException
 import com.orryx.editor.ai.CreateAiJobCommand
 import com.orryx.editor.auth.Account
@@ -15,6 +19,8 @@ import com.orryx.editor.draft.CreateDraftCommand
 import com.orryx.editor.draft.Draft
 import com.orryx.editor.entitlement.EntitlementType
 import com.orryx.editor.payment.CreatePaymentCommand
+import com.orryx.editor.payment.PaymentOrder
+import com.orryx.editor.payment.PaymentOrderStatus
 import com.orryx.editor.payment.PaymentProviderType
 import com.orryx.editor.payment.PaymentSettlementOutcome
 import com.orryx.editor.payment.ProductId
@@ -25,6 +31,7 @@ import com.orryx.editor.release.PluginReleaseTransaction
 import com.orryx.editor.release.PublishReleaseCommand
 import com.orryx.editor.release.PublishReleaseResult
 import com.orryx.editor.release.ReleaseTransactionCoordinator
+import com.orryx.editor.release.ReleaseTransactionStatus
 import com.orryx.editor.release.ReleaseTransferToken
 import com.orryx.editor.release.SignedRelease
 import com.orryx.editor.security.constantTimeEquals
@@ -37,6 +44,7 @@ import com.orryx.editor.versioning.DraftFile
 import com.orryx.editor.versioning.DraftFileChangeType
 import com.orryx.editor.versioning.DraftVersionSource
 import com.orryx.editor.versioning.StoredDraftVersion
+import com.orryx.editor.wallet.WalletLedgerEntry
 import io.ktor.http.ContentType
 import io.ktor.http.Cookie
 import io.ktor.http.CookieEncoding
@@ -136,6 +144,18 @@ fun Route.commercialRoutes(
                     )
                 )
             }
+            get("/ledger") {
+                val account = call.requireAccount(services) ?: return@get
+                val limit = call.queryLimit() ?: return@get
+                call.respond(WalletLedgerResponse(services.wallets.ledger(account.id, limit).map(WalletLedgerEntry::toResponse)))
+            }
+            get("/orders") {
+                val account = call.requireAccount(services) ?: return@get
+                val limit = call.queryLimit() ?: return@get
+                val status = call.optionalEnumQuery<PaymentOrderStatus>("status") ?: if (call.request.queryParameters["status"] != null) return@get else null
+                val orders = services.paymentStore?.listOrders(account.id, status, limit).orEmpty()
+                call.respond(PaymentOrdersResponse(orders.map(PaymentOrder::toResponse)))
+            }
             post("/orders") {
                 val account = call.requireAccount(services, requireCsrf = true) ?: return@post
                 val payment = services.payment
@@ -168,6 +188,13 @@ fun Route.commercialRoutes(
                         status = created.order.status.name
                     )
                 )
+            }
+        }
+
+        if (services.features.aiWorkbenchEnabled && services.aiProviders != null) {
+            get("/ai/providers") {
+                call.requireAccount(services) ?: return@get
+                call.respond(AiProvidersResponse(services.aiProviders.listEnabled().map(AiProviderCatalogEntry::toPublicResponse)))
             }
         }
 
@@ -261,6 +288,35 @@ private fun Route.cloudDraftRoutes(services: CommercialServices) {
                 call.respond(draft.toResponse())
             }
         }
+        get("/{draftId}/versions") {
+            val account = call.requireAccount(services) ?: return@get
+            val draftId = call.requiredUuidParameter("draftId")?.let(UUID::fromString) ?: return@get
+            val draft = drafts.get(draftId)
+            if (draft == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("DRAFT_NOT_FOUND", "草稿不存在"))
+                return@get
+            }
+            if (draft.accountId != account.id) return@get call.forbid()
+            val limit = call.queryLimit() ?: return@get
+            call.respond(DraftVersionsResponse(drafts.listVersions(draftId, limit).map(StoredDraftVersion::toResponse)))
+        }
+        get("/{draftId}/versions/{versionId}") {
+            val account = call.requireAccount(services) ?: return@get
+            val draftId = call.requiredUuidParameter("draftId")?.let(UUID::fromString) ?: return@get
+            val versionId = call.requiredUuidParameter("versionId")?.let(UUID::fromString) ?: return@get
+            val draft = drafts.get(draftId)
+            if (draft == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("DRAFT_NOT_FOUND", "草稿不存在"))
+                return@get
+            }
+            if (draft.accountId != account.id) return@get call.forbid()
+            val version = drafts.getVersion(versionId)
+            if (version == null || version.version.draftId != draftId) {
+                call.respond(HttpStatusCode.NotFound, ApiError("DRAFT_VERSION_NOT_FOUND", "草稿版本不存在"))
+            } else {
+                call.respond(version.toResponse())
+            }
+        }
         post("/{draftId}/versions") {
             val account = call.requireAccount(services, requireCsrf = true) ?: return@post
             val draftId = call.requiredUuidParameter("draftId")?.let(UUID::fromString) ?: return@post
@@ -292,6 +348,91 @@ private fun Route.cloudDraftRoutes(services: CommercialServices) {
             }
         }
     }
+
+    route("/server-instances/{instanceId}/history") {
+        get {
+            val account = call.requireAccount(services) ?: return@get
+            val instanceId = call.requiredUuidParameter("instanceId") ?: return@get
+            if (!services.claims.canAccessServer(account.id, instanceId)) return@get call.forbid()
+            val limit = call.queryLimit() ?: return@get
+            val fetchLimit = 100
+            val items = mutableListOf<ServerHistoryItemResponse>()
+            snapshots.list(instanceId, fetchLimit).forEach { snapshot ->
+                items += ServerHistoryItemResponse(
+                    type = "SNAPSHOT",
+                    id = snapshot.id.toString(),
+                    serverInstanceId = snapshot.serverInstanceId,
+                    createdAt = snapshot.createdAt.toString(),
+                    manifestRevision = snapshot.manifestRevision,
+                    source = snapshot.source.name
+                )
+            }
+            services.releases?.repository?.let { repository ->
+                repository.listReleases(account.id, instanceId, null, fetchLimit).forEach { release ->
+                    items += ServerHistoryItemResponse(
+                        type = "RELEASE",
+                        id = release.id.toString(),
+                        serverInstanceId = release.serverInstanceId,
+                        createdAt = release.createdAt.toString(),
+                        manifestRevision = release.targetManifestRevision,
+                        draftId = release.draftId.toString(),
+                        releaseId = release.id.toString()
+                    )
+                }
+                repository.listTransactions(account.id, instanceId, null, fetchLimit).forEach { transaction ->
+                    items += ServerHistoryItemResponse(
+                        type = "RELEASE_TRANSACTION",
+                        id = transaction.id.toString(),
+                        serverInstanceId = transaction.serverInstanceId,
+                        createdAt = transaction.createdAt.toString(),
+                        status = transaction.status.name,
+                        releaseId = transaction.releaseId.toString(),
+                        transactionId = transaction.id.toString()
+                    )
+                }
+            }
+            call.respond(
+                ServerHistoryResponse(
+                    items.sortedWith(
+                        compareByDescending<ServerHistoryItemResponse> { Instant.parse(it.createdAt) }
+                            .thenByDescending { it.id }
+                    ).take(limit)
+                )
+            )
+        }
+        post("/{historyId}/restore") {
+            val account = call.requireAccount(services, requireCsrf = true) ?: return@post
+            val instanceId = call.requiredUuidParameter("instanceId") ?: return@post
+            val historyId = call.requiredUuidParameter("historyId")?.let(UUID::fromString) ?: return@post
+            if (!services.claims.canAccessServer(account.id, instanceId)) return@post call.forbid()
+            val input = call.receive<RestoreSnapshotInput>()
+            require(input.title.isNotBlank()) { "title 不能为空" }
+            val directSnapshot = snapshots.get(historyId)?.takeIf { it.serverInstanceId == instanceId }
+            val snapshot = directSnapshot ?: run {
+                val releaseRepository = services.releases?.repository
+                val release = releaseRepository?.findRelease(historyId)?.takeIf {
+                    it.accountId == account.id && it.serverInstanceId == instanceId
+                }
+                if (release == null) {
+                    call.respond(HttpStatusCode.NotFound, ApiError("HISTORY_NOT_FOUND", "历史记录不存在"))
+                    return@post
+                }
+                val releaseFiles = releaseRepository.listFiles(release.id)
+                snapshots.createSnapshot(
+                    CreateSnapshotCommand(
+                        serverInstanceId = instanceId,
+                        files = releaseFiles.map { file ->
+                            SnapshotFile(file.path, file.contentRevision, file.size, file.content)
+                        },
+                        source = SnapshotSource.RELEASE,
+                        expectedManifestRevision = release.targetManifestRevision
+                    )
+                )
+            }
+            val draft = drafts.createDraft(CreateDraftCommand(account.id, instanceId, snapshot.id, input.title))
+            call.respond(HttpStatusCode.Created, draft.toResponse())
+        }
+    }
 }
 
 private fun Route.releaseRoutes(
@@ -302,6 +443,25 @@ private fun Route.releaseRoutes(
     val drafts = checkNotNull(services.drafts)
 
     route("/releases") {
+        get {
+            val account = call.requireAccount(services) ?: return@get
+            val limit = call.queryLimit() ?: return@get
+            val serverInstanceId = call.optionalUuidQuery("serverInstanceId") ?: if (call.request.queryParameters["serverInstanceId"] != null) return@get else null
+            val draftId = call.optionalUuidQuery("draftId")?.let(UUID::fromString)
+                ?: if (call.request.queryParameters["draftId"] != null) return@get else null
+            if (serverInstanceId != null && call.requireServerPermission(
+                    services,
+                    account,
+                    serverInstanceId,
+                    CommercialPermission.RELEASE_READ
+                ) == null
+            ) return@get
+            call.respond(
+                ReleasesResponse(
+                    releases.repository.listReleases(account.id, serverInstanceId, draftId, limit).map(SignedRelease::toResponse)
+                )
+            )
+        }
         post {
             val account = call.requireAccount(services, requireCsrf = true) ?: return@post
             val idempotencyKey = call.request.headers["Idempotency-Key"]
@@ -602,6 +762,32 @@ private fun Route.aiJobRoutes(services: CommercialServices) {
     val jobs = checkNotNull(services.aiJobs)
     val repository = checkNotNull(services.aiJobRepository)
     route("/ai/jobs") {
+        get {
+            val account = call.requireAccount(services) ?: return@get
+            val limit = call.queryLimit() ?: return@get
+            val serverInstanceId = call.optionalUuidQuery("serverInstanceId")?.let(UUID::fromString)
+                ?: if (call.request.queryParameters["serverInstanceId"] != null) return@get else null
+            val draftId = call.optionalUuidQuery("draftId")?.let(UUID::fromString)
+                ?: if (call.request.queryParameters["draftId"] != null) return@get else null
+            val status = call.optionalEnumQuery<AiJobStatus>("status")
+                ?: if (call.request.queryParameters["status"] != null) return@get else null
+            if (serverInstanceId != null && !services.claims.canAccessServer(account.id, serverInstanceId.toString())) {
+                return@get call.forbid()
+            }
+            call.respond(
+                AiJobsResponse(
+                    repository.list(
+                        AiJobQuery(
+                            accountId = UUID.fromString(account.id),
+                            serverInstanceId = serverInstanceId,
+                            draftId = draftId,
+                            status = status,
+                            limit = limit
+                        )
+                    ).map(AiJob::toResponse)
+                )
+            )
+        }
         post {
             val account = call.requireAccount(services, requireCsrf = true) ?: return@post
             val input = call.receive<CreateAiJobInput>()
@@ -630,7 +816,7 @@ private fun Route.aiJobRoutes(services: CommercialServices) {
                         operation = AiOperation.valueOf(input.operation),
                         prompt = input.prompt,
                         providerId = input.providerId,
-                        model = input.model,
+                        model = input.model.orEmpty(),
                         idempotencyKey = input.idempotencyKey
                     )
                 )
@@ -650,10 +836,54 @@ private fun Route.aiJobRoutes(services: CommercialServices) {
             val job = repository.find(jobId)
             if (job == null) {
                 call.respond(HttpStatusCode.NotFound, ApiError("AI_JOB_NOT_FOUND", "AI 任务不存在"))
-            } else if (job.accountId.toString() != account.id) {
+            } else if (job.accountId.toString() != account.id ||
+                !services.claims.canAccessServer(account.id, job.serverInstanceId.toString())
+            ) {
                 call.forbid()
             } else {
                 call.respond(job.toResponse())
+            }
+        }
+        get("/{jobId}/events") {
+            val account = call.requireAccount(services) ?: return@get
+            val jobId = call.requiredUuidParameter("jobId")?.let(UUID::fromString) ?: return@get
+            val job = repository.find(jobId)
+            if (job == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("AI_JOB_NOT_FOUND", "AI 任务不存在"))
+                return@get
+            }
+            if (job.accountId.toString() != account.id ||
+                !services.claims.canAccessServer(account.id, job.serverInstanceId.toString())
+            ) return@get call.forbid()
+            val afterSeq = call.request.queryParameters["afterSeq"]?.toLongOrNull() ?: 0L
+            if (afterSeq < 0) {
+                call.respond(HttpStatusCode.BadRequest, ApiError("INVALID_AFTER_SEQ", "afterSeq 无效"))
+                return@get
+            }
+            val limit = call.queryLimit() ?: return@get
+            call.respond(AiJobEventsResponse(repository.listEvents(jobId, afterSeq, limit).map(AiJobEvent::toResponse)))
+        }
+        post("/{jobId}/cancel") {
+            val account = call.requireAccount(services, requireCsrf = true) ?: return@post
+            val jobId = call.requiredUuidParameter("jobId")?.let(UUID::fromString) ?: return@post
+            val job = repository.find(jobId)
+            if (job == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("AI_JOB_NOT_FOUND", "AI 任务不存在"))
+                return@post
+            }
+            if (job.accountId.toString() != account.id ||
+                !services.claims.canAccessServer(account.id, job.serverInstanceId.toString())
+            ) return@post call.forbid()
+            val canceled = try {
+                jobs.cancel(jobId)
+            } catch (failure: AiJobException) {
+                call.respond(HttpStatusCode.Conflict, ApiError(failure.code, "AI 任务当前状态不可取消"))
+                return@post
+            }
+            if (canceled == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("AI_JOB_NOT_FOUND", "AI 任务不存在"))
+            } else {
+                call.respond(canceled.toResponse())
             }
         }
     }
@@ -737,6 +967,27 @@ private suspend fun ApplicationCall.requiredUuidParameter(name: String): String?
     return normalized
 }
 
+private suspend fun ApplicationCall.optionalUuidQuery(name: String): String? {
+    val raw = request.queryParameters[name] ?: return null
+    val normalized = runCatching { UUID.fromString(raw).toString() }.getOrNull()
+    if (normalized == null) respond(HttpStatusCode.BadRequest, ApiError("INVALID_QUERY", "$name 无效"))
+    return normalized
+}
+
+private suspend inline fun <reified T : Enum<T>> ApplicationCall.optionalEnumQuery(name: String): T? {
+    val raw = request.queryParameters[name] ?: return null
+    val value = enumValues<T>().firstOrNull { it.name == raw.uppercase() }
+    if (value == null) respond(HttpStatusCode.BadRequest, ApiError("INVALID_QUERY", "$name 无效"))
+    return value
+}
+
+private suspend fun ApplicationCall.queryLimit(): Int? {
+    val raw = request.queryParameters["limit"] ?: return 100
+    val limit = raw.toIntOrNull()?.takeIf { it in 1..100 }
+    if (limit == null) respond(HttpStatusCode.BadRequest, ApiError("INVALID_LIMIT", "limit 必须在 1..100 范围内"))
+    return limit
+}
+
 private fun buildPaymentUrl(gateway: String, fields: Map<String, String>): String = buildString {
     append(gateway)
     append(if ('?' in gateway) '&' else '?')
@@ -781,6 +1032,20 @@ private fun AiJob.toResponse() = AiJobResponse(
     operation.name, prompt, providerId, model, runnerResult, usage?.let { UsageResponse(it.inputTokens, it.outputTokens, it.cachedInputTokens, it.totalTokens) },
     costAmount, errorCode, errorMessage, createdAt.toString(), updatedAt.toString(), startedAt?.toString(), finishedAt?.toString()
 )
+private fun AiJobEvent.toResponse() = AiJobEventResponse(jobId.toString(), seq, eventType, payload, createdAt.toString())
+private fun AiProviderCatalogEntry.toPublicResponse() = AiProviderResponse(
+    id = providerId,
+    displayName = displayName,
+    defaultModel = defaultModel,
+    models = models.map { it.id }
+)
+private fun WalletLedgerEntry.toResponse() = WalletLedgerEntryResponse(
+    id, operationType.name, giftDeltaCents, cashDeltaCents, giftBalanceCents, cashBalanceCents, description, createdAt.toString()
+)
+private fun PaymentOrder.toResponse() = PaymentOrderResponse(
+    id, merchantOrderNo, productId.name, provider.name, amountCents, giftCents, status.name,
+    providerTransactionId, createdAt.toString(), paidAt?.toString()
+)
 
 @Serializable private data class RegisterInput(val email: String, val password: String, val displayName: String)
 @Serializable private data class LoginInput(val email: String, val password: String)
@@ -795,6 +1060,37 @@ private fun AiJob.toResponse() = AiJobResponse(
 @Serializable private data class EntitlementResponse(val type: String, val grantedAt: String)
 @Serializable private data class WalletResponse(val cashCents: Long, val giftCents: Long, val availableCents: Long)
 @Serializable private data class BillingOrderResponse(val payUrl: String, val orderId: String, val status: String)
+@Serializable private data class WalletLedgerResponse(val entries: List<WalletLedgerEntryResponse>)
+@Serializable private data class WalletLedgerEntryResponse(
+    val id: String,
+    val operationType: String,
+    val giftDeltaCents: Long,
+    val cashDeltaCents: Long,
+    val giftBalanceCents: Long,
+    val cashBalanceCents: Long,
+    val description: String,
+    val createdAt: String
+)
+@Serializable private data class PaymentOrdersResponse(val orders: List<PaymentOrderResponse>)
+@Serializable private data class PaymentOrderResponse(
+    val id: String,
+    val merchantOrderNo: String,
+    val productId: String,
+    val provider: String,
+    val amountCents: Long,
+    val giftCents: Long,
+    val status: String,
+    val providerTransactionId: String?,
+    val createdAt: String,
+    val paidAt: String?
+)
+@Serializable private data class AiProvidersResponse(val providers: List<AiProviderResponse>)
+@Serializable private data class AiProviderResponse(
+    val id: String,
+    val displayName: String,
+    val defaultModel: String,
+    val models: List<String>
+)
 
 @Serializable private data class CreateSnapshotInput(val files: List<SnapshotFileInput>, val expectedManifestRevision: String? = null)
 @Serializable private data class SnapshotFileInput(val path: String, val content: String, val revision: String? = null)
@@ -806,8 +1102,23 @@ private fun AiJob.toResponse() = AiJobResponse(
 @Serializable private data class DraftFileInput(val changeType: String, val path: String, val baseRevision: String? = null, val content: String? = null)
 @Serializable private data class DraftsResponse(val drafts: List<DraftResponse>)
 @Serializable private data class DraftResponse(val id: String, val accountId: String, val serverInstanceId: String, val baseSnapshotId: String, val title: String, val status: String, val currentVersion: Long, val createdAt: String, val updatedAt: String)
+@Serializable private data class DraftVersionsResponse(val versions: List<DraftVersionResponse>)
 @Serializable private data class DraftVersionResponse(val id: String, val draftId: String, val versionNumber: Long, val source: String, val manifestRevision: String, val createdAt: String, val files: List<DraftFileResponse>)
 @Serializable private data class DraftFileResponse(val changeType: String, val path: String, val baseRevision: String?, val contentRevision: String?, val size: Long, val content: String?)
+@Serializable private data class RestoreSnapshotInput(val title: String)
+@Serializable private data class ServerHistoryResponse(val items: List<ServerHistoryItemResponse>)
+@Serializable private data class ServerHistoryItemResponse(
+    val type: String,
+    val id: String,
+    val serverInstanceId: String,
+    val createdAt: String,
+    val status: String? = null,
+    val manifestRevision: String? = null,
+    val source: String? = null,
+    val draftId: String? = null,
+    val releaseId: String? = null,
+    val transactionId: String? = null
+)
 
 @Serializable private data class PublishReleaseInput(
     val serverInstanceId: String,
@@ -822,6 +1133,7 @@ private fun AiJob.toResponse() = AiJobResponse(
     val transaction: ReleaseTransactionResponse,
     val replayed: Boolean
 )
+@Serializable private data class ReleasesResponse(val releases: List<SignedReleaseResponse>)
 @Serializable private data class SignedReleaseResponse(
     val id: String,
     val serverInstanceId: String,
@@ -878,8 +1190,17 @@ private fun AiJob.toResponse() = AiJobResponse(
     val operation: String,
     val prompt: String,
     val providerId: String,
-    val model: String,
+    val model: String? = null,
     val idempotencyKey: String
+)
+@Serializable private data class AiJobsResponse(val jobs: List<AiJobResponse>)
+@Serializable private data class AiJobEventsResponse(val events: List<AiJobEventResponse>)
+@Serializable private data class AiJobEventResponse(
+    val jobId: String,
+    val seq: Long,
+    val eventType: String,
+    val payload: JsonElement,
+    val createdAt: String
 )
 @Serializable private data class UsageResponse(val inputTokens: Long, val outputTokens: Long, val cachedInputTokens: Long, val totalTokens: Long)
 @Serializable private data class AiJobResponse(

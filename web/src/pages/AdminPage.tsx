@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Ban, Check, Clock, Copy, Key, Plus, RefreshCw, RotateCcw, Shield } from "lucide-react"
+import { CommercialOperations } from "@/features/admin/CommercialOperations"
 import { KetherDocsCard } from "@/features/admin/KetherDocsCard"
+import { ProviderManagement } from "@/features/admin/ProviderManagement"
 import { UpdateCard } from "@/features/admin/UpdateCard"
 import { apiFetch } from "@/lib/api-client"
 
@@ -159,6 +161,8 @@ export function AdminPage() {
 
         <KetherDocsCard adminKey={adminKey} />
         <UpdateCard adminKey={adminKey} />
+        <ProviderManagement adminKey={adminKey} />
+        <CommercialOperations adminKey={adminKey} />
 
         <section className="industrial-panel license-section" aria-labelledby="license-list-title">
           <div className="section-heading"><Key aria-hidden="true" /><div><h2 id="license-list-title">License 列表</h2><p>共 {licenses.length} 条授权记录。</p></div></div>

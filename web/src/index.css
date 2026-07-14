@@ -646,7 +646,19 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .server-instance-list svg { width: 16px; height: 16px; color: #8fc7ed; }
 .server-instance-list strong, .server-instance-list code { display: block; }
 .server-instance-list strong { margin-bottom: 2px; font-size: 0.8rem; }
-.server-instance-list li > span { color: var(--industrial-muted); font-size: 0.7rem; text-align: right; }
+.server-instance-list li > div > span { display: block; margin-top: 4px; color: var(--industrial-muted); font-size: 0.7rem; }
+.server-workbench-link { min-height: 34px; padding: 6px 9px; white-space: nowrap; text-decoration: none; }
+.portal-billing-section { margin-top: 18px; padding: 18px; border: 1px solid var(--industrial-border); border-radius: 2px; background: #14171c; }
+.portal-billing-section > .section-heading { margin-bottom: 14px; }
+.portal-billing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.portal-billing-grid > div { min-width: 0; border: 1px solid var(--industrial-border); background: var(--industrial-surface-raised); }
+.portal-billing-grid h3 { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--industrial-border); font-size: 0.78rem; }
+.portal-billing-grid .empty-copy { padding: 12px; }
+.portal-dense-table { overflow-x: auto; }
+.portal-dense-table table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+.portal-dense-table th { padding: 8px 9px; border-bottom: 1px solid var(--industrial-border); color: var(--industrial-muted); background: #111419; text-align: left; }
+.portal-dense-table td { max-width: 180px; padding: 9px; border-bottom: 1px solid #30353d; overflow-wrap: anywhere; vertical-align: top; }
+.portal-dense-table tr:last-child td { border-bottom: 0; }
 .legacy-license-result { display: grid; grid-template-columns: 1fr; gap: 1px; margin: 18px 0 0; border: 1px solid var(--industrial-border); background: var(--industrial-border); }
 .dialog-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 72%); }
 .confirm-dialog { width: min(100%, 440px); padding: 20px; }
@@ -672,7 +684,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 760px) {
   .access-shell, .portal-shell { place-items: start center; padding: 14px; }
   .access-card, .portal-panel { padding: 18px; }
-  .portal-guest-grid, .portal-control-grid, .workspace-grid { grid-template-columns: 1fr; }
+  .portal-guest-grid, .portal-control-grid, .workspace-grid, .portal-billing-grid { grid-template-columns: 1fr; }
   .access-header { align-items: flex-start; }
   .page-heading, .portal-header { align-items: flex-start; flex-direction: column; }
   .page-heading > .industrial-button, .portal-header > .industrial-button { width: 100%; }
@@ -680,7 +692,14 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .account-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .purchase-panel .industrial-button { width: 100%; }
   .server-instance-list li { grid-template-columns: auto minmax(0, 1fr); }
-  .server-instance-list li > span { grid-column: 2; text-align: left; }
+  .server-workbench-link { grid-column: 1 / -1; width: 100%; min-height: 44px; }
+  .portal-dense-table { overflow: visible; }
+  .portal-dense-table thead { display: none; }
+  .portal-dense-table table, .portal-dense-table tbody, .portal-dense-table tr, .portal-dense-table td { display: block; }
+  .portal-dense-table tr { border-bottom: 1px solid var(--industrial-border); }
+  .portal-dense-table tr:last-child { border-bottom: 0; }
+  .portal-dense-table td { display: grid; grid-template-columns: 82px minmax(0, 1fr); max-width: none; border-bottom: 1px solid #30353d; }
+  .portal-dense-table td::before { content: attr(data-label); color: var(--industrial-muted); }
   .admin-main { width: min(100% - 24px, 1180px); padding-top: 20px; }
   .status-strip { grid-template-columns: repeat(2, 1fr); }
   .status-strip > div:nth-child(2) { border-right: 0; }

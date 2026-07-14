@@ -59,6 +59,11 @@ class InMemoryWalletStore : WalletStore {
     override suspend fun ledger(accountId: String, limit: Int): List<WalletLedgerEntry> = mutex.withLock {
         entries.asReversed().filter { it.accountId == accountId }.take(limit)
     }
+
+    override suspend fun listWallets(limit: Int): List<WalletBalance> = mutex.withLock {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        balances.values.sortedBy(WalletBalance::accountId).take(limit)
+    }
 }
 
 internal fun calculateDeltas(

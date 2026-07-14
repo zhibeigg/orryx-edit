@@ -7,6 +7,7 @@ interface WalletStore {
     suspend fun apply(command: WalletMutationCommand, entryId: String, now: java.time.Instant): WalletMutationResult
     suspend fun balance(accountId: String): WalletBalance
     suspend fun ledger(accountId: String, limit: Int): List<WalletLedgerEntry>
+    suspend fun listWallets(limit: Int): List<WalletBalance>
 }
 
 class WalletService(
@@ -45,8 +46,13 @@ class WalletService(
     suspend fun balance(accountId: String): WalletBalance = store.balance(UUID.fromString(accountId).toString())
 
     suspend fun ledger(accountId: String, limit: Int = 100): List<WalletLedgerEntry> {
-        require(limit in 1..500) { "limit must be between 1 and 500" }
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
         return store.ledger(UUID.fromString(accountId).toString(), limit)
+    }
+
+    suspend fun listWallets(limit: Int = 100): List<WalletBalance> {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        return store.listWallets(limit)
     }
 
     private suspend fun apply(

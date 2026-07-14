@@ -118,6 +118,15 @@ class PostgresWalletStore(private val database: R2dbcDatabase) : WalletStore {
             ) { row, _ -> row.toWalletEntry() }
         }
 
+    override suspend fun listWallets(limit: Int): List<WalletBalance> = database.withConnection { connection ->
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        queryAll(
+            connection.createStatement(
+                "SELECT * FROM commercial_wallets ORDER BY updated_at DESC, account_id LIMIT $1"
+            ).bind(0, limit)
+        ) { row, _ -> row.toBalance() }
+    }
+
     private suspend fun lockBalance(connection: Connection, accountId: String): WalletBalance = queryOne(
         connection.createStatement("SELECT * FROM commercial_wallets WHERE account_id = $1 FOR UPDATE")
             .bind(0, UUID.fromString(accountId))

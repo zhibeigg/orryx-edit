@@ -2,6 +2,9 @@ package com.orryx.editor.ai
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -9,6 +12,8 @@ import java.util.UUID
 class InMemoryAiJobRepository : AiJobRepository {
     private val mutex = Mutex()
     private val jobs = linkedMapOf<UUID, AiJob>()
+    private val events = mutableMapOf<UUID, MutableList<AiJobEvent>>()
+    private val eventsByKey = mutableMapOf<Pair<UUID, String>, AiJobEvent>()
 
     override suspend fun create(command: CreateAiJobCommand): AiJob {
         validateCreateAiJobCommand(command)
@@ -34,11 +39,38 @@ class InMemoryAiJobRepository : AiJobRepository {
                 idempotencyKey = command.idempotencyKey,
                 createdAt = command.now,
                 updatedAt = command.now
-            ).also { jobs[it.id] = it }
+            ).also {
+                jobs[it.id] = it
+                appendEventLocked(
+                    AppendAiJobEventCommand(
+                        it.id,
+                        "SUBMITTED",
+                        "submitted",
+                        buildJsonObject {
+                            put("status", AiJobStatus.QUEUED.name)
+                            put("operation", it.operation.name)
+                            put("providerId", it.providerId)
+                            put("model", it.model)
+                        },
+                        command.now
+                    )
+                )
+            }
         }
     }
 
     override suspend fun find(id: UUID): AiJob? = mutex.withLock { jobs[id] }
+
+    override suspend fun list(query: AiJobQuery): List<AiJob> = mutex.withLock {
+        jobs.values.asSequence()
+            .filter { query.accountId == null || it.accountId == query.accountId }
+            .filter { query.serverInstanceId == null || it.serverInstanceId == query.serverInstanceId }
+            .filter { query.draftId == null || it.draftId == query.draftId }
+            .filter { query.status == null || it.status == query.status }
+            .sortedWith(compareByDescending<AiJob> { it.createdAt }.thenByDescending { it.id })
+            .take(query.limit)
+            .toList()
+    }
 
     override suspend fun findByIdempotency(accountId: UUID, idempotencyKey: String): AiJob? = mutex.withLock {
         jobs.values.firstOrNull { it.accountId == accountId && it.idempotencyKey == idempotencyKey }
@@ -68,6 +100,25 @@ class InMemoryAiJobRepository : AiJobRepository {
                 errorMessage = null
             )
             jobs[current.id] = claimed
+            val eventKey = "claim:${now.toEpochMilli()}"
+            appendEventLocked(
+                AppendAiJobEventCommand(
+                    current.id,
+                    "CLAIMED",
+                    eventKey,
+                    buildJsonObject { put("leaseExpiresAt", expiresAt.toString()) },
+                    now
+                )
+            )
+            appendEventLocked(
+                AppendAiJobEventCommand(
+                    current.id,
+                    "RUNNING",
+                    "running:${now.toEpochMilli()}",
+                    buildJsonObject { put("status", AiJobStatus.RUNNING.name) },
+                    now
+                )
+            )
             AiJobLease(claimed, owner, expiresAt)
         }
     }
@@ -95,6 +146,18 @@ class InMemoryAiJobRepository : AiJobRepository {
         now: Instant
     ): AiJob = updateRunning(jobId, owner, now) { current ->
         check(current.usage != null && current.costAmount != null) { "成功前必须记录 usage/cost" }
+        appendEventLocked(
+            AppendAiJobEventCommand(
+                jobId,
+                "SUCCEEDED",
+                "succeeded",
+                buildJsonObject {
+                    put("status", AiJobStatus.SUCCEEDED.name)
+                    put("costAmount", current.costAmount)
+                },
+                now
+            )
+        )
         current.copy(
             status = AiJobStatus.SUCCEEDED,
             leaseOwner = null,
@@ -113,6 +176,18 @@ class InMemoryAiJobRepository : AiJobRepository {
         errorMessage: String?,
         now: Instant
     ): AiJob = updateRunning(jobId, owner, now) { current ->
+        appendEventLocked(
+            AppendAiJobEventCommand(
+                jobId,
+                "FAILED",
+                "failed",
+                buildJsonObject {
+                    put("status", AiJobStatus.FAILED.name)
+                    put("errorCode", errorCode)
+                },
+                now
+            )
+        )
         current.copy(
             status = AiJobStatus.FAILED,
             leaseOwner = null,
@@ -125,6 +200,15 @@ class InMemoryAiJobRepository : AiJobRepository {
     }
 
     override suspend fun requeue(jobId: UUID, owner: String, now: Instant): AiJob = updateRunning(jobId, owner, now) { current ->
+        appendEventLocked(
+            AppendAiJobEventCommand(
+                jobId,
+                "REQUEUED",
+                "requeued:${now.toEpochMilli()}",
+                buildJsonObject { put("status", AiJobStatus.QUEUED.name) },
+                now
+            )
+        )
         current.copy(
             status = AiJobStatus.QUEUED,
             leaseOwner = null,
@@ -143,10 +227,52 @@ class InMemoryAiJobRepository : AiJobRepository {
                 leaseExpiresAt = null,
                 updatedAt = now,
                 finishedAt = now
-            ).also { jobs[jobId] = it }
+            ).also {
+                jobs[jobId] = it
+                appendEventLocked(
+                    AppendAiJobEventCommand(
+                        jobId,
+                        "CANCELED",
+                        "canceled",
+                        buildJsonObject { put("status", AiJobStatus.CANCELED.name) },
+                        now
+                    )
+                )
+            }
             AiJobStatus.CANCELED -> current
             AiJobStatus.SUCCEEDED, AiJobStatus.FAILED -> throw AiJobException(AiJobErrorCode.INVALID_STATE)
         }
+    }
+
+    override suspend fun appendEvent(command: AppendAiJobEventCommand): AiJobEvent? = mutex.withLock {
+        appendEventLocked(command)
+    }
+
+    override suspend fun listEvents(jobId: UUID, afterSeq: Long, limit: Int): List<AiJobEvent> = mutex.withLock {
+        require(afterSeq >= 0) { "afterSeq 不能为负数" }
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        events[jobId].orEmpty().asSequence()
+            .filter { it.seq > afterSeq }
+            .take(limit)
+            .toList()
+    }
+
+    private fun appendEventLocked(command: AppendAiJobEventCommand): AiJobEvent? {
+        if (command.jobId !in jobs) return null
+        val key = command.jobId to command.eventKey
+        eventsByKey[key]?.let { return it }
+        val payload = safeAiEventPayload(command.eventKey, command.payload)
+        val jobEvents = events.getOrPut(command.jobId) { mutableListOf() }
+        val event = AiJobEvent(
+            jobId = command.jobId,
+            seq = (jobEvents.lastOrNull()?.seq ?: 0) + 1,
+            eventType = command.eventType,
+            payload = payload,
+            createdAt = command.createdAt
+        )
+        jobEvents += event
+        eventsByKey[key] = event
+        return event
     }
 
     private suspend fun updateRunning(

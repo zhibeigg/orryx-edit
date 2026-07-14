@@ -46,6 +46,65 @@ class PostgresReleaseRepository(
     override suspend fun findTransaction(serverInstanceId: String, idempotencyKey: String): PluginReleaseTransaction? =
         database.withConnection { findTransaction(it, serverInstanceId, idempotencyKey, false) }
 
+    override suspend fun listReleases(
+        accountId: String?,
+        serverInstanceId: String?,
+        draftId: UUID?,
+        limit: Int
+    ): List<SignedRelease> = database.withConnection { connection ->
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        val conditions = mutableListOf<String>()
+        val values = mutableListOf<Any>()
+        fun add(column: String, value: Any?) {
+            if (value != null) {
+                values += value
+                conditions += "$column = \$${values.size}"
+            }
+        }
+        add("account_id", accountId?.let(UUID::fromString))
+        add("server_instance_id", serverInstanceId?.let(UUID::fromString))
+        add("draft_id", draftId)
+        val sql = buildString {
+            append("SELECT * FROM commercial_releases")
+            if (conditions.isNotEmpty()) append(" WHERE ").append(conditions.joinToString(" AND "))
+            append(" ORDER BY created_at DESC, release_id DESC LIMIT $").append(values.size + 1)
+        }
+        var statement = connection.createStatement(sql)
+        values.forEachIndexed { index, value -> statement = statement.bind(index, value) }
+        statement = statement.bind(values.size, limit)
+        queryAll(statement) { row, _ -> row.toRelease() }
+    }
+
+    override suspend fun listTransactions(
+        accountId: String?,
+        serverInstanceId: String?,
+        status: ReleaseTransactionStatus?,
+        limit: Int
+    ): List<PluginReleaseTransaction> = database.withConnection { connection ->
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        val conditions = mutableListOf<String>()
+        val values = mutableListOf<Any>()
+        fun add(column: String, value: Any?) {
+            if (value != null) {
+                values += value
+                conditions += "$column = \$${values.size}"
+            }
+        }
+        add("r.account_id", accountId?.let(UUID::fromString))
+        add("t.server_instance_id", serverInstanceId?.let(UUID::fromString))
+        add("t.status", status?.name)
+        val sql = buildString {
+            append("SELECT t.* FROM commercial_plugin_release_transactions t ")
+            append("JOIN commercial_releases r ON r.release_id = t.release_id")
+            if (conditions.isNotEmpty()) append(" WHERE ").append(conditions.joinToString(" AND "))
+            append(" ORDER BY t.created_at DESC, t.transaction_id DESC LIMIT $").append(values.size + 1)
+        }
+        var statement = connection.createStatement(sql)
+        values.forEachIndexed { index, value -> statement = statement.bind(index, value) }
+        statement = statement.bind(values.size, limit)
+        queryAll(statement) { row, _ -> row.toTransaction() }
+    }
+
     override suspend fun listFiles(releaseId: UUID): List<ReleaseFile> = database.withConnection { connection ->
         queryAll(
             connection.createStatement(

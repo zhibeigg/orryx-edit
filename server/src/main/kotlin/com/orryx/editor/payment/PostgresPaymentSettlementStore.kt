@@ -2,6 +2,7 @@ package com.orryx.editor.payment
 
 import com.orryx.editor.database.R2dbcDatabase
 import com.orryx.editor.database.executeFully
+import com.orryx.editor.database.queryAll
 import com.orryx.editor.database.queryOne
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.Row
@@ -75,6 +76,33 @@ class PostgresPaymentSettlementStore(
                     .bind(0, merchantOrderNo)
             ) { row, _ -> row.toPaymentOrder() }
         }
+
+    override suspend fun listOrders(
+        accountId: String?,
+        status: PaymentOrderStatus?,
+        limit: Int
+    ): List<PaymentOrder> = database.withConnection { connection ->
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        val conditions = mutableListOf<String>()
+        val values = mutableListOf<Any>()
+        if (accountId != null) {
+            values += UUID.fromString(accountId)
+            conditions += "account_id = \$${values.size}"
+        }
+        if (status != null) {
+            values += status.name
+            conditions += "status = \$${values.size}"
+        }
+        val sql = buildString {
+            append("SELECT * FROM commercial_payment_orders")
+            if (conditions.isNotEmpty()) append(" WHERE ").append(conditions.joinToString(" AND "))
+            append(" ORDER BY created_at DESC, order_id DESC LIMIT $").append(values.size + 1)
+        }
+        var statement = connection.createStatement(sql)
+        values.forEachIndexed { index, value -> statement = statement.bind(index, value) }
+        statement = statement.bind(values.size, limit)
+        queryAll(statement) { row, _ -> row.toPaymentOrder() }
+    }
 
     override suspend fun settlePaid(
         notification: ValidatedPaymentNotification,

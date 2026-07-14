@@ -9,6 +9,7 @@ import {
   LogIn,
   LogOut,
   RefreshCw,
+  ReceiptText,
   Server,
   ShieldCheck,
   ShoppingCart,
@@ -16,6 +17,8 @@ import {
   WalletCards,
 } from "lucide-react"
 import { ApiError, apiErrorMessage, apiRequest } from "@/lib/api-client"
+import { workbenchPath } from "@/lib/app-route"
+import { resolveBillingOrders, resolveWalletLedger, workbenchApi, type BillingOrderHistory, type WalletLedgerEntry } from "@/lib/workbench-api"
 import {
   accountApi,
   resolveAccount,
@@ -62,10 +65,22 @@ function workspaceId(workspace: WorkspaceSummary) {
   return workspace.id ?? workspace.workspaceId ?? "unknown-workspace"
 }
 
+function formatDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("zh-CN", { dateStyle: "short", timeStyle: "short" }).format(date)
+}
+
+function formatSignedCny(cents: number) {
+  const value = formatCny(Math.abs(cents))
+  return cents > 0 ? `+${value}` : cents < 0 ? `-${value}` : value
+}
+
 export function PortalPage() {
   const [account, setAccount] = useState<AccountView | null>(null)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [billing, setBilling] = useState<BillingSummary | null>(null)
+  const [ledger, setLedger] = useState<WalletLedgerEntry[]>([])
+  const [orders, setOrders] = useState<BillingOrderHistory[]>([])
   const [booting, setBooting] = useState(true)
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,12 +88,16 @@ export function PortalPage() {
   const loadCommercialData = useCallback(async () => {
     setDashboardLoading(true)
     try {
-      const [workspaceResponse, billingResponse] = await Promise.all([
+      const [workspaceResponse, billingResponse, ledgerResponse, orderResponse] = await Promise.all([
         accountApi.workspaces(),
         accountApi.billingSummary(),
+        workbenchApi.walletLedger().catch(() => [] as WalletLedgerEntry[]),
+        workbenchApi.orderHistory().catch(() => [] as BillingOrderHistory[]),
       ])
       setWorkspaces(resolveWorkspaces(workspaceResponse))
       setBilling(billingResponse)
+      setLedger(resolveWalletLedger(ledgerResponse))
+      setOrders(resolveBillingOrders(orderResponse))
     } finally {
       setDashboardLoading(false)
     }
@@ -98,6 +117,8 @@ export function PortalPage() {
         setAccount(null)
         setWorkspaces([])
         setBilling(null)
+        setLedger([])
+        setOrders([])
       } else {
         setError(apiErrorMessage(cause, "账户控制台加载失败。"))
       }
@@ -131,6 +152,8 @@ export function PortalPage() {
       account={account}
       workspaces={workspaces}
       billing={billing}
+      ledger={ledger}
+      orders={orders}
       loading={dashboardLoading}
       error={error}
       onRefresh={() => void loadSession()}
@@ -149,6 +172,8 @@ export function PortalPage() {
           setAccount(null)
           setWorkspaces([])
           setBilling(null)
+          setLedger([])
+          setOrders([])
         } catch (cause) {
           setError(apiErrorMessage(cause, "退出登录失败。"))
         }
@@ -232,6 +257,8 @@ function AccountConsole({
   account,
   workspaces,
   billing,
+  ledger,
+  orders,
   loading,
   error,
   onRefresh,
@@ -241,6 +268,8 @@ function AccountConsole({
   account: AccountView
   workspaces: WorkspaceSummary[]
   billing: BillingSummary | null
+  ledger: WalletLedgerEntry[]
+  orders: BillingOrderHistory[]
   loading: boolean
   error: string | null
   onRefresh: () => void
@@ -369,8 +398,8 @@ function AccountConsole({
                         {servers.map((instance) => (
                           <li key={instance.id}>
                             <Server aria-hidden="true" />
-                            <div><strong>{instance.displayName ?? "未命名服务器"}</strong><code>{instance.id}</code></div>
-                            <span className={instance.online ? "state-success" : ""}>{instance.online ? "在线" : instance.lastSeenAt ? `最近：${new Date(instance.lastSeenAt).toLocaleString("zh-CN")}` : "已注册"}</span>
+                            <div><strong>{instance.displayName ?? "未命名服务器"}</strong><code>{instance.id}</code><span className={instance.online ? "state-success" : ""}>{instance.online ? "在线" : instance.lastSeenAt ? `最近：${new Date(instance.lastSeenAt).toLocaleString("zh-CN")}` : "已注册"}</span></div>
+                            <a className="industrial-button industrial-button--quiet server-workbench-link" href={workbenchPath(id, instance.id)}>打开工作台</a>
                           </li>
                         ))}
                       </ul>
@@ -380,6 +409,14 @@ function AccountConsole({
               })}
             </div>
           )}
+        </section>
+
+        <section className="portal-billing-section" aria-labelledby="billing-history-title">
+          <div className="section-heading"><ReceiptText aria-hidden="true" /><div><h2 id="billing-history-title">Wallet Ledger / 订单历史</h2><p>只读展示钱包变动与支付订单。若扩展端点尚未启用，这里保持空状态。</p></div></div>
+          <div className="portal-billing-grid">
+            <div><h3>钱包流水</h3>{loading ? <p className="empty-copy" role="status">正在加载钱包流水…</p> : ledger.length === 0 ? <p className="empty-copy">暂无钱包流水。</p> : <div className="portal-dense-table"><table><thead><tr><th>时间</th><th>类型</th><th>金额</th><th>说明</th></tr></thead><tbody>{ledger.map((entry) => <tr key={entry.id}><td data-label="时间">{formatDate(entry.createdAt)}</td><td data-label="类型">{entry.type}</td><td data-label="金额" className={entry.amountCents < 0 ? "state-danger" : "state-success"}>{formatSignedCny(entry.amountCents)}</td><td data-label="说明">{entry.description ?? "—"}</td></tr>)}</tbody></table></div>}</div>
+            <div><h3>订单历史</h3>{loading ? <p className="empty-copy" role="status">正在加载订单历史…</p> : orders.length === 0 ? <p className="empty-copy">暂无订单记录。</p> : <div className="portal-dense-table"><table><thead><tr><th>时间</th><th>产品</th><th>金额</th><th>状态</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id ?? order.orderId}><td data-label="时间">{formatDate(order.createdAt)}</td><td data-label="产品">{order.productCode}</td><td data-label="金额">{formatCny(order.amountCents)}</td><td data-label="状态">{order.status}</td></tr>)}</tbody></table></div>}</div>
+          </div>
         </section>
       </section>
     </main>

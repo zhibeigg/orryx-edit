@@ -9,6 +9,18 @@ interface ReleaseRepository {
     suspend fun findRelease(releaseId: UUID): SignedRelease?
     suspend fun findTransaction(transactionId: UUID): PluginReleaseTransaction?
     suspend fun findTransaction(serverInstanceId: String, idempotencyKey: String): PluginReleaseTransaction?
+    suspend fun listReleases(
+        accountId: String? = null,
+        serverInstanceId: String? = null,
+        draftId: UUID? = null,
+        limit: Int = 100
+    ): List<SignedRelease>
+    suspend fun listTransactions(
+        accountId: String? = null,
+        serverInstanceId: String? = null,
+        status: ReleaseTransactionStatus? = null,
+        limit: Int = 100
+    ): List<PluginReleaseTransaction>
     suspend fun listFiles(releaseId: UUID): List<ReleaseFile>
     suspend fun findFile(releaseId: UUID, ordinal: Int): ReleaseFile?
 

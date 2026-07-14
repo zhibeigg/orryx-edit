@@ -46,6 +46,20 @@ class InMemoryPaymentSettlementStore : PaymentSettlementStore {
         ordersByMerchantNo[merchantOrderNo]
     }
 
+    override suspend fun listOrders(
+        accountId: String?,
+        status: PaymentOrderStatus?,
+        limit: Int
+    ): List<PaymentOrder> = mutex.withLock {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        ordersByMerchantNo.values.asSequence()
+            .filter { accountId == null || it.accountId == accountId }
+            .filter { status == null || it.status == status }
+            .sortedWith(compareByDescending<PaymentOrder> { it.createdAt }.thenByDescending { it.id })
+            .take(limit)
+            .toList()
+    }
+
     override suspend fun settlePaid(
         notification: ValidatedPaymentNotification,
         paidAt: Instant,

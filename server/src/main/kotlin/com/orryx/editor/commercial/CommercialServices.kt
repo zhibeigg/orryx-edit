@@ -2,6 +2,7 @@ package com.orryx.editor.commercial
 
 import com.orryx.editor.ai.AiJobRepository
 import com.orryx.editor.ai.AiJobService
+import com.orryx.editor.ai.AiProviderCatalogService
 import com.orryx.editor.auth.AccountService
 import com.orryx.editor.auth.SessionService
 import com.orryx.editor.claim.ClaimService
@@ -10,6 +11,7 @@ import com.orryx.editor.config.CommercialFeatureConfig
 import com.orryx.editor.draft.DraftService
 import com.orryx.editor.entitlement.EntitlementService
 import com.orryx.editor.payment.PaymentService
+import com.orryx.editor.payment.PaymentSettlementStore
 import com.orryx.editor.release.ReleaseRepository
 import com.orryx.editor.release.ReleaseService
 import com.orryx.editor.release.ReleaseSnapshotService
@@ -32,10 +34,12 @@ data class CommercialServices(
     val entitlements: EntitlementService,
     val wallets: WalletService,
     val payment: PaymentService? = null,
+    val paymentStore: PaymentSettlementStore? = null,
     val paymentGateway: URI? = null,
     val drafts: DraftService? = null,
     val snapshots: SnapshotService? = null,
     val releases: CommercialReleaseServices? = null,
     val aiJobs: AiJobService? = null,
-    val aiJobRepository: AiJobRepository? = null
+    val aiJobRepository: AiJobRepository? = null,
+    val aiProviders: AiProviderCatalogService? = null
 )

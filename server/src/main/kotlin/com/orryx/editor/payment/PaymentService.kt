@@ -7,6 +7,11 @@ import java.util.UUID
 interface PaymentSettlementStore {
     suspend fun createOrder(order: PaymentOrder): PaymentOrderCreateResult
     suspend fun findByMerchantOrderNo(merchantOrderNo: String): PaymentOrder?
+    suspend fun listOrders(
+        accountId: String? = null,
+        status: PaymentOrderStatus? = null,
+        limit: Int = 100
+    ): List<PaymentOrder>
 
     /** Atomically marks the order paid, grants its entitlement and appends its gift ledger entry. */
     suspend fun settlePaid(
@@ -58,6 +63,16 @@ class PaymentService(
         val persistedProduct = productCatalog.get(created.order.productId) ?: error("product is not available")
         check(created.order.amountCents == persistedProduct.priceCents) { "persisted order amount differs from catalog" }
         return CreatedPayment(created.order, provider.createRequest(created.order, persistedProduct))
+    }
+
+    suspend fun listOrders(
+        accountId: String? = null,
+        status: PaymentOrderStatus? = null,
+        limit: Int = 100
+    ): List<PaymentOrder> {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        val normalizedAccountId = accountId?.let { UUID.fromString(it).toString() }
+        return store.listOrders(normalizedAccountId, status, limit)
     }
 
     suspend fun handleNotification(

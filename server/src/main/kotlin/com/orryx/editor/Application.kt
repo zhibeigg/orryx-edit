@@ -2,15 +2,16 @@ package com.orryx.editor
 
 import com.orryx.editor.ai.AiJobService
 import com.orryx.editor.ai.AiJobWorker
-import com.orryx.editor.ai.AiProviderRegistration
+import com.orryx.editor.ai.AiProviderCatalogService
+import com.orryx.editor.ai.AiProviderModel
 import com.orryx.editor.ai.AiProviderRegistry
-import com.orryx.editor.ai.FixedRateCostCalculator
-import com.orryx.editor.ai.ModelTokenPricing
+import com.orryx.editor.ai.PostgresAiProviderCatalogRepository
+import com.orryx.editor.ai.RegistryCostCalculator
+import com.orryx.editor.ai.StoredProviderConfig
 import com.orryx.editor.ai.OpenAiCompatibleProvider
 import com.orryx.editor.ai.OpenAiProviderConfig
 import com.orryx.editor.ai.PostgresAiAccessPolicy
 import com.orryx.editor.ai.PostgresAiJobRepository
-import com.orryx.editor.ai.ProviderModelKey
 import com.orryx.editor.audit.PostgresAuditRepository
 import com.orryx.editor.auth.AccountService
 import com.orryx.editor.auth.Argon2idPasswordHasher
@@ -131,9 +132,10 @@ private suspend fun createCommercialServices(
     val wallets = WalletService(PostgresWalletStore(database))
 
     val alipayConfig = config.alipay
+    val paymentStore = PostgresPaymentSettlementStore(database)
     val payment = if (alipayConfig != null) {
         PaymentService(
-            store = PostgresPaymentSettlementStore(database),
+            store = paymentStore,
             providers = listOf(
                 AlipayProvider(
                     appId = alipayConfig.appId,
@@ -187,9 +189,21 @@ private suspend fun createCommercialServices(
 
     var aiService: AiJobService? = null
     var aiRepository: PostgresAiJobRepository? = null
+    var aiCatalog: AiProviderCatalogService? = null
     if (config.commercialFeatures.aiWorkbenchEnabled) {
         val aiConfig = requireNotNull(config.aiProvider) { "AI Provider 配置缺失" }
         val runnerConfig = requireNotNull(config.runner) { "Runner 配置缺失" }
+        val initialModels = listOf(
+            AiProviderModel(
+                id = aiConfig.model,
+                inputCentsPerMillion = aiConfig.inputCostPerMillionCents,
+                outputCentsPerMillion = aiConfig.outputCostPerMillionCents
+            )
+        )
+        val providerConfigJson = Json.encodeToString(
+            StoredProviderConfig.serializer(),
+            StoredProviderConfig(initialModels)
+        )
         database.withConnection { connection ->
             executeFully(
                 connection.createStatement(
@@ -197,13 +211,11 @@ private suspend fun createCommercialServices(
                     INSERT INTO ai_providers(
                         provider_id, provider_type, display_name, base_url, default_model,
                         enabled, config, created_at, updated_at
-                    ) VALUES ($1, 'OPENAI_COMPATIBLE', $2, $3, $4, TRUE, '{}'::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ) VALUES ($1, 'OPENAI_COMPATIBLE', $2, $3, $4, TRUE, $5::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ON CONFLICT (provider_id) DO UPDATE
                     SET provider_type = EXCLUDED.provider_type,
-                        display_name = EXCLUDED.display_name,
                         base_url = EXCLUDED.base_url,
-                        default_model = EXCLUDED.default_model,
-                        enabled = TRUE,
+                        config = CASE WHEN ai_providers.config = '{}'::jsonb THEN EXCLUDED.config ELSE ai_providers.config END,
                         updated_at = CURRENT_TIMESTAMP
                     """.trimIndent()
                 )
@@ -211,6 +223,7 @@ private suspend fun createCommercialServices(
                     .bind(1, aiConfig.providerId)
                     .bind(2, aiConfig.baseUrl.toString())
                     .bind(3, aiConfig.model)
+                    .bind(4, providerConfigJson)
             )
         }
         val provider = OpenAiCompatibleProvider(
@@ -223,12 +236,9 @@ private suspend fun createCommercialServices(
                 maxResponseBytes = aiConfig.maxResponseBytes
             )
         )
-        val providerRegistry = AiProviderRegistry(
-            providers = listOf(provider),
-            registrations = listOf(
-                AiProviderRegistration(aiConfig.providerId, enabled = true, models = setOf(aiConfig.model), defaultModel = aiConfig.model)
-            )
-        )
+        val providerRegistry = AiProviderRegistry(providers = listOf(provider))
+        aiCatalog = AiProviderCatalogService(PostgresAiProviderCatalogRepository(database), providerRegistry)
+        aiCatalog.initialize()
         val runner = KtorRunnerClient(
             httpClient,
             RunnerClientConfig(
@@ -246,14 +256,7 @@ private suspend fun createCommercialServices(
             runnerClient = runner,
             accessPolicy = PostgresAiAccessPolicy(database, aiConfig.usageReservationCents),
             artifactSink = DraftArtifactSinkAdapter(requireNotNull(draftService)),
-            costCalculator = FixedRateCostCalculator(
-                mapOf(
-                    ProviderModelKey(aiConfig.providerId, aiConfig.model) to ModelTokenPricing(
-                        inputCentsPerMillion = aiConfig.inputCostPerMillionCents,
-                        outputCentsPerMillion = aiConfig.outputCostPerMillionCents
-                    )
-                )
-            )
+            costCalculator = RegistryCostCalculator(providerRegistry)
         )
         AiJobWorker(applicationScope, aiService, "${config.updates.instanceId}-ai").start()
     }
@@ -267,12 +270,14 @@ private suspend fun createCommercialServices(
         entitlements = entitlements,
         wallets = wallets,
         payment = payment,
+        paymentStore = paymentStore,
         paymentGateway = alipayConfig?.gateway,
         drafts = draftService,
         snapshots = snapshotService,
         releases = releaseServices,
         aiJobs = aiService,
-        aiJobRepository = aiRepository
+        aiJobRepository = aiRepository,
+        aiProviders = aiCatalog
     )
 }
 

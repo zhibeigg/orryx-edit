@@ -27,6 +27,8 @@ export interface CloudDraftFileChange {
   changeType: "UPSERT" | "DELETE"
   path: string
   baseRevision?: string | null
+  contentRevision?: string | null
+  size?: number
   content?: string | null
 }
 
@@ -40,8 +42,10 @@ export interface CloudDraftVersion {
   id: string
   draftId: string
   versionNumber: number
+  parentVersionId?: string | null
   source: CloudDraftVersionSource
   manifestRevision?: string
+  authorAccountId?: string
   createdAt: string
   files?: CloudDraftFileChange[]
 }

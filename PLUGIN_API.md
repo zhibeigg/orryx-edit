@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.6.5）
+# Orryx Editor 插件端协议（0.8.5）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
@@ -29,7 +29,8 @@
 - 同一 workspace 同时只有一个 authoritative plugin session。每次成功注册产生新的 `sessionEpoch`；旧连接继续发消息会稳定收到 `STALE_PLUGIN_SESSION`。
 - 协议 V2 默认不参与协商，确保现有 V1 前端与插件写入流程不受灰度代码影响。设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 后才可协商 V2。
 - V2 的文件写入、创建、删除、重命名与 Reload 默认全部关闭；只有同时设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 和 `EDITOR_V2_WRITES_ENABLED=true` 后才会转发。
-- `manifest.snapshot`、`release.request`、`release.result` 当前仅保留 DTO/Schema，不在 relay allowlist 中，也不执行发布事务。
+- `manifest.snapshot` 仍为保留消息；`release.request` 与 `release.result` 已正式启用，但只允许 V2 relay↔plugin 方向，浏览器 WebSocket 永远不能直接发起发布。
+- 发布事务由已登录账户通过 `/api/v2/releases` 显式创建；插件只执行签名验证、staging、备份、激活、Readiness 与回滚。
 
 ## 1. 注册服务器
 
@@ -44,7 +45,16 @@
     "pluginVersion": "1.2.3",
     "protocolVersions": ["v1", "v2"],
     "preferredProtocol": "v2",
-    "capabilities": ["protocol.allowlist", "revision.sha256", "mutation.preconditions"],
+    "capabilities": [
+      "protocol.allowlist",
+      "revision.sha256",
+      "mutation.preconditions",
+      "release.transaction.v1",
+      "release.signature.ed25519",
+      "release.readiness.async",
+      "release.recovery.v1",
+      "release.http-pull.v1"
+    ],
     "connectionNonce": "random-connection-nonce"
   }
 }
@@ -68,7 +78,8 @@
     "relayCapabilities": [
       "protocol.allowlist",
       "session.epoch",
-      "revision.sha256"
+      "revision.sha256",
+      "release.control.v1"
     ],
     "connectionNonce": "random-connection-nonce"
   }
@@ -285,7 +296,74 @@ file.rename {oldPath,newPath}  -> file.written
 
 禁止从异步回调直接调用 Bukkit 主线程敏感 API。应使用 Bukkit Scheduler 切回主线程。
 
-## 7. 稳定错误码
+## 7. V2 签名发布事务
+
+发布控制消息只允许协商为 V2、声明完整发布能力且绑定当前 `serverInstanceId` 的权威插件会话。
+
+### Prepare
+
+Relay 发送 `release.request`，`data.action=prepare`。请求包含：
+
+- `transactionId`、`releaseId`、幂等 `commandId`。
+- `canonicalVersion=orryx-release-v1`。
+- `canonicalPayloadSha256`、`signingKeyId`、无填充 Base64URL Ed25519 `signature`。
+- `expectedManifestRevision`、`targetManifestRevision`、`fileCount`、`totalBytes`。
+- 短期 `operationsUrl`、Bearer `transferToken` 和 `transferExpiresAt`。
+
+插件必须：
+
+1. 读取当前 allowlist Manifest 并核对 expected revision。
+2. 通过精确 HTTPS URL 下载完整目标 operations 与文件；显式允许时仅接受 localhost HTTP。
+3. 校验路径、大小写、符号链接、文件大小、SHA-256、总字节和目标 Manifest。
+4. 按冻结 canonical 二进制格式重建 payload，并使用本机 `Editor.Release.TrustedKeys` 中的公钥验签。
+5. 将完整目标写入 `.editor/releases/transactions/<transactionId>/stage`，持久化 journal 后返回 `PREPARED`。
+
+传输 Token、URL 和过期时间不进入签名；完整目标文件集合、base/content revision 和大小全部进入签名。远端不能通过协议增加或替换 TrustedKeys。
+
+### Commit 与异步 Readiness
+
+Relay 发送 `action=commit` 和 `readinessDeadline`。插件按 Editor allowlist 顶层项执行：
+
+1. live → backup。
+2. stage → live。
+3. 每个 checkpoint 后原子持久化 journal。
+4. 磁盘交换完成立即返回 `READINESS_PENDING`。
+5. 在 Bukkit 主线程调用 `ReloadAPI.reloadWithReport()`。
+6. 重算 Manifest；重载报告成功且 revision 等于 target 时主动发送 `release.result(action=status,id="",pluginState=READY)`。
+
+Readiness、文件下载和 journal I/O 不得阻塞 Bukkit 主线程。
+
+### Rollback 与恢复
+
+- `action=rollback` 恢复 backup，并验证恢复后的 Manifest 等于 expected revision。
+- 进程启动后异步扫描 journal；`COMMITTING`、`ACTIVATING`、`ROLLING_BACK` 自动继续收敛。
+- 无法无歧义判断 live/stage/backup 状态时进入 `RECOVERY_REQUIRED`，不得猜测成功。
+- 只能交换 Editor allowlist 文件；`config.yml`、数据库、`.editor` 身份和事务目录永不进入替换集合。
+
+插件结果格式：
+
+```json
+{
+  "type": "release.result",
+  "id": "command-id-or-empty",
+  "data": {
+    "action": "status",
+    "transactionId": "uuid",
+    "releaseId": "uuid",
+    "commandId": "64-char-sha256",
+    "success": true,
+    "pluginState": "READY",
+    "eventId": "uuid",
+    "eventSeq": 4,
+    "observedManifestRevision": "...",
+    "resultManifestRevision": "..."
+  }
+}
+```
+
+机器可读方向、能力和状态列表以 `schemas/editor-relay-contract-v2.json` 为准。
+
+## 8. 稳定错误码
 
 常见错误：
 
@@ -317,6 +395,15 @@ MISSING_BASE_REVISION
 INVALID_REVISION
 REVISION_CONFLICT
 FEATURE_DISABLED
+RELEASE_DISABLED
+RELEASE_REQUIRES_V2
+MISSING_RELEASE_CAPABILITY
+MANIFEST_PRECONDITION_FAILED
+UNTRUSTED_SIGNING_KEY
+SIGNATURE_INVALID
+TARGET_MANIFEST_MISMATCH
+READINESS_FAILED
+RECOVERY_AMBIGUOUS
 PLUGIN_ERROR
 ```
 

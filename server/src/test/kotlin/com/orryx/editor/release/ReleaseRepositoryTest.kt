@@ -24,6 +24,8 @@ class ReleaseRepositoryTest {
         val first = record(idempotencyKey = "publish-1", fingerprint = "a".repeat(64))
 
         assertFalse(assertIs<CreateReleaseResult.Created>(repository.create(first)).replayed)
+        assertEquals(listOf(first.release.id), repository.listReleases(ACCOUNT_ID, SERVER_ID, first.release.draftId).map(SignedRelease::id))
+        assertEquals(listOf(first.transaction.id), repository.listTransactions(ACCOUNT_ID, SERVER_ID, ReleaseTransactionStatus.QUEUED).map(PluginReleaseTransaction::id))
         val replayReleaseId = UUID.randomUUID()
         val replayRecord = first.copy(
             release = first.release.copy(id = replayReleaseId),

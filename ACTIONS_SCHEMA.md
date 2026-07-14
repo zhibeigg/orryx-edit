@@ -2,7 +2,7 @@
 
 ## 来源与运行时行为
 
-Orryx Editor 0.4.5 不再把构建时 JSON 当作唯一数据源。服务端只读取 Orryx 官方 GitHub Pages 的 `stable` 通道：
+Orryx Editor 0.8.5 不再把构建时 JSON 当作唯一数据源。服务端只读取 Orryx 官方 GitHub Pages 的 `stable` 通道：
 
 ```text
 https://zhibeigg.github.io/Orryx/kether/channels/stable.json
@@ -70,7 +70,7 @@ Authorization: Bearer <ADMIN_KEY>
   "version": 2,
   "schemaVersion": 3,
   "pluginId": "Orryx",
-  "pluginVersion": "2.43.114",
+  "pluginVersion": "2.49.122",
   "commit": "40-character-git-sha",
   "types": {},
   "categories": {},

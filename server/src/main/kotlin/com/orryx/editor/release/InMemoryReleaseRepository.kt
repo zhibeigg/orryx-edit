@@ -58,6 +58,40 @@ class InMemoryReleaseRepository : ReleaseRepository {
     override suspend fun findTransaction(serverInstanceId: String, idempotencyKey: String): PluginReleaseTransaction? =
         mutex.withLock { idempotency[serverInstanceId to idempotencyKey]?.let(transactions::get)?.copy() }
 
+    override suspend fun listReleases(
+        accountId: String?,
+        serverInstanceId: String?,
+        draftId: UUID?,
+        limit: Int
+    ): List<SignedRelease> = mutex.withLock {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        releases.values.asSequence()
+            .filter { accountId == null || it.accountId == accountId }
+            .filter { serverInstanceId == null || it.serverInstanceId == serverInstanceId }
+            .filter { draftId == null || it.draftId == draftId }
+            .sortedWith(compareByDescending<SignedRelease> { it.createdAt }.thenByDescending { it.id })
+            .take(limit)
+            .map(SignedRelease::deepCopy)
+            .toList()
+    }
+
+    override suspend fun listTransactions(
+        accountId: String?,
+        serverInstanceId: String?,
+        status: ReleaseTransactionStatus?,
+        limit: Int
+    ): List<PluginReleaseTransaction> = mutex.withLock {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+        transactions.values.asSequence()
+            .filter { serverInstanceId == null || it.serverInstanceId == serverInstanceId }
+            .filter { status == null || it.status == status }
+            .filter { accountId == null || releases[it.releaseId]?.accountId == accountId }
+            .sortedWith(compareByDescending<PluginReleaseTransaction> { it.createdAt }.thenByDescending { it.id })
+            .take(limit)
+            .map(PluginReleaseTransaction::copy)
+            .toList()
+    }
+
     override suspend fun listFiles(releaseId: UUID): List<ReleaseFile> = mutex.withLock {
         files[releaseId].orEmpty().map(ReleaseFile::copy)
     }

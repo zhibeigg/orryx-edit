@@ -4,6 +4,7 @@ import com.orryx.editor.audit.AuditEvent
 import com.orryx.editor.audit.AuditRepository
 import com.orryx.editor.build.BuildInfo
 import com.orryx.editor.commercial.CommercialServices
+import com.orryx.editor.commercial.commercialAdminRoutes
 import com.orryx.editor.commercial.commercialRoutes
 import com.orryx.editor.ketherdocs.KetherDocsService
 import com.orryx.editor.ketherdocs.ketherDocsAdminRoutes
@@ -240,6 +241,7 @@ fun Application.configureRouting(
                 route("/system") { updateAdminRoutes(service, ::authorized) }
             }
             ketherDocsService?.let { service -> ketherDocsAdminRoutes(service, ::authorized) }
+            commercialServices?.let { services -> commercialAdminRoutes(services, ::authorized) }
         }
 
         route("/api/license") {
@@ -253,6 +255,12 @@ fun Application.configureRouting(
                 val success = licenseManager.clearIps(entry.license)
                 if (success) recordAudit(auditRepository, "license.ips_cleared", "license", maskedLicense(entry.license))
                 call.respond(SuccessResponse(success))
+            }
+        }
+
+        route("/api/{path...}") {
+            handle {
+                call.respond(HttpStatusCode.NotFound, ApiError("API_NOT_FOUND", "API 路由不存在或功能未启用"))
             }
         }
 

@@ -94,6 +94,17 @@ class RoutingSecurityTest {
     }
 
     @Test
+    fun `account cookie never grants admin access and disabled commercial routes are unreachable`() = testApplication {
+        application { configureRouting(manager(), SessionRegistry(), adminKey) }
+        val admin = client.get("/api/admin/stats") {
+            header(HttpHeaders.Cookie, "orryx_session=account-session; orryx_csrf=csrf")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, admin.status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/admin/commercial/orders").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/v2/ai/providers").status)
+    }
+
+    @Test
     fun `invalid management owner returns stable error`() = testApplication {
         application { configureRouting(manager(), SessionRegistry(), adminKey) }
         val response = client.post("/api/admin/license") {

@@ -1,198 +1,165 @@
 # Orryx Editor
 
-面向 Minecraft 服主与 Orryx 开发者的多人 Web 配置编辑器。浏览器通过中心 Ktor 服务与指定 Minecraft 子服建立隔离工作区，支持可恢复会话、协作者状态、文件版本冲突保护和受控在线更新。
+面向 Minecraft 服主与 Orryx 开发者的商业化配置变更控制平台。浏览器通过 Ktor 服务管理账户、服务器实例、云端草稿、AI Job、审核、签名发布和不可变历史；Orryx 插件负责最终的签名验证、文件事务、主线程激活、Readiness 与崩溃恢复。
 
-## 技术栈
+当前版本：`0.8.5`，数据库 Schema：`12`，Editor 协议：V1/V2。
 
-- Web：React 19、TypeScript、Vite 8、Tailwind CSS 4、Monaco、React Flow、Three.js
-- Server：Kotlin、Ktor 3、Netty、协程
-- 持久化：PostgreSQL、R2DBC PostgreSQL、R2DBC Pool
-- 协议：HTTP JSON + WebSocket JSON
+## 核心边界
 
-## 0.4.5 架构
+- AI 只能调用私有 Creation Suite Runner 的 `generate`、`validate`、`plan`，输出只进入云端草稿。
+- AI 永远不能调用 `materialize`、生产文件写入、插件 reload、服务器命令或 Shell。
+- 只有已登录账户点击发布并通过归属/RBAC 校验后，服务端才会创建签名发布事务。
+- 插件只交换 Editor allowlist 文件，不替换整个 `plugins/Orryx`；`config.yml`、数据库、`.editor` 身份和事务数据不进入发布集合。
+- 历史回退只会从旧 Snapshot 创建新草稿，不直接覆盖生产文件。
+- Provider API Key、支付宝私钥、Runner secret、发布签名私钥只来自服务端环境，不进入前端、数据库明文字段、响应或日志。
+
+## 架构
 
 ```text
-浏览器 ── /ws ──> Orryx Editor Server <── /ws/server ── Minecraft 插件
-                       │
-                       ├── PostgreSQL / R2DBC
-                       ├── Orryx Kether stable 文档（官方 GitHub Pages）
-                       └── 私有 GitHub Release（仅后端访问）
+账户浏览器
+  │ HTTPS / Cookie + CSRF
+  ▼
+Orryx Editor Server (Ktor)
+  ├── PostgreSQL / R2DBC（Schema v12）
+  ├── AI Provider（服务端密钥）
+  ├── 私有 Creation Suite Runner
+  ├── 官方 Kether stable Schema
+  └── V2 Relay ── WebSocket ── Orryx Plugin
+                                  ├── Ed25519 验签
+                                  ├── staging / backup / journal
+                                  ├── Bukkit 主线程激活
+                                  └── async Readiness / rollback / recovery
 ```
 
-- PostgreSQL 是唯一主存储；不回退到 JSON 或内存。
-- 旧 `licenses.json` 只在首次迁移时异步导入，原文件不会删除。
-- `workspaceId = SHA-256(serverKey + NUL + serverId)`，同 License 的不同子服完全隔离。
-- URL Token 只能原子消费一次；浏览器仅在 `sessionStorage` 保存可轮换的 resume token，数据库只保存 SHA-256。
-- 浏览器请求 ID 会在 relay 内改写，插件响应只返回发起请求的浏览器。
-- 文件写入携带 `baseRevision`；过期 revision 返回 `REVISION_CONFLICT`，不会静默覆盖。
-- 在线更新只接受稳定版、精确资产、HTTPS allowlist 和匹配的 SHA-256/manifest。
-- Kether Schema 只从 Orryx 官方 `stable` 通道同步；服务端校验不可变路径、契约、字节数与 SHA-256 后原子写入 PostgreSQL，失败继续使用 last-known-good 缓存。
-- 浏览器只请求本机 `/api/actions-schema`，新会话采用新 Schema，已经打开的编辑会话不会中途切换。
+Web 使用 React 19、TypeScript、Vite、Monaco、React Flow 和 Three.js。服务端使用 Kotlin、Ktor 3、协程与 R2DBC PostgreSQL。插件端兼容 Minecraft 1.12–1.21。
+
+## 用户流程
+
+1. 在 `/portal` 注册或登录邮箱账户。
+2. 认领已有 License，并等待插件注册稳定的 `serverInstance`。
+3. 从 Server Snapshot 创建云端 Draft。
+4. 在工作台选择 `GENERATE`、`VALIDATE` 或 `PLAN`，AI Job 经 Provider 与私有 Runner 生成不可变 Draft Version。
+5. 在 Monaco Diff 中审核文件、diagnostics、checks、references 与 requirements。
+6. 用户显式发布当前已审核版本。
+7. 服务端签名完整目标 Manifest，插件执行 prepare → commit → readiness。
+8. 成功生成 Release Snapshot；失败自动回滚或进入 `RECOVERY_REQUIRED`。
+9. 从历史恢复时创建新草稿，再次走审核与发布。
+
+## 页面
+
+- `/`：兼容的实时 Editor 连接入口。
+- `/portal`：账户、License 认领、服务器、钱包、订单与工作台入口。
+- `/workspaces/{workspaceId}/servers/{serverInstanceId}`：AI 三栏工作台、审核发布和历史。
+- `/admin`：License、更新、Kether 文档、AI Provider 与商业运行状态。
+
+复杂编辑工作台以桌面端为主；窄屏使用分栏标签切换，不隐藏审核、历史或失败恢复入口。
+
+## Feature Flags
+
+所有商业能力默认关闭，并按依赖 fail-closed：
+
+```text
+EDITOR_PROTOCOL_V2_ENABLED=false
+EDITOR_V2_WRITES_ENABLED=false
+ACCOUNTS_ENABLED=false
+CLOUD_DRAFTS_ENABLED=false
+AI_WORKBENCH_ENABLED=false
+RUNNER_ENABLED=false
+RELEASE_TRANSACTIONS_ENABLED=false
+ALIPAY_ENABLED=false
+```
+
+启用发布事务还必须配置 HTTPS 数据面 URL 与 Ed25519 PKCS#8/X.509 密钥。完整变量见 `.env.example`。
+
+## 数据库与迁移
+
+PostgreSQL 是唯一主存储；应用启动时通过 advisory lock 和 checksum 执行迁移。Schema v12 包含：
+
+- 账户、Cookie 会话、RBAC、License 认领、Workspace 与 Server Instance。
+- 永久权益、产品、钱包余额与 append-only ledger、支付宝订单和事件。
+- Provider 目录、AI Job、usage reservation、Job events 和 Runner execution。
+- Snapshot、不可变 Draft Version 与文件。
+- Signed Release、完整目标文件、插件事务、事件、传输授权和签名公钥 metadata。
+
+数据库不可用、迁移 checksum 不匹配或签名配置不完整时，相关能力拒绝启动；不会回退到 JSON 或内存生产存储。
 
 ## 环境要求
 
 - Java 21+
 - Node.js 20+
 - PostgreSQL 15+
-- Git Bash（Windows 执行 `build.sh` 时）
+- Git Bash（Windows 执行脚本时）
 
-复制 `.env.example` 并设置环境变量。生产必填：
-
-```text
-ADMIN_KEY          至少 16 字符的随机管理密钥
-DATABASE_URL       r2dbc:postgresql://host:5432/database
-DATABASE_USER      PostgreSQL 用户
-DATABASE_PASSWORD  PostgreSQL 密码
-```
-
-常用可选项：
+生产至少配置：
 
 ```text
-PORT=9090
-DATA_DIR=data
-DB_POOL_MIN_IDLE=1
-DB_POOL_MAX_SIZE=10
-EDITOR_SESSION_TTL_HOURS=24
-DEPLOYMENT_MODE=source|launcher|container
-UPDATE_ENABLED=false
-UPDATE_GITHUB_REPOSITORY=zhibeigg/orryx-edit
-UPDATE_GITHUB_TOKEN=<private repo read-only token>
-KETHER_DOCS_SYNC_ENABLED=true
-KETHER_DOCS_SYNC_INTERVAL_HOURS=12
-KETHER_DOCS_REQUEST_TIMEOUT_SECONDS=20
-KETHER_DOCS_MAX_SCHEMA_BYTES=4194304
+ADMIN_KEY
+DATABASE_URL
+DATABASE_USER
+DATABASE_PASSWORD
 ```
 
-完整配置见 `.env.example`。GitHub Token 只存在于服务端环境和 GitHub Authorization 请求头，不会进入前端、响应或日志。
-
-## 数据库与迁移
-
-应用启动顺序：
-
-1. 校验配置和强管理密钥。
-2. 建立 R2DBC Pool 并执行 `SELECT 1`。
-3. 在事务中获取 PostgreSQL advisory lock。
-4. 校验 `schema_migrations` checksum 并执行待应用迁移。
-5. 尝试一次性导入旧 `licenses.json`。
-6. 校验并恢复 PostgreSQL 中的 Kether Schema 缓存；没有缓存时读取 JAR 内置基线。
-7. 启动 HTTP、WebSocket、会话清理和 Kether stable 同步任务。
-
-迁移不使用 Flyway、JDBC 或阻塞数据库 API。数据库不可用、checksum 不匹配或迁移失败时服务拒绝启动。
+账户、AI、Runner、支付和发布配置均在 `.env.example` 中按功能分组。
 
 ## 构建与测试
+
+完整构建：
 
 ```bash
 bash build.sh
 ```
 
-根构建会执行：
-
-- `npm ci`
-- ESLint、TypeScript、Vitest、Vite production build
-- `./gradlew --no-daemon test shadowJar`
-
-产物：
-
-```text
-server/build/libs/orryx-editor-server-A.B.C.jar
-```
-
-## 启动
-
-### source / container 模式
-
-```bash
-ADMIN_KEY=... DATABASE_URL=... DATABASE_USER=... DATABASE_PASSWORD=... bash start.sh
-```
-
-Windows：
-
-```powershell
-$env:ADMIN_KEY="..."
-$env:DATABASE_URL="r2dbc:postgresql://127.0.0.1:5432/orryx_editor"
-$env:DATABASE_USER="orryx"
-$env:DATABASE_PASSWORD="..."
-.\start.ps1
-```
-
-### launcher 模式与自动回滚
-
-设置：
-
-```text
-DEPLOYMENT_MODE=launcher
-UPDATE_ENABLED=true
-UPDATE_GITHUB_TOKEN=<read-only token>
-```
-
-Admin 后台可以检查、下载、校验并暂存 Release。应用请求重启后以退出码 `42` 退出；`start.sh`/`start.ps1` 会：
-
-1. 再次校验 pending manifest 与 staged JAR SHA-256。
-2. 备份当前 JAR。
-3. 在旧进程退出后切换 JAR。
-4. 启动新版本并轮询 `/health/ready`，同时核对版本。
-5. 失败时终止新进程、恢复备份并启动旧版本。
-
-`container` 模式不会在容器内替换 JAR，只允许检查新版本。
-
-## Kether 文档自动同步
-
-服务端启动后立即读取 `https://zhibeigg.github.io/Orryx/kether/channels/stable.json`，之后默认每 12 小时轮询。它只接受 Orryx 官方同源 HTTPS URL，并依次验证 channel、不可变 Release manifest、Schema v3、资源字节数、4 MiB 大小预算、SHA-256、稳定 ID 和类型引用。
-
-同步成功后 Schema 与状态原子保存到 PostgreSQL；失败时不会覆盖当前可用版本。管理后台显示 `UP_TO_DATE`、`DEGRADED` 或 `FAILED`，并可手动触发 stable 同步。公共入口：
-
-- `GET /api/actions-schema`
-- `GET /actions-schema.json`（兼容入口）
-- `GET /api/admin/kether-docs/status`
-- `POST /api/admin/kether-docs/sync`
-
-详细契约、响应头和回退语义见 [`ACTIONS_SCHEMA.md`](ACTIONS_SCHEMA.md)。
-
-## CI/CD 与发布
-
-`.github/workflows/ci.yml` 在 Pull Request 和 `master` push 上执行。前端关键解析模块当前覆盖率基线为语句 60%、分支 40%、函数 55%、行 60%，CI 会拒绝低于基线的变更：
-
-- 前端 lint、typecheck、覆盖率测试、bundle budget 和静态资源 secret scan
-- 后端单元测试、JUnit 报告和真实 PostgreSQL 集成测试
-- clean fat JAR 打包、静态资源/版本 smoke test
-- Playwright 360/768/1024/1440 响应式与 axe 无障碍检查
-
-`.github/workflows/release.yml` 在 `vA.B.C` tag 或手动触发时校验 tag 与根 `VERSION` 一致，生成 JAR、SHA-256、`update-manifest.json`、launcher 部署包和可选 GHCR 镜像。Actions 使用最小权限、并发控制和固定 commit SHA；Dependabot 维护 action/npm/Gradle/Docker 更新。
-
-常用本地质量命令：
+常用本地命令：
 
 ```bash
 cd web
+npm ci
 npm run lint
 npm run typecheck
 npm run test:ci
 npm run build
 npm run check:bundle
 npm run check:secrets
-npm run e2e          # 需要已运行的测试服务
 
 cd ../server
-./gradlew --no-daemon test shadowJar
+./gradlew --no-daemon test build
 ```
 
-容器与 systemd/launcher 部署见 `deploy/README.md`。Docker Compose 使用非 root、只读根文件系统，并在 container 模式下禁用原地 JAR 替换。
+真实 PostgreSQL 集成测试依赖：
 
-## 健康检查
+```text
+TEST_DATABASE_URL=r2dbc:postgresql://...
+```
 
-- `GET /health/live`：进程存活和版本。
-- `GET /health/ready`：真实 PostgreSQL 可用性、迁移完成状态、可用 Kether Schema 和版本；缓存降级仍为 ready，三种来源均不可用时返回 not-ready。
+本地未配置时测试会明确条件跳过，不能视为真实 PostgreSQL 已通过。Playwright E2E 还要求先在 `127.0.0.1:19090` 启动连接 PostgreSQL 的打包服务，并设置匹配的 `E2E_ADMIN_KEY`。
 
-## 页面与管理 API
+Creation Suite 验收位于 `Orryx/agent-skills/orryx-creation-suite`，包括 pytest、合同 JSON 校验、递归越权拒绝与 eval subtests。Orryx 插件通过 `./gradlew build` 验证。
 
-- `/`：编辑器连接与工作区
-- `/admin`：License、运行状态和在线更新
-- `/portal`：License 自助信息与 IP 解绑
-- `GET /api/admin/system/version`
-- `GET /api/admin/update/status`
-- `POST /api/admin/update/jobs`
-- `GET /api/admin/update/jobs/{id}`
-- `GET /api/admin/kether-docs/status`
-- `POST /api/admin/kether-docs/sync`
+## 发布事务
+
+服务端 canonical payload 固定为 `orryx-release-v1`，使用 JDK Ed25519 签名；插件使用本机可信公钥验证。V2 控制消息为：
+
+- relay → plugin：`release.request`
+- plugin → relay：`release.result`
+
+数据面使用短期 Bearer Token 拉取 operations 和内容。Token、URL 和过期时间不进入签名；完整目标文件路径、base/content SHA、大小和目标 Manifest 进入签名。详细协议见 [`PLUGIN_API.md`](PLUGIN_API.md)。
+
+## 部署
+
+支持 source、launcher 和 container：
+
+- launcher 可校验私有 Release、切换 JAR、检查 `/health/ready` 并自动恢复旧版本。
+- container 模式不在容器内替换自身 JAR。
+- 私有 Runner 应作为同机低权限进程或 sidecar 部署，只监听明确私网/本机地址。
+- 反向代理只有在 `TRUSTED_PROXY_IPS` 中才被信任；生产启用 HTTPS、Secure Cookie 和 HSTS。
+
+详见 [`deploy/README.md`](deploy/README.md)。
+
+## 健康与管理
+
+- `GET /health/live`
+- `GET /health/ready`
 - `GET /api/actions-schema`
+- `/api/admin/*` 使用 `Authorization: Bearer <ADMIN_KEY>`
 
-管理 API 使用 `Authorization: Bearer <ADMIN_KEY>`。详细插件 WebSocket 协议见 `PLUGIN_API.md`。
+管理接口不会返回 Provider 密钥、支付私钥、Runner secret、发布签名私钥、AI 原始 Provider 请求/响应或 Release Transfer Token。

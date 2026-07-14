@@ -2,6 +2,8 @@ package com.orryx.editor.ai
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -80,9 +82,43 @@ data class AiJobBilling(
     }
 }
 
+data class AiJobQuery(
+    val accountId: UUID? = null,
+    val serverInstanceId: UUID? = null,
+    val draftId: UUID? = null,
+    val status: AiJobStatus? = null,
+    val limit: Int = 100
+) {
+    init {
+        require(limit in 1..100) { "limit 必须在 1..100 范围内" }
+    }
+}
+
+data class AiJobEvent(
+    val jobId: UUID,
+    val seq: Long,
+    val eventType: String,
+    val payload: JsonElement,
+    val createdAt: Instant
+)
+
+data class AppendAiJobEventCommand(
+    val jobId: UUID,
+    val eventType: String,
+    val eventKey: String,
+    val payload: JsonElement,
+    val createdAt: Instant
+) {
+    init {
+        require(eventType.matches(Regex("[A-Z][A-Z0-9_]{0,63}"))) { "eventType 无效" }
+        require(eventKey.isNotBlank() && eventKey.length <= 128) { "eventKey 无效" }
+    }
+}
+
 interface AiJobRepository {
     suspend fun create(command: CreateAiJobCommand): AiJob
     suspend fun find(id: UUID): AiJob?
+    suspend fun list(query: AiJobQuery): List<AiJob>
     suspend fun findByIdempotency(accountId: UUID, idempotencyKey: String): AiJob?
     suspend fun claimNext(owner: String, now: Instant, leaseDuration: Duration): AiJobLease?
     suspend fun recordBilling(jobId: UUID, owner: String, billing: AiJobBilling, now: Instant): AiJob
@@ -96,6 +132,8 @@ interface AiJobRepository {
     suspend fun fail(jobId: UUID, owner: String, errorCode: String, errorMessage: String?, now: Instant): AiJob
     suspend fun requeue(jobId: UUID, owner: String, now: Instant): AiJob
     suspend fun cancel(jobId: UUID, now: Instant): AiJob?
+    suspend fun appendEvent(command: AppendAiJobEventCommand): AiJobEvent?
+    suspend fun listEvents(jobId: UUID, afterSeq: Long = 0, limit: Int = 100): List<AiJobEvent>
 }
 
 class AiJobException(val code: String, message: String? = null) : RuntimeException(message ?: code)
@@ -131,3 +169,37 @@ internal fun AiJob.sameIdempotentRequest(command: CreateAiJobCommand): Boolean =
         providerId == command.providerId &&
         model == command.model &&
         idempotencyKey == command.idempotencyKey
+
+internal fun safeAiEventPayload(eventKey: String, payload: JsonElement): JsonObject {
+    require(eventKey.isNotBlank() && eventKey.length <= 128) { "eventKey 无效" }
+    require(!payload.containsSensitiveAiEventField()) { "AI event payload 包含敏感字段" }
+    val values = if (payload is JsonObject) payload.toMutableMap() else mutableMapOf("value" to payload)
+    values["eventKey"] = JsonPrimitive(eventKey)
+    val result = JsonObject(values)
+    require(result.toString().toByteArray(Charsets.UTF_8).size <= 16 * 1024) { "AI event payload 过大" }
+    return result
+}
+
+private fun JsonElement.containsSensitiveAiEventField(): Boolean = when (this) {
+    is JsonObject -> entries.any { (key, value) ->
+        key.lowercase() in SENSITIVE_AI_EVENT_FIELDS || value.containsSensitiveAiEventField()
+    }
+    is kotlinx.serialization.json.JsonArray -> any(JsonElement::containsSensitiveAiEventField)
+    else -> false
+}
+
+private val SENSITIVE_AI_EVENT_FIELDS = setOf(
+    "prompt",
+    "apikey",
+    "api_key",
+    "secret",
+    "authorization",
+    "providerrequest",
+    "provider_request",
+    "providerresponse",
+    "provider_response",
+    "requestpayload",
+    "request_payload",
+    "responsepayload",
+    "response_payload"
+)

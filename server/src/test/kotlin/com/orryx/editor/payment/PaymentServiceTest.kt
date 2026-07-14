@@ -44,6 +44,7 @@ class PaymentServiceTest {
         assertTrue(store.hasPermanentEntitlement(accountId))
         assertEquals(5_000, store.giftBalance(accountId))
         assertEquals(1, store.giftGrantCount(created.order.id))
+        assertEquals(listOf(created.order.id), service.listOrders(accountId, PaymentOrderStatus.PAID).map(PaymentOrder::id))
     }
 
     @Test

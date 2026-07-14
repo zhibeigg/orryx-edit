@@ -1,7 +1,9 @@
 import { lazy, Suspense } from "react"
+import { parseAppRoute } from "@/lib/app-route"
 
 const AdminPage = lazy(() => import("@/pages/AdminPage").then((module) => ({ default: module.AdminPage })))
 const PortalPage = lazy(() => import("@/pages/PortalPage").then((module) => ({ default: module.PortalPage })))
+const WorkbenchPage = lazy(() => import("@/features/workbench").then((module) => ({ default: module.WorkbenchPage })))
 const EditorRoute = lazy(() => import("@/routes/EditorRoute").then((module) => ({ default: module.EditorRoute })))
 
 function RouteFallback() {
@@ -13,12 +15,14 @@ function RouteFallback() {
 }
 
 export default function App() {
-  const path = window.location.pathname
-  const Route = path === "/admin" ? AdminPage : path === "/portal" ? PortalPage : EditorRoute
+  const route = parseAppRoute(window.location.pathname)
 
   return (
     <Suspense fallback={<RouteFallback />}>
-      <Route />
+      {route.kind === "admin" ? <AdminPage />
+        : route.kind === "portal" ? <PortalPage />
+          : route.kind === "workbench" ? <WorkbenchPage workspaceId={route.workspaceId} serverInstanceId={route.serverInstanceId} />
+            : <EditorRoute />}
     </Suspense>
   )
 }

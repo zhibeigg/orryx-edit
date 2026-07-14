@@ -9,7 +9,9 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AiJobRepositoryTest {
     private val now = Instant.parse("2026-03-20T00:00:00Z")
@@ -71,6 +73,31 @@ class AiJobRepositoryTest {
         val reclaimed = repository.claimNext("worker-2", now.plusSeconds(6), Duration.ofMinutes(1))
         assertEquals(job.id, reclaimed?.job?.id)
         assertEquals("worker-2", reclaimed?.owner)
+    }
+
+    @Test
+    fun `list events and cancel remain scoped by repository filters without sensitive payloads`() = runTest {
+        val repository = InMemoryAiJobRepository()
+        val first = repository.create(command())
+        val otherAccount = UUID.fromString("10000000-0000-0000-0000-000000000002")
+        repository.create(
+            command().copy(
+                id = UUID.randomUUID(),
+                accountId = otherAccount,
+                idempotencyKey = "request-2"
+            )
+        )
+
+        assertEquals(listOf(first.id), repository.list(AiJobQuery(accountId = first.accountId)).map(AiJob::id))
+        val canceled = repository.cancel(first.id, now.plusSeconds(1))
+        assertEquals(AiJobStatus.CANCELED, canceled?.status)
+        val events = repository.listEvents(first.id)
+        assertEquals(listOf("SUBMITTED", "CANCELED"), events.map(AiJobEvent::eventType))
+        assertEquals(listOf(1L, 2L), events.map(AiJobEvent::seq))
+        val payload = events.joinToString { it.payload.toString() }
+        assertFalse(payload.contains(command().prompt))
+        assertFalse(payload.contains("provider_request"))
+        assertTrue(payload.contains("eventKey"))
     }
 
     @Test

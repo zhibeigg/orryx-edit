@@ -39,6 +39,7 @@ class WalletServiceTest {
         assertEquals(WalletMutationOutcome.IDEMPOTENT_REPLAY, replay.outcome)
         assertEquals(2_000, replay.balance.availableCents)
         assertEquals(3, service.ledger(accountId).size)
+        assertEquals(listOf(accountId), service.listWallets().map(WalletBalance::accountId))
 
         val conflict = service.debit(accountId, 1_000, "usage:one", "Different amount")
         assertEquals(WalletMutationOutcome.IDEMPOTENCY_KEY_CONFLICT, conflict.outcome)
