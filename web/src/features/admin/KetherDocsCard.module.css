@@ -130,8 +130,8 @@
 .button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .button:disabled { cursor: not-allowed; opacity: .5; }
 .button svg { width: 15px; height: 15px; }
-.primary { border-color: var(--accent-primary-strong); background: var(--accent-primary-strong); color: var(--text-primary); }
-.primary:hover:not(:disabled) { background: var(--accent-primary); }
+.primary { border-color: oklch(54% .18 29); background: oklch(46% .18 28); color: var(--text-primary); }
+.primary:hover:not(:disabled) { border-color: oklch(59% .18 31); background: oklch(50% .18 30); }
 
 .spinning { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
