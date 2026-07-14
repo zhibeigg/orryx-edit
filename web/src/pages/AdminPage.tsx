@@ -113,7 +113,7 @@ export function AdminPage() {
         <section className="access-card" aria-labelledby="admin-login-title">
           <header className="access-header">
             <div className="product-mark" aria-hidden="true"><Shield /></div>
-            <div><p className="eyebrow">OPERATIONS CONTROL</p><h1 id="admin-login-title">Orryx 管理后台</h1><p>管理 License、AI Provider、发布事务与商业运行状态。</p></div>
+            <div><p className="eyebrow">OPERATIONS CONTROL</p><h1 id="admin-login-title">Orryx 管理后台</h1><p>管理授权、AI Provider、发布事务与商业状态。</p></div>
           </header>
           <form className="industrial-form" onSubmit={handleLogin}>
             <input type="text" name="username" value="admin" autoComplete="username" readOnly hidden />
