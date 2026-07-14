@@ -13,11 +13,19 @@ async function expectNoSeriousAxeViolations(page: import("@playwright/test").Pag
 
 test("插件门户首页在所有视口保持可读和可操作", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByRole("heading", { name: /不用想象.*真实技能/ })).toBeVisible()
-  await expect(page.getByRole("figure", { name: /Orryx Editor 技能编辑工作区实景/ })).toBeVisible()
-  await expect(page.getByRole("figure", { name: /Orryx 中心.*真实运行链路示例/ })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /把一套技能.*配置写到服务器/ })).toBeVisible()
+  await expect(page.getByRole("figure", { name: /Orryx Editor 只读交互演示/ })).toBeVisible()
   await expect(page.getByRole("link", { name: "创建账户" }).first()).toHaveAttribute("href", "/register")
   await expect(page.getByText("/orryx edit").first()).toBeVisible()
+
+  await page.getByRole("button", { name: /玄冰护体.yml/ }).click()
+  await expect(page.getByRole("heading", { name: "玄冰护体" })).toBeVisible()
+  await page.getByRole("tab", { name: "YAML" }).click()
+  await expect(page.getByLabel("玄冰护体 YAML 只读预览")).toContainText("shield")
+
+  await page.getByRole("button", { name: "验证配置" }).click()
+  await expect(page.getByText(/Revision \d+ 已验证，模块已就绪/).first()).toBeVisible()
+
   await expectNoPageOverflow(page)
   await expectNoSeriousAxeViolations(page)
 })

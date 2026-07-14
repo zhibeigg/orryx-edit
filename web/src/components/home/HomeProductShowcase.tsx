@@ -1,24 +1,32 @@
-import { useEffect, useState, type CSSProperties } from "react"
+import { useEffect, useReducer, useState, type CSSProperties, type KeyboardEvent } from "react"
 import {
   Activity,
   BadgeCheck,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   FileCode2,
-  FileText,
   FolderOpen,
   Gamepad2,
   KeyRound,
   LockKeyhole,
-  Monitor,
   Network,
+  RotateCcw,
   Save,
   Server,
   ShieldCheck,
   TerminalSquare,
   Workflow,
 } from "lucide-react"
+import {
+  createInitialDemoState,
+  demoReducer,
+  demoSkillOrder,
+  demoSkills,
+  validationPhaseOrder,
+  validationStepState,
+  type DemoPhase,
+  type DemoView,
+} from "./home-demo-state"
 
 type CenterHealthState =
   | { phase: "loading" }
@@ -51,230 +59,362 @@ function useCenterHealth(): CenterHealthState {
   return health
 }
 
-const timelineRows = [
-  { label: "扇形选区", start: "2%", width: "14%", tone: "selector" },
-  { label: "播放动作", start: "13%", width: "18%", tone: "motion" },
-  { label: "造成伤害", start: "31%", width: "24%", tone: "damage" },
-  { label: "熔岩粒子", start: "48%", width: "35%", tone: "effect" },
+const viewDefinitions: Array<{ id: DemoView; label: string; icon: typeof Activity }> = [
+  { id: "parameters", label: "参数", icon: Activity },
+  { id: "timeline", label: "时间轴", icon: Workflow },
+  { id: "yaml", label: "YAML", icon: FileCode2 },
+  { id: "runtime", label: "运行结果", icon: TerminalSquare },
 ]
 
+const validationSteps: Array<{
+  phase: Exclude<DemoPhase, "idle">
+  label: string
+  detail: string
+}> = [
+  { phase: "schema", label: "Schema 检查", detail: "动作、参数和选择器" },
+  { phase: "revision", label: "生成 Revision", detail: "基于当前只读快照" },
+  { phase: "sync", label: "模拟服务器同步", detail: "不写入任何生产文件" },
+  { phase: "ready", label: "模块就绪", detail: "返回重载结果" },
+]
+
+function phaseIndex(phase: DemoPhase) {
+  return phase === "idle" ? -1 : validationPhaseOrder.indexOf(phase)
+}
+
 export function EditorWorkspaceShowcase() {
+  const health = useCenterHealth()
+  const [state, dispatch] = useReducer(demoReducer, createInitialDemoState())
+  const skill = demoSkills[state.skillId]
+  const isValidating = state.phase === "schema" || state.phase === "revision" || state.phase === "sync"
+
+  useEffect(() => {
+    if (!isValidating) return
+    const delay = state.phase === "schema" ? 520 : state.phase === "revision" ? 580 : 720
+    const timer = window.setTimeout(() => dispatch({ type: "advance-validation" }), delay)
+    return () => window.clearTimeout(timer)
+  }, [isValidating, state.phase])
+
+  const healthLabel = health.phase === "up"
+    ? `中心在线 · ${health.version}`
+    : health.phase === "loading"
+      ? "正在检查中心"
+      : "中心状态暂不可用"
+
+  const statusMessage = state.phase === "idle"
+    ? "选择技能或视图，然后运行一次只读验证。"
+    : state.phase === "schema"
+      ? "正在检查 Schema 与动作参数…"
+      : state.phase === "revision"
+        ? "Schema 通过，正在生成演示 Revision…"
+        : state.phase === "sync"
+          ? `Revision ${state.revision + 1} 已生成，正在模拟服务器同步…`
+          : `Revision ${state.revision} 已验证，模块已就绪。`
+
+  const handleViewKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
+    event.preventDefault()
+    let nextIndex = index
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + viewDefinitions.length) % viewDefinitions.length
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % viewDefinitions.length
+    if (event.key === "Home") nextIndex = 0
+    if (event.key === "End") nextIndex = viewDefinitions.length - 1
+    const nextView = viewDefinitions[nextIndex]
+    dispatch({ type: "select-view", view: nextView.id })
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>("[role='tab']")[nextIndex]
+      ?.focus()
+  }
+
   return (
-    <figure className="product-shot product-shot--editor" aria-labelledby="editor-shot-caption">
-      <figcaption id="editor-shot-caption" className="sr-only">
-        Orryx Editor 技能编辑工作区实景，包含文件树、结构化参数、技能时间轴、YAML 源码和服务器保存状态。
+    <figure className="interactive-editor" aria-labelledby="interactive-editor-caption">
+      <figcaption id="interactive-editor-caption" className="sr-only">
+        可切换技能、参数、时间轴、YAML 和运行结果的 Orryx Editor 只读交互演示。
       </figcaption>
 
-      <header className="shot-windowbar">
-        <div className="shot-windowbar__title">
-          <span className="shot-app-mark" aria-hidden="true">OX</span>
-          <div>
-            <strong>Orryx Editor</strong>
-            <small>伏魔录 · channel_0</small>
-          </div>
+      <header className="interactive-editor__windowbar">
+        <div className="interactive-editor__traffic" aria-hidden="true"><span /><span /><span /></div>
+        <div className="interactive-editor__window-title">
+          <strong>Orryx Editor</strong>
+          <span>demo/channel_0</span>
         </div>
-        <div className="shot-windowbar__status"><span aria-hidden="true" />服务器已连接</div>
-        <div className="shot-windowbar__collaborators" aria-label="当前协作者">
-          <span>知</span><span>无</span><strong>2 人协作</strong>
+        <div className={`interactive-editor__health is-${health.phase}`} aria-live="polite">
+          <span aria-hidden="true" />{healthLabel}
         </div>
       </header>
 
-      <div className="editor-demo-shell">
-        <aside className="editor-demo-files" aria-label="示例文件树">
-          <div className="demo-pane-heading">
-            <span>文件浏览器</span>
-            <small>37 FILES</small>
+      <div className="interactive-editor__toolbar">
+        <div className="interactive-editor__identity">
+          <span className="interactive-editor__mark" aria-hidden="true">OX</span>
+          <div><strong>{skill.name}</strong><small>{skill.fileName}</small></div>
+        </div>
+
+        <div className="interactive-editor__view-tabs" role="tablist" aria-label="编辑器演示视图">
+          {viewDefinitions.map(({ id, label, icon: Icon }, index) => (
+            <button
+              id={`demo-view-tab-${id}`}
+              key={id}
+              type="button"
+              role="tab"
+              aria-label={label}
+              aria-selected={state.view === id}
+              aria-controls={`demo-view-panel-${id}`}
+              tabIndex={state.view === id ? 0 : -1}
+              className={state.view === id ? "is-active" : ""}
+              onClick={() => dispatch({ type: "select-view", view: id })}
+              onKeyDown={(event) => handleViewKeyDown(event, index)}
+            >
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="interactive-editor__validate"
+          disabled={isValidating}
+          aria-busy={isValidating}
+          onClick={() => dispatch({ type: "start-validation" })}
+        >
+          <BadgeCheck aria-hidden="true" />
+          {isValidating ? "验证中…" : state.phase === "ready" ? "再次验证" : "验证配置"}
+        </button>
+      </div>
+
+      <div className="interactive-editor__body">
+        <aside className="interactive-editor__skills" aria-label="演示技能文件">
+          <div className="interactive-editor__skills-heading">
+            <span>SKILL FILES</span>
+            <small>{demoSkillOrder.length}</small>
           </div>
-          <ul className="demo-file-tree">
-            <li className="is-folder"><ChevronDown aria-hidden="true" /><FolderOpen aria-hidden="true" /><strong>skills</strong></li>
-            <li className="is-file is-active"><FileCode2 aria-hidden="true" /><span>烈焰斩.yml</span><small>M</small></li>
-            <li className="is-file"><FileCode2 aria-hidden="true" /><span>御剑术.yml</span></li>
-            <li className="is-file"><FileCode2 aria-hidden="true" /><span>玄冰护体.yml</span></li>
-            <li className="is-folder is-collapsed"><ChevronRight aria-hidden="true" /><FolderOpen aria-hidden="true" /><strong>jobs</strong></li>
-            <li className="is-folder is-collapsed"><ChevronRight aria-hidden="true" /><FolderOpen aria-hidden="true" /><strong>stations</strong></li>
-            <li className="is-folder is-collapsed"><ChevronRight aria-hidden="true" /><FolderOpen aria-hidden="true" /><strong>selectors</strong></li>
-            <li className="is-file is-root"><FileText aria-hidden="true" /><span>config.yml</span></li>
-          </ul>
-          <div className="demo-file-sync"><CheckCircle2 aria-hidden="true" /><span>文件树已同步</span></div>
+          <div className="interactive-editor__skill-list">
+            {demoSkillOrder.map((skillId) => {
+              const item = demoSkills[skillId]
+              const selected = state.skillId === skillId
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={selected ? "is-active" : ""}
+                  aria-pressed={selected}
+                  onClick={() => dispatch({ type: "select-skill", skillId })}
+                >
+                  <FileCode2 aria-hidden="true" />
+                  <span><strong>{item.fileName}</strong><small>{item.type}</small></span>
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              )
+            })}
+          </div>
+          <div className="interactive-editor__readonly">
+            <LockKeyhole aria-hidden="true" />
+            <span><strong>只读交互演示</strong><small>不会写入生产服务器</small></span>
+          </div>
         </aside>
 
-        <div className="editor-demo-workspace">
-          <div className="demo-tabbar">
-            <div className="demo-tab is-active"><FileCode2 aria-hidden="true" /><span>烈焰斩.yml</span><i role="img" aria-label="有未保存修改" /></div>
-            <div className="demo-tab"><FileCode2 aria-hidden="true" /><span>selectors.yml</span></div>
-            <div className="demo-publish" aria-label="发布面板示例"><Workflow aria-hidden="true" />发布 <b>1</b></div>
+        <section className="interactive-editor__workspace" aria-label={`${skill.name} 演示工作区`}>
+          <header className="interactive-editor__skill-header">
+            <div>
+              <span>{skill.type} SKILL</span>
+              <h2>{skill.name}</h2>
+              <p>{skill.summary}</p>
+            </div>
+            <dl>
+              <div><dt>Revision</dt><dd>{state.revision}</dd></div>
+              <div><dt>状态</dt><dd>{state.phase === "ready" ? "READY" : "DEMO"}</dd></div>
+            </dl>
+          </header>
+
+          <div
+            id={`demo-view-panel-${state.view}`}
+            className="interactive-editor__panel"
+            role="tabpanel"
+            aria-labelledby={`demo-view-tab-${state.view}`}
+            tabIndex={0}
+          >
+            {state.view === "parameters" && <ParametersPanel skill={skill} />}
+            {state.view === "timeline" && <TimelinePanel skill={skill} />}
+            {state.view === "yaml" && <YamlPanel skill={skill} />}
+            {state.view === "runtime" && (
+              <RuntimePanel
+                skill={skill}
+                phase={state.phase}
+                revision={state.revision}
+              />
+            )}
           </div>
 
-          <div className="demo-editor-tabs" aria-label="技能编辑视图">
-            <span className="is-active">基础选项</span>
-            <span>变量</span>
-            <span>Actions 脚本</span>
-            <span>时间轴</span>
-            <span>YAML 源码</span>
-          </div>
-
-          <div className="demo-editor-canvas">
-            <section className="demo-skill-panel" aria-label="技能结构化参数">
-              <header>
-                <div>
-                  <small>DIRECT SKILL</small>
-                  <h3>烈焰斩</h3>
-                </div>
-                <span><Activity aria-hidden="true" />生产配置</span>
-              </header>
-
-              <dl className="demo-skill-metrics">
-                <div><dt>等级范围</dt><dd>1 — 5</dd></div>
-                <div><dt>冷却时间</dt><dd>8.0 s</dd></div>
-                <div><dt>法力消耗</dt><dd>24</dd></div>
-              </dl>
-
-              <div className="demo-form-grid">
-                <label><span>伤害公式</span><strong>level × 1.8 + 24</strong></label>
-                <label><span>目标选择器</span><strong>fan 5 90</strong></label>
-              </div>
-
-              <div className="demo-timeline">
-                <div className="demo-timeline__head"><span>技能时间轴</span><small>42 ticks · 2.1s</small></div>
-                <div className="demo-ruler"><span>0t</span><span>10t</span><span>20t</span><span>30t</span><span>40t</span></div>
-                {timelineRows.map((row) => (
-                  <div className="demo-timeline-row" key={row.label}>
-                    <span>{row.label}</span>
-                    <div><i className={`is-${row.tone}`} style={{ left: row.start, width: row.width } as CSSProperties} /></div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="demo-code-panel" aria-label="YAML 源码预览">
-              <header><span>YAML SOURCE</span><small>注释保留</small></header>
-              <pre aria-label="烈焰斩技能 YAML 示例"><code><span className="code-line"><i>1</i><b>Options:</b></span>{"\n"}<span className="code-line"><i>2</i>  <b>Type:</b> <em>DIRECT</em></span>{"\n"}<span className="code-line"><i>3</i>  <b>MaxLevel:</b> <strong>5</strong></span>{"\n"}<span className="code-line"><i>4</i>  <b>Cooldown:</b> <strong>8</strong></span>{"\n"}<span className="code-line"><i>5</i>  <b>Mana:</b> <strong>24</strong></span>{"\n"}<span className="code-line"><i>6</i><b>Actions:</b> <em>|-</em></span>{"\n"}<span className="code-line"><i>7</i>  <span>select fan 5 90</span></span>{"\n"}<span className="code-line"><i>8</i>  <span>damage &quot;level * 1.8 + 24&quot;</span></span>{"\n"}<span className="code-line"><i>9</i>  <span>particle flame</span></span></code></pre>
-              <div className="demo-diagnostics"><BadgeCheck aria-hidden="true" /><span>Schema 通过 · 0 个错误</span></div>
-            </section>
-          </div>
-
-          <footer className="demo-savebar">
-            <span><Save aria-hidden="true" />skills/烈焰斩.yml</span>
-            <strong><CheckCircle2 aria-hidden="true" />已保存并同步到服务器</strong>
-            <small>revision 42</small>
+          <footer className="interactive-editor__statusbar">
+            <div className={`interactive-editor__status-copy is-${state.phase}`} aria-live="polite">
+              {state.phase === "ready" ? <CheckCircle2 aria-hidden="true" /> : <Activity aria-hidden="true" />}
+              <span>{statusMessage}</span>
+            </div>
+            <button type="button" onClick={() => dispatch({ type: "reset" })}>
+              <RotateCcw aria-hidden="true" />重置演示
+            </button>
           </footer>
-        </div>
+        </section>
       </div>
     </figure>
   )
 }
 
-export function RuntimeOperationsShowcase() {
-  const health = useCenterHealth()
-  const healthLabel = health.phase === "up" ? "中心在线" : health.phase === "loading" ? "正在检查中心" : "状态暂不可用"
+function ParametersPanel({ skill }: { skill: (typeof demoSkills)[keyof typeof demoSkills] }) {
+  return (
+    <div className="demo-parameters">
+      <dl className="demo-parameters__metrics">
+        <div><dt>最大等级</dt><dd>{skill.maxLevel}</dd></div>
+        <div><dt>冷却时间</dt><dd>{skill.cooldown}</dd></div>
+        <div><dt>法力消耗</dt><dd>{skill.mana}</dd></div>
+      </dl>
+      <dl className="demo-parameters__fields">
+        <div><dt>伤害 / 数值公式</dt><dd>{skill.formula}</dd></div>
+        <div><dt>目标选择器</dt><dd>{skill.selector}</dd></div>
+        <div><dt>配置类型</dt><dd>{skill.type}</dd></div>
+        <div><dt>时间轴长度</dt><dd>{skill.totalTicks} ticks</dd></div>
+      </dl>
+      <p><LockKeyhole aria-hidden="true" />参数来自真实 Orryx 配置结构；首页演示不会开放自由输入。</p>
+    </div>
+  )
+}
+
+function TimelinePanel({ skill }: { skill: (typeof demoSkills)[keyof typeof demoSkills] }) {
+  return (
+    <div className="demo-timeline-view">
+      <header><span>技能时间轴</span><small>{skill.totalTicks} ticks · {(skill.totalTicks / 20).toFixed(1)}s</small></header>
+      <div className="demo-timeline-view__ruler" aria-hidden="true">
+        <span>0t</span><span>{Math.round(skill.totalTicks * 0.25)}t</span><span>{Math.round(skill.totalTicks * 0.5)}t</span><span>{Math.round(skill.totalTicks * 0.75)}t</span><span>{skill.totalTicks}t</span>
+      </div>
+      <ol>
+        {skill.timeline.map((item) => {
+          const start = item.start / skill.totalTicks * 100
+          const width = Math.max((item.end - item.start) / skill.totalTicks * 100, 4)
+          return (
+            <li key={item.id}>
+              <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+              <div aria-label={`${item.label}，从 ${item.start} tick 到 ${item.end} tick`}>
+                <i className={`is-${item.tone}`} style={{ "--timeline-start": `${start}%`, "--timeline-width": `${width}%` } as CSSProperties} />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
+function YamlPanel({ skill }: { skill: (typeof demoSkills)[keyof typeof demoSkills] }) {
+  return (
+    <div className="demo-yaml-view">
+      <header><span>{skill.fileName}</span><small>UTF-8 · comments preserved</small></header>
+      <pre aria-label={`${skill.name} YAML 只读预览`}><code>
+        {skill.yaml.split("\n").map((line, index) => (
+          <span className="demo-yaml-line" key={`${index}-${line}`}><i>{index + 1}</i><span>{line || " "}</span></span>
+        ))}
+      </code></pre>
+      <footer><BadgeCheck aria-hidden="true" />Schema 可验证 · YAML 与结构化视图共享同一快照</footer>
+    </div>
+  )
+}
+
+function RuntimePanel({
+  skill,
+  phase,
+  revision,
+}: {
+  skill: (typeof demoSkills)[keyof typeof demoSkills]
+  phase: DemoPhase
+  revision: number
+}) {
+  const currentPhaseIndex = phaseIndex(phase)
+  const runtimeLogs = [
+    { phase: "schema" as const, source: "SCHEMA", message: `${skill.fileName} 参数检查通过` },
+    { phase: "revision" as const, source: "SNAPSHOT", message: `revision ${phase === "ready" ? revision : revision + 1} generated` },
+    { phase: "sync" as const, source: "FILE", message: "模拟文件同步完成 · no production write" },
+    { phase: "ready" as const, source: "RELOAD", message: skill.result.reload },
+  ]
 
   return (
-    <figure className="product-shot product-shot--runtime" aria-labelledby="runtime-shot-caption">
-      <figcaption id="runtime-shot-caption" className="sr-only">
-        Orryx 中心、Minecraft 运行服与浏览器之间的真实运行链路示例，以及脱敏后的后台事件。
-      </figcaption>
+    <div className="demo-runtime-view">
+      <ol className="demo-runtime-view__steps" aria-label="只读验证进度" tabIndex={0}>
+        {validationSteps.map((step) => {
+          const state = validationStepState(phase, step.phase)
+          return (
+            <li className={`is-${state}`} key={step.phase}>
+              <span aria-hidden="true">{state === "complete" ? <CheckCircle2 /> : <i />}</span>
+              <div><strong>{step.label}</strong><small>{step.detail}</small></div>
+            </li>
+          )
+        })}
+      </ol>
 
-      <header className="runtime-windowbar">
-        <div><TerminalSquare aria-hidden="true" /><span>SERVER OPERATIONS</span></div>
-        <strong className={`runtime-health runtime-health--${health.phase}`} aria-live="polite"><span aria-hidden="true" />{healthLabel}</strong>
-        <small>{health.phase === "up" ? `Editor ${health.version}` : "health/ready"}</small>
-      </header>
+      <dl className="demo-runtime-view__results">
+        <div><dt>选择结果</dt><dd>{skill.result.selected}</dd></div>
+        <div><dt>作用模块</dt><dd>{skill.result.affected}</dd></div>
+        <div><dt>目标 Revision</dt><dd>{phase === "ready" ? revision : revision + 1}</dd></div>
+      </dl>
 
-      <div className="runtime-layout">
-        <section className="runtime-topology" aria-label="实时连接拓扑">
-          <div className="runtime-topology__heading">
-            <span>实时连接拓扑</span>
-            <small>已验证链路</small>
-          </div>
-          <div className="runtime-nodes">
-            <article>
-              <Server aria-hidden="true" />
-              <div><strong>GAME SERVER</strong><small>channel_0</small></div>
-              <span><i aria-hidden="true" />REGISTERED</span>
-            </article>
-            <div className="runtime-route" aria-hidden="true"><i /></div>
-            <article>
-              <Network aria-hidden="true" />
-              <div><strong>ORRYX CENTER</strong><small>Relay · Protocol V1</small></div>
-              <span><i aria-hidden="true" />READY</span>
-            </article>
-            <div className="runtime-route" aria-hidden="true"><i /></div>
-            <article>
-              <Monitor aria-hidden="true" />
-              <div><strong>EDITOR SESSION</strong><small>2 collaborators</small></div>
-              <span><i aria-hidden="true" />AUTHENTICATED</span>
-            </article>
-          </div>
-
-          <dl className="runtime-results">
-            <div><dt>文件请求</dt><dd><CheckCircle2 aria-hidden="true" />已转发</dd></div>
-            <div><dt>版本检查</dt><dd><CheckCircle2 aria-hidden="true" />revision 42</dd></div>
-            <div><dt>模块重载</dt><dd><CheckCircle2 aria-hidden="true" />skill ready</dd></div>
-            <div><dt>发布事务</dt><dd><ShieldCheck aria-hidden="true" />signed</dd></div>
-          </dl>
-        </section>
-
-        <section className="runtime-console" aria-label="脱敏服务器后台事件">
-          <header><span>RUNNING LOG</span><small>SENSITIVE DATA REDACTED</small></header>
-          <ol>
-            <li><time>04:26:16</time><span className="log-source">EDITOR</span><p>正在连接固定中心 orryx.mcwar.cn</p></li>
-            <li><time>04:26:17</time><span className="log-source">RELAY</span><p>服务器注册成功 · Protocol V1</p></li>
-            <li><time>04:31:08</time><span className="log-source">FILE</span><p>skills/烈焰斩.yml revision 42 accepted</p></li>
-            <li><time>04:31:08</time><span className="log-source">RELOAD</span><p>skill module ready</p></li>
-            <li><time>04:31:09</time><span className="log-source">PUBLISH</span><p>signed manifest committed</p></li>
-          </ol>
-          <footer><Activity aria-hidden="true" /><span>所有凭据与地址均已脱敏</span><strong>0 ERROR</strong></footer>
-        </section>
+      <div className="demo-runtime-view__console">
+        <header><TerminalSquare aria-hidden="true" /><span>VALIDATION LOG</span></header>
+        <ol>
+          {runtimeLogs.map((log) => {
+            const logIndex = validationPhaseOrder.indexOf(log.phase)
+            const visible = currentPhaseIndex >= logIndex
+            return (
+              <li className={visible ? "is-visible" : ""} key={log.phase}>
+                <time>{visible ? "NOW" : "—"}</time><span>{log.source}</span><p>{visible ? log.message : "等待上一步完成"}</p>
+              </li>
+            )
+          })}
+        </ol>
       </div>
-    </figure>
+    </div>
   )
 }
 
 const storyFrames = [
   {
     step: "01",
-    title: "游戏里发起",
+    title: "游戏内签发",
+    detail: "玩家执行 /orryx edit，生成 5 分钟内有效的一次性链接。",
     icon: Gamepad2,
-    visual: (
-      <div className="story-chat">
-        <div><span>OrryxE2E</span><code>/orryx edit</code></div>
-        <p>[Orryx] <strong>[点击打开编辑器 · 5 分钟内有效]</strong></p>
-      </div>
-    ),
   },
   {
     step: "02",
-    title: "一次性连接",
+    title: "安全进入工作区",
+    detail: "浏览器在联网前清除 Fragment，并原子消费 Token。",
     icon: KeyRound,
-    visual: (
-      <div className="story-gate">
-        <div className="story-address"><LockKeyhole aria-hidden="true" /><span>orryx.mcwar.cn/connect</span></div>
-        <ol><li className="is-complete"><CheckCircle2 aria-hidden="true" />读取 Fragment</li><li className="is-complete"><CheckCircle2 aria-hidden="true" />原子消费 Token</li><li><Network aria-hidden="true" />进入服务器工作区</li></ol>
-      </div>
-    ),
   },
   {
     step: "03",
-    title: "保存到运行服",
+    title: "验证后保存",
+    detail: "Revision、Schema、签名和重载结果共同决定是否完成发布。",
     icon: Save,
-    visual: (
-      <div className="story-save">
-        <div><FileCode2 aria-hidden="true" /><span>skills/烈焰斩.yml</span><small>revision 42</small></div>
-        <p><CheckCircle2 aria-hidden="true" /><strong>保存成功</strong><span>服务器文件与编辑器一致</span></p>
-      </div>
-    ),
   },
 ]
 
 export function ConnectionStoryboard() {
   return (
-    <ol className="connection-story" aria-label="从游戏命令到服务器保存的三个真实界面状态">
-      {storyFrames.map(({ step, title, icon: Icon, visual }) => (
+    <ol className="compact-connection-story" aria-label="从游戏到服务器的三步连接流程">
+      {storyFrames.map(({ step, title, detail, icon: Icon }) => (
         <li key={step}>
-          <header><span>{step}</span><Icon aria-hidden="true" /><strong>{title}</strong></header>
-          {visual}
+          <span>{step}</span>
+          <Icon aria-hidden="true" />
+          <div><strong>{title}</strong><p>{detail}</p></div>
         </li>
       ))}
     </ol>
+  )
+}
+
+export function SecurityBoundarySummary() {
+  return (
+    <div className="security-boundary-summary">
+      <div><Server aria-hidden="true" /><span>运行服</span></div>
+      <Network aria-hidden="true" />
+      <div><ShieldCheck aria-hidden="true" /><span>Orryx Center</span></div>
+      <Network aria-hidden="true" />
+      <div><FolderOpen aria-hidden="true" /><span>Editor</span></div>
+    </div>
   )
 }
