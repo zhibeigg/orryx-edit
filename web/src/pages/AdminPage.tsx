@@ -109,11 +109,11 @@ export function AdminPage() {
 
   if (!authed) {
     return (
-      <main id="main-content" className="access-shell">
+      <main id="main-content" className="access-shell admin-access-shell">
         <section className="access-card" aria-labelledby="admin-login-title">
           <header className="access-header">
             <div className="product-mark" aria-hidden="true"><Shield /></div>
-            <div><p className="eyebrow">ADMIN CONTROL</p><h1 id="admin-login-title">Orryx 管理后台</h1><p>管理 License、服务器绑定与在线状态。</p></div>
+            <div><p className="eyebrow">OPERATIONS CONTROL</p><h1 id="admin-login-title">Orryx 管理后台</h1><p>管理 License、AI Provider、发布事务与商业运行状态。</p></div>
           </header>
           <form className="industrial-form" onSubmit={handleLogin}>
             <input type="text" name="username" value="admin" autoComplete="username" readOnly hidden />
@@ -133,7 +133,7 @@ export function AdminPage() {
   return (
     <div className="admin-shell">
       <header className="admin-header">
-        <div className="admin-brand"><span className="product-mark product-mark--small" aria-hidden="true"><Shield /></span><div><strong>Orryx Admin</strong><span>License 控制台</span></div></div>
+        <div className="admin-brand"><span className="product-mark product-mark--small" aria-hidden="true"><Shield /></span><div><strong>Orryx Admin</strong><span>商业控制平面 · 实时运维</span></div></div>
         <button className="industrial-button industrial-button--quiet" type="button" onClick={() => { setAuthed(false); sessionStorage.removeItem("adminKey") }}>退出</button>
       </header>
 

@@ -562,6 +562,45 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .status-message--error { border-color: #7c4545; color: #ffb4b4; background: #321f22; }
 .status-message--success { border-color: #396d54; color: #a5e4c0; background: #172d23; }
 
+.admin-shell, .admin-access-shell {
+  --surface-canvas: oklch(14.5% 0.012 155);
+  --surface-base: oklch(18.5% 0.014 155);
+  --surface-raised: oklch(22.5% 0.016 155);
+  --surface-hover: oklch(27% 0.019 155);
+  --surface-active: oklch(31% 0.022 155);
+  --surface-input: oklch(12% 0.01 155);
+  --text-primary: oklch(93% 0.012 110);
+  --text-secondary: oklch(76% 0.016 125);
+  --text-muted: oklch(64% 0.016 135);
+  --border-subtle: oklch(31% 0.018 155);
+  --border-strong: oklch(44% 0.025 150);
+  --accent-primary: oklch(72% 0.13 135);
+  --accent-primary-strong: oklch(61% 0.12 137);
+  --accent-success: oklch(74% 0.13 145);
+  --accent-warning: oklch(79% 0.12 82);
+  --accent-danger: oklch(68% 0.14 28);
+  --focus-ring: oklch(84% 0.105 135);
+  --industrial-bg: var(--surface-canvas);
+  --industrial-surface: var(--surface-base);
+  --industrial-surface-raised: var(--surface-raised);
+  --industrial-border: var(--border-subtle);
+  --industrial-border-strong: var(--border-strong);
+  --industrial-text: var(--text-primary);
+  --industrial-muted: var(--text-secondary);
+  --industrial-accent: var(--accent-primary);
+  --industrial-accent-hover: var(--focus-ring);
+  --industrial-success: var(--accent-success);
+  --industrial-warning: var(--accent-warning);
+  --industrial-danger: var(--accent-danger);
+}
+.admin-access-shell { background: var(--surface-canvas); }
+.admin-access-shell .access-card { border-color: var(--border-strong); background: var(--surface-base); }
+.admin-access-shell .eyebrow, .admin-shell .eyebrow { color: var(--accent-primary); }
+.admin-access-shell .product-mark, .admin-shell .product-mark { border-color: color-mix(in oklch, var(--accent-primary) 55%, var(--border-strong)); color: var(--accent-primary); background: color-mix(in oklch, var(--accent-primary) 12%, var(--surface-raised)); }
+.admin-access-shell .field-group input, .admin-shell .field-group input, .admin-shell .field-group select, .admin-shell .create-license-form input, .admin-shell .create-license-form select { border-color: var(--border-strong); background: var(--surface-input); }
+.admin-access-shell .field-group input::placeholder, .admin-shell .field-group input::placeholder, .admin-shell .create-license-form input::placeholder { color: var(--text-muted); }
+.admin-access-shell .industrial-button--primary, .admin-shell .industrial-button--primary { border-color: var(--accent-primary-strong); color: oklch(14% 0.025 145); background: var(--accent-primary); }
+.admin-access-shell .industrial-button--primary:hover:not(:disabled), .admin-shell .industrial-button--primary:hover:not(:disabled) { border-color: var(--focus-ring); background: var(--focus-ring); }
 .admin-shell { min-height: 100vh; color: var(--industrial-text); background: var(--industrial-bg); }
 .admin-header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px clamp(16px, 4vw, 36px); border-bottom: 1px solid var(--industrial-border); background: var(--industrial-surface); }
 .admin-brand strong, .admin-brand span { display: block; }
@@ -573,6 +612,26 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .status-strip > div:last-child { border-right: 0; }
 .status-strip dt { color: var(--industrial-muted); font-size: 0.75rem; }
 .status-strip dd { margin: 0; color: var(--industrial-text); font-size: 1rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.admin-shell .admin-header { border-color: var(--border-strong); background: var(--surface-base); }
+.admin-shell .admin-brand strong { letter-spacing: .015em; }
+.admin-shell .page-heading { padding: 16px 0 18px; border-bottom: 1px solid var(--border-subtle); }
+.admin-shell .status-strip { border-color: var(--border-strong); background: var(--surface-base); }
+.admin-shell .status-strip > div { background: var(--surface-base); }
+.admin-shell .status-strip > div:nth-child(2) dd { color: var(--accent-success); }
+.admin-shell .status-strip > div:nth-child(3) dd { color: oklch(75% 0.08 220); }
+.admin-shell .status-strip > div:nth-child(4) dd { color: var(--accent-warning); }
+.admin-shell .industrial-panel { border-color: var(--border-subtle); background: var(--surface-base); }
+.admin-shell .section-heading > svg { color: var(--accent-primary); }
+.admin-shell .industrial-button--quiet:hover:not(:disabled) { border-color: var(--accent-primary); background: var(--surface-hover); }
+.admin-shell .industrial-button--success { border-color: color-mix(in oklch, var(--accent-success) 62%, var(--border-strong)); color: oklch(89% 0.07 145); background: color-mix(in oklch, var(--accent-success) 14%, var(--surface-raised)); }
+.admin-shell .industrial-button--danger-quiet { border-color: color-mix(in oklch, var(--accent-danger) 55%, var(--border-strong)); color: oklch(84% 0.075 28); }
+.admin-shell .license-table th { color: var(--text-secondary); background: var(--surface-raised); }
+.admin-shell .license-table td { border-color: var(--border-subtle); }
+.admin-shell .license-table tbody tr:hover { background: var(--surface-raised); }
+.admin-shell .state-success { color: var(--accent-success); }
+.admin-shell .state-warning { color: var(--accent-warning); }
+.admin-shell .state-danger { color: var(--accent-danger); }
+.admin-shell :where(button, input, select, textarea):focus-visible, .admin-access-shell :where(button, input, select, textarea):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .industrial-panel { padding: 18px; }
 .industrial-panel + .industrial-panel { margin-top: 18px; }
 .section-heading { align-items: flex-start; margin-bottom: 16px; }

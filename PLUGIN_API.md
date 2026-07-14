@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.8.5）
+# Orryx Editor 插件端协议（0.8.6）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
