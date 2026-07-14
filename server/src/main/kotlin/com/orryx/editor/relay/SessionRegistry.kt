@@ -19,6 +19,7 @@ data class GameServer(
     val negotiatedProtocol: ProtocolVersion = ProtocolVersion.V1,
     val capabilities: Set<String> = emptySet(),
     val connectionNonce: String? = null,
+    val serverInstanceId: String? = null,
     val sessionEpoch: Long,
     val registeredAt: Long = System.currentTimeMillis()
 )
@@ -181,6 +182,20 @@ class SessionRegistry(
         val socket = ktorSockets[session] ?: return null
         return sessions[socket]
     }
+
+    @Synchronized
+    fun bindServerInstance(session: RelaySocket, serverInstanceId: String): GameServer? {
+        val current = sessions[session] ?: return null
+        if (!isAuthoritative(session)) return null
+        val updated = current.copy(serverInstanceId = serverInstanceId)
+        sessions[session] = updated
+        return updated
+    }
+
+    fun getAuthoritativeServerByInstance(serverInstanceId: String): GameServer? =
+        sessions.values.firstOrNull {
+            it.serverInstanceId == serverInstanceId && authoritativeWorkspaceSessions[it.workspaceId] === it.session
+        }
 
     fun isAuthoritative(session: RelaySocket): Boolean {
         val server = sessions[session] ?: return false

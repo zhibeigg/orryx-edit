@@ -22,7 +22,8 @@ data class SnapshotFile(
 enum class SnapshotSource {
     PLUGIN,
     BROWSER,
-    IMPORT
+    IMPORT,
+    RELEASE
 }
 
 data class SnapshotLimits(

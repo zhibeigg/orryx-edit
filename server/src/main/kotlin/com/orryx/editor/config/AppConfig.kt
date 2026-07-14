@@ -31,9 +31,11 @@ data class SessionConfig(
 data class EditorProtocolConfig(
     val v2Enabled: Boolean = false,
     val v2WritesEnabled: Boolean = false,
+    val releaseTransactionsEnabled: Boolean = false,
 ) {
     init {
         require(!v2WritesEnabled || v2Enabled) { "启用 V2 写路径前必须先启用协议 V2" }
+        require(!releaseTransactionsEnabled || v2Enabled) { "启用发布事务前必须先启用协议 V2" }
     }
 }
 
@@ -57,6 +59,31 @@ data class AccountWebConfig(
     val secureCookie: Boolean,
     val cookieDomain: String?
 )
+
+data class ReleaseRuntimeConfig(
+    val enabled: Boolean = false,
+    val publicBaseUrl: URI? = null,
+    val allowLocalHttp: Boolean = false,
+    val signingPrivateKeyPkcs8Base64: String? = null,
+    val signingPublicKeyX509Base64: String? = null,
+    val transferTtl: Duration = Duration.ofMinutes(5),
+    val transactionLease: Duration = Duration.ofSeconds(30),
+    val readinessTimeout: Duration = Duration.ofMinutes(3),
+    val maxReleaseBytes: Long = 67_108_864
+) {
+    init {
+        if (enabled) {
+            val baseUrl = requireNotNull(publicBaseUrl) { "启用发布事务时 RELEASE_PUBLIC_BASE_URL 不能为空" }
+            val loopbackHttp = allowLocalHttp && baseUrl.scheme.equals("http", true) &&
+                baseUrl.host?.lowercase() in setOf("127.0.0.1", "localhost", "::1")
+            require((baseUrl.scheme.equals("https", true) || loopbackHttp) && baseUrl.host != null && baseUrl.userInfo == null) {
+                "RELEASE_PUBLIC_BASE_URL 必须是无凭据的 HTTPS 地址，或显式允许的本机 HTTP 地址"
+            }
+            require(!signingPrivateKeyPkcs8Base64.isNullOrBlank()) { "启用发布事务时 RELEASE_SIGNING_PRIVATE_KEY_PKCS8_BASE64 不能为空" }
+            require(!signingPublicKeyX509Base64.isNullOrBlank()) { "启用发布事务时 RELEASE_SIGNING_PUBLIC_KEY_X509_BASE64 不能为空" }
+        }
+    }
+}
 
 data class AlipayRuntimeConfig(
     val appId: String,
@@ -110,6 +137,7 @@ data class AppConfig(
     val editorProtocol: EditorProtocolConfig,
     val commercialFeatures: CommercialFeatureConfig,
     val accountWeb: AccountWebConfig,
+    val release: ReleaseRuntimeConfig,
     val alipay: AlipayRuntimeConfig?,
     val aiProvider: AiProviderRuntimeConfig?,
     val runner: RunnerRuntimeConfig?,
@@ -146,6 +174,13 @@ data class AppConfig(
                 runnerEnabled = environment.booleanValue("RUNNER_ENABLED", false),
                 aiWorkbenchEnabled = environment.booleanValue("AI_WORKBENCH_ENABLED", false),
             )
+            val releaseEnabled = environment.booleanValue("RELEASE_TRANSACTIONS_ENABLED", false)
+            require(!releaseEnabled || commercialFeatures.accountsEnabled) {
+                "启用发布事务前必须启用账户系统"
+            }
+            require(!releaseEnabled || commercialFeatures.cloudDraftsEnabled) {
+                "启用发布事务前必须启用云端草稿"
+            }
 
             return AppConfig(
                 port = port,
@@ -185,12 +220,24 @@ data class AppConfig(
                 editorProtocol = EditorProtocolConfig(
                     v2Enabled = environment.booleanValue("EDITOR_PROTOCOL_V2_ENABLED", false),
                     v2WritesEnabled = environment.booleanValue("EDITOR_V2_WRITES_ENABLED", false),
+                    releaseTransactionsEnabled = releaseEnabled,
                 ),
                 commercialFeatures = commercialFeatures,
                 accountWeb = AccountWebConfig(
                     sessionTtl = Duration.ofHours(environment.longValue("ACCOUNT_SESSION_TTL_HOURS", 168, 1L..8_760L)),
                     secureCookie = environment.booleanValue("ACCOUNT_COOKIE_SECURE", true),
                     cookieDomain = environment.value("ACCOUNT_COOKIE_DOMAIN")
+                ),
+                release = ReleaseRuntimeConfig(
+                    enabled = releaseEnabled,
+                    publicBaseUrl = environment.value("RELEASE_PUBLIC_BASE_URL")?.let(::URI),
+                    allowLocalHttp = environment.booleanValue("RELEASE_ALLOW_LOCAL_HTTP", false),
+                    signingPrivateKeyPkcs8Base64 = environment.value("RELEASE_SIGNING_PRIVATE_KEY_PKCS8_BASE64"),
+                    signingPublicKeyX509Base64 = environment.value("RELEASE_SIGNING_PUBLIC_KEY_X509_BASE64"),
+                    transferTtl = Duration.ofSeconds(environment.longValue("RELEASE_TRANSFER_TTL_SECONDS", 300, 30L..3_600L)),
+                    transactionLease = Duration.ofSeconds(environment.longValue("RELEASE_TRANSACTION_LEASE_SECONDS", 30, 5L..300L)),
+                    readinessTimeout = Duration.ofSeconds(environment.longValue("RELEASE_READINESS_TIMEOUT_SECONDS", 180, 30L..900L)),
+                    maxReleaseBytes = environment.longValue("RELEASE_MAX_BYTES", 67_108_864, 1L..268_435_456L)
                 ),
                 alipay = if (commercialFeatures.alipayEnabled) AlipayRuntimeConfig(
                     appId = environment.requiredValue("ALIPAY_APP_ID"),

@@ -11,6 +11,7 @@ import com.orryx.editor.ketherdocs.respondKetherDocsSchema
 import com.orryx.editor.license.LicenseEntry
 import com.orryx.editor.license.LicenseManager
 import com.orryx.editor.relay.SessionRegistry
+import com.orryx.editor.release.ReleaseTransactionCoordinator
 import com.orryx.editor.security.IpRateLimiter
 import com.orryx.editor.security.SecuritySettings
 import com.orryx.editor.security.constantTimeEquals
@@ -87,7 +88,8 @@ fun Application.configureRouting(
     readinessCheck: suspend () -> Boolean = { true },
     updateService: UpdateService? = null,
     ketherDocsService: KetherDocsService? = null,
-    commercialServices: CommercialServices? = null
+    commercialServices: CommercialServices? = null,
+    releaseCoordinator: ReleaseTransactionCoordinator? = null
 ) {
     install(ContentNegotiation) { json() }
 
@@ -138,7 +140,7 @@ fun Application.configureRouting(
             else call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("NOT_READY", buildInfo.version))
         }
 
-        commercialServices?.let { commercialRoutes(it) }
+        commercialServices?.let { commercialRoutes(it, releaseCoordinator) }
 
         if (ketherDocsService != null) {
             get("/actions-schema.json") { call.respondKetherDocsSchema(ketherDocsService) }

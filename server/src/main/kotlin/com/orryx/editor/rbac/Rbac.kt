@@ -12,6 +12,9 @@ enum class CommercialPermission {
     LICENSE_CLAIM,
     SERVER_INSTANCE_READ,
     SERVER_INSTANCE_MANAGE,
+    RELEASE_READ,
+    RELEASE_CREATE,
+    RELEASE_ROLLBACK,
     ENTITLEMENT_READ,
     WALLET_READ,
     WALLET_SPEND,
@@ -48,6 +51,9 @@ object BuiltInRoles {
             CommercialPermission.LICENSE_CLAIM,
             CommercialPermission.SERVER_INSTANCE_READ,
             CommercialPermission.SERVER_INSTANCE_MANAGE,
+            CommercialPermission.RELEASE_READ,
+            CommercialPermission.RELEASE_CREATE,
+            CommercialPermission.RELEASE_ROLLBACK,
             CommercialPermission.ENTITLEMENT_READ,
             CommercialPermission.WALLET_READ,
             CommercialPermission.WALLET_SPEND,
@@ -62,6 +68,7 @@ object BuiltInRoles {
             CommercialPermission.WORKSPACE_READ,
             CommercialPermission.MEMBERSHIP_READ,
             CommercialPermission.SERVER_INSTANCE_READ,
+            CommercialPermission.RELEASE_READ,
             CommercialPermission.ENTITLEMENT_READ,
             CommercialPermission.WALLET_READ
         )

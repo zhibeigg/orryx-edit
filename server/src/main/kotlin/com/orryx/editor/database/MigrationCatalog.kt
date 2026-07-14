@@ -502,6 +502,115 @@ object MigrationCatalog {
                 "ALTER TABLE ai_jobs ADD CONSTRAINT ai_jobs_draft_fk FOREIGN KEY (draft_id) REFERENCES drafts(id) ON DELETE SET NULL",
                 "ALTER TABLE ai_jobs ADD CONSTRAINT ai_jobs_base_version_fk FOREIGN KEY (base_version_id) REFERENCES draft_versions(id) ON DELETE SET NULL"
             )
+        ),
+        Migration(
+            version = 12,
+            description = "signed releases plugin transactions events and transfer grants",
+            statements = listOf(
+                "ALTER TABLE server_snapshots DROP CONSTRAINT server_snapshots_source_check",
+                "ALTER TABLE server_snapshots ADD CONSTRAINT server_snapshots_source_check CHECK (source IN ('PLUGIN', 'BROWSER', 'IMPORT', 'RELEASE'))",
+                """
+                CREATE TABLE commercial_release_signing_keys (
+                    key_id CHAR(64) PRIMARY KEY,
+                    algorithm VARCHAR(32) NOT NULL CHECK (algorithm = 'Ed25519'),
+                    public_key_der BYTEA NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    retired_at TIMESTAMPTZ NULL
+                )
+                """.trimIndent(),
+                """
+                CREATE TABLE commercial_releases (
+                    release_id UUID PRIMARY KEY,
+                    account_id UUID NOT NULL REFERENCES commercial_accounts(account_id) ON DELETE RESTRICT,
+                    server_instance_id UUID NOT NULL REFERENCES commercial_server_instances(instance_id) ON DELETE RESTRICT,
+                    stable_server_id VARCHAR(128) NOT NULL,
+                    draft_id UUID NOT NULL REFERENCES drafts(id) ON DELETE RESTRICT,
+                    draft_version_id UUID NOT NULL REFERENCES draft_versions(id) ON DELETE RESTRICT,
+                    draft_version_number BIGINT NOT NULL CHECK (draft_version_number > 0),
+                    expected_base_manifest_revision CHAR(64) NOT NULL,
+                    target_manifest_revision CHAR(64) NOT NULL,
+                    key_id CHAR(64) NOT NULL REFERENCES commercial_release_signing_keys(key_id) ON DELETE RESTRICT,
+                    canonical_payload BYTEA NOT NULL,
+                    signature VARCHAR(128) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    UNIQUE (draft_id, draft_version_id)
+                )
+                """.trimIndent(),
+                "CREATE INDEX commercial_releases_instance_created_idx ON commercial_releases (server_instance_id, created_at DESC)",
+                """
+                CREATE TABLE commercial_release_files (
+                    release_id UUID NOT NULL REFERENCES commercial_releases(release_id) ON DELETE RESTRICT,
+                    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+                    path VARCHAR(2048) NOT NULL,
+                    change_type VARCHAR(16) NOT NULL CHECK (change_type = 'UPSERT'),
+                    base_revision CHAR(64) NULL,
+                    content_revision CHAR(64) NOT NULL,
+                    size BIGINT NOT NULL CHECK (size >= 0),
+                    content TEXT NOT NULL,
+                    PRIMARY KEY (release_id, ordinal),
+                    UNIQUE (release_id, path)
+                )
+                """.trimIndent(),
+                """
+                CREATE TABLE commercial_plugin_release_transactions (
+                    transaction_id UUID PRIMARY KEY,
+                    release_id UUID NOT NULL UNIQUE REFERENCES commercial_releases(release_id) ON DELETE RESTRICT,
+                    server_instance_id UUID NOT NULL REFERENCES commercial_server_instances(instance_id) ON DELETE RESTRICT,
+                    idempotency_key VARCHAR(128) NOT NULL,
+                    request_fingerprint CHAR(64) NOT NULL,
+                    status VARCHAR(32) NOT NULL CHECK (status IN (
+                        'QUEUED', 'PREPARE_DISPATCHED', 'PREPARED', 'COMMIT_DISPATCHED',
+                        'READINESS_PENDING', 'ROLLBACK_DISPATCHED', 'SUCCEEDED', 'ROLLED_BACK',
+                        'FAILED', 'RECOVERY_REQUIRED'
+                    )),
+                    state_version BIGINT NOT NULL DEFAULT 0 CHECK (state_version >= 0),
+                    lease_owner VARCHAR(128) NULL,
+                    lease_expires_at TIMESTAMPTZ NULL,
+                    error_code VARCHAR(100) NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL,
+                    finished_at TIMESTAMPTZ NULL,
+                    UNIQUE (server_instance_id, idempotency_key)
+                )
+                """.trimIndent(),
+                "CREATE UNIQUE INDEX commercial_plugin_release_one_active_idx ON commercial_plugin_release_transactions (server_instance_id) WHERE status NOT IN ('SUCCEEDED', 'ROLLED_BACK', 'FAILED')",
+                "CREATE INDEX commercial_plugin_release_claim_idx ON commercial_plugin_release_transactions (status, lease_expires_at, created_at)",
+                """
+                CREATE TABLE commercial_release_events (
+                    transaction_id UUID NOT NULL REFERENCES commercial_plugin_release_transactions(transaction_id) ON DELETE RESTRICT,
+                    sequence BIGINT NOT NULL CHECK (sequence > 0),
+                    event_key VARCHAR(128) NOT NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    payload TEXT NOT NULL,
+                    payload_fingerprint CHAR(64) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    PRIMARY KEY (transaction_id, sequence),
+                    UNIQUE (transaction_id, event_key)
+                )
+                """.trimIndent(),
+                """
+                CREATE TABLE commercial_release_transfer_grants (
+                    grant_id UUID PRIMARY KEY,
+                    release_id UUID NOT NULL REFERENCES commercial_releases(release_id) ON DELETE RESTRICT,
+                    token_hash CHAR(64) NOT NULL UNIQUE,
+                    granted_to_server_instance_id UUID NOT NULL REFERENCES commercial_server_instances(instance_id) ON DELETE CASCADE,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    revoked_at TIMESTAMPTZ NULL
+                )
+                """.trimIndent(),
+                "CREATE INDEX commercial_release_transfer_active_idx ON commercial_release_transfer_grants (release_id, granted_to_server_instance_id, expires_at) WHERE revoked_at IS NULL",
+                """
+                CREATE FUNCTION reject_commercial_release_mutation() RETURNS trigger AS $$
+                BEGIN
+                    RAISE EXCEPTION 'signed release records are immutable';
+                END;
+                $$ LANGUAGE plpgsql
+                """.trimIndent(),
+                "CREATE TRIGGER commercial_releases_immutable BEFORE UPDATE OR DELETE ON commercial_releases FOR EACH ROW EXECUTE FUNCTION reject_commercial_release_mutation()",
+                "CREATE TRIGGER commercial_release_files_immutable BEFORE UPDATE OR DELETE ON commercial_release_files FOR EACH ROW EXECUTE FUNCTION reject_commercial_release_mutation()",
+                "CREATE TRIGGER commercial_release_events_append_only BEFORE UPDATE OR DELETE ON commercial_release_events FOR EACH ROW EXECUTE FUNCTION reject_commercial_release_mutation()"
+            )
         )
     )
 

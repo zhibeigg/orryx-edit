@@ -32,6 +32,8 @@ class AppConfigTest {
         assertEquals(true, config.ketherDocs.enabled)
         assertEquals(false, config.editorProtocol.v2Enabled)
         assertEquals(false, config.editorProtocol.v2WritesEnabled)
+        assertEquals(false, config.editorProtocol.releaseTransactionsEnabled)
+        assertEquals(false, config.release.enabled)
         assertEquals(false, config.commercialFeatures.accountsEnabled)
         assertEquals(false, config.commercialFeatures.cloudDraftsEnabled)
         assertEquals(false, config.commercialFeatures.alipayEnabled)
@@ -88,6 +90,44 @@ class AppConfigTest {
         assertFailsWith<IllegalArgumentException> {
             AppConfig.load(base + ("EDITOR_V2_WRITES_ENABLED" to "true"))
         }
+    }
+
+    @Test
+    fun `release transactions require account drafts v2 and signing material`() {
+        val base = mapOf(
+            "ADMIN_KEY" to "0123456789abcdef",
+            "DATABASE_URL" to "postgresql://localhost/orryx",
+            "RELEASE_TRANSACTIONS_ENABLED" to "true"
+        )
+        assertFailsWith<IllegalArgumentException> { AppConfig.load(base) }
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(base + mapOf(
+                "ACCOUNTS_ENABLED" to "true",
+                "CLOUD_DRAFTS_ENABLED" to "true"
+            ))
+        }
+
+        val required = base + mapOf(
+            "ACCOUNTS_ENABLED" to "true",
+            "CLOUD_DRAFTS_ENABLED" to "true",
+            "EDITOR_PROTOCOL_V2_ENABLED" to "true",
+            "RELEASE_PUBLIC_BASE_URL" to "https://editor.example.com",
+            "RELEASE_SIGNING_PRIVATE_KEY_PKCS8_BASE64" to "private-key",
+            "RELEASE_SIGNING_PUBLIC_KEY_X509_BASE64" to "public-key"
+        )
+        val enabled = AppConfig.load(required)
+        assertEquals(true, enabled.editorProtocol.releaseTransactionsEnabled)
+        assertEquals(true, enabled.release.enabled)
+        assertEquals("https://editor.example.com", enabled.release.publicBaseUrl.toString())
+
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(required + ("RELEASE_PUBLIC_BASE_URL" to "http://localhost:9090"))
+        }
+        val local = AppConfig.load(required + mapOf(
+            "RELEASE_PUBLIC_BASE_URL" to "http://127.0.0.1:9090",
+            "RELEASE_ALLOW_LOCAL_HTTP" to "true"
+        ))
+        assertEquals("http://127.0.0.1:9090", local.release.publicBaseUrl.toString())
     }
 
     @Test

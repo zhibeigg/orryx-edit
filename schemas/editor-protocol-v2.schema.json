@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://orryx.dev/schemas/editor-protocol-v2.schema.json",
-  "title": "Orryx Editor Relay Protocol V2 Skeleton",
-  "description": "Phase 0 protocol DTO schema. Manifest snapshot and release definitions are contracts only; release execution is not implemented.",
+  "title": "Orryx Editor Relay Protocol V2",
+  "description": "V2 identity, SHA revision and signed release transaction contracts.",
   "type": "object",
   "$defs": {
     "protocolVersion": {
@@ -12,6 +12,10 @@
     "sha256Revision": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "capability": {
       "type": "string",
@@ -68,6 +72,7 @@
         "success": { "type": "boolean" },
         "serverKey": { "type": "string" },
         "serverId": { "type": "string" },
+        "serverInstanceId": { "$ref": "#/$defs/uuid" },
         "workspaceId": { "$ref": "#/$defs/sha256Revision" },
         "negotiatedProtocol": { "$ref": "#/$defs/protocolVersion" },
         "sessionEpoch": { "type": "integer", "minimum": 1 },
@@ -129,26 +134,68 @@
         "createdAt": { "type": "integer", "minimum": 0 }
       }
     },
-    "releaseRequestData": {
+    "releaseFile": {
       "type": "object",
-      "required": ["manifestId", "expectedManifestRevision"],
+      "required": ["ordinal", "path", "contentRevision", "size", "contentUrl"],
       "additionalProperties": false,
       "properties": {
-        "manifestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "baseRevision": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256Revision" },
+            { "type": "null" }
+          ]
+        },
+        "contentRevision": { "$ref": "#/$defs/sha256Revision" },
+        "size": { "type": "integer", "minimum": 0 },
+        "contentUrl": { "type": "string", "format": "uri", "maxLength": 2048 }
+      }
+    },
+    "releaseRequestData": {
+      "type": "object",
+      "required": ["action", "transactionId", "releaseId", "commandId"],
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "enum": ["prepare", "commit", "status", "rollback"] },
+        "transactionId": { "$ref": "#/$defs/uuid" },
+        "releaseId": { "$ref": "#/$defs/uuid" },
+        "commandId": { "$ref": "#/$defs/sha256Revision" },
+        "canonicalVersion": { "type": "string", "const": "orryx-release-v1" },
+        "canonicalPayloadSha256": { "$ref": "#/$defs/sha256Revision" },
+        "signingKeyId": { "$ref": "#/$defs/sha256Revision" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9_-]{86}$" },
         "expectedManifestRevision": { "$ref": "#/$defs/sha256Revision" },
-        "releaseId": { "type": "string", "minLength": 1, "maxLength": 128 }
+        "targetManifestRevision": { "$ref": "#/$defs/sha256Revision" },
+        "fileCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "totalBytes": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+        "operationsUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "transferToken": { "type": "string", "minLength": 40, "maxLength": 256 },
+        "transferExpiresAt": { "type": "integer", "minimum": 1 },
+        "readinessDeadline": { "type": "integer", "minimum": 1 },
+        "reason": { "type": "string", "maxLength": 160 }
       }
     },
     "releaseResultData": {
       "type": "object",
-      "required": ["success"],
+      "required": ["action", "transactionId", "releaseId", "commandId", "success", "pluginState", "eventId", "eventSeq"],
       "additionalProperties": false,
       "properties": {
+        "action": { "type": "string", "enum": ["prepare", "commit", "status", "rollback"] },
+        "transactionId": { "$ref": "#/$defs/uuid" },
+        "releaseId": { "$ref": "#/$defs/uuid" },
+        "commandId": { "$ref": "#/$defs/sha256Revision" },
         "success": { "type": "boolean" },
-        "releaseId": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "manifestRevision": { "$ref": "#/$defs/sha256Revision" },
-        "code": { "type": "string" },
-        "message": { "type": "string" }
+        "pluginState": {
+          "type": "string",
+          "enum": ["PREPARING", "PREPARED", "COMMITTING", "READINESS_PENDING", "READY", "ROLLING_BACK", "ROLLED_BACK", "FAILED", "RECOVERY_REQUIRED"]
+        },
+        "eventId": { "$ref": "#/$defs/uuid" },
+        "eventSeq": { "type": "integer", "minimum": 1 },
+        "observedManifestRevision": { "$ref": "#/$defs/sha256Revision" },
+        "resultManifestRevision": { "$ref": "#/$defs/sha256Revision" },
+        "errorCode": { "type": "string", "maxLength": 100 },
+        "message": { "type": "string", "maxLength": 1000 }
       }
     }
   },
@@ -158,6 +205,7 @@
     "v2BrowserFileWrite": { "$ref": "#/$defs/v2BrowserFileWriteData" },
     "v2PluginFileWrite": { "$ref": "#/$defs/v2PluginFileWriteData" },
     "manifestSnapshot": { "$ref": "#/$defs/manifestSnapshotData" },
+    "releaseFile": { "$ref": "#/$defs/releaseFile" },
     "releaseRequest": { "$ref": "#/$defs/releaseRequestData" },
     "releaseResult": { "$ref": "#/$defs/releaseResultData" }
   }

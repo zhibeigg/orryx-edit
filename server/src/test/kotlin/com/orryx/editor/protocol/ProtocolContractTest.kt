@@ -50,6 +50,40 @@ class ProtocolContractTest {
     }
 
     @Test
+    fun `release control is v2 plugin only and never browser routable`() {
+        assertIs<ContractValidationResult.Allowed>(
+            ProtocolContracts.validate(
+                MessageTypes.RELEASE_REQUEST,
+                ProtocolRole.RELAY,
+                MessageDirection.RELAY_TO_PLUGIN,
+                ProtocolVersion.V2
+            )
+        )
+        assertIs<ContractValidationResult.Allowed>(
+            ProtocolContracts.validate(
+                MessageTypes.RELEASE_RESULT,
+                ProtocolRole.PLUGIN,
+                MessageDirection.PLUGIN_TO_RELAY,
+                ProtocolVersion.V2
+            )
+        )
+        val v1 = ProtocolContracts.validate(
+            MessageTypes.RELEASE_REQUEST,
+            ProtocolRole.RELAY,
+            MessageDirection.RELAY_TO_PLUGIN,
+            ProtocolVersion.V1
+        )
+        assertEquals("MESSAGE_NOT_SUPPORTED", assertIs<ContractValidationResult.Rejected>(v1).error.code)
+        val browser = ProtocolContracts.validate(
+            MessageTypes.RELEASE_REQUEST,
+            ProtocolRole.BROWSER,
+            MessageDirection.BROWSER_TO_RELAY,
+            ProtocolVersion.V2
+        )
+        assertEquals("MESSAGE_DIRECTION_NOT_ALLOWED", assertIs<ContractValidationResult.Rejected>(browser).error.code)
+    }
+
+    @Test
     fun `canonical relay manifest matches runtime allowlists and reserved routes`() {
         val manifestPath = Path.of("..", "schemas", "editor-relay-contract-v2.json")
         val manifest = Json.parseToJsonElement(Files.readString(manifestPath)).jsonObject
@@ -63,7 +97,12 @@ class ProtocolContractTest {
 
         ProtocolVersion.entries.forEach { version ->
             expected.forEach { (direction, types) ->
-                assertEquals(types, ProtocolContracts.allowedTypes(direction, version))
+                val versionTypes = if (version == ProtocolVersion.V1) {
+                    types - setOf(MessageTypes.RELEASE_REQUEST, MessageTypes.RELEASE_RESULT)
+                } else {
+                    types
+                }
+                assertEquals(versionTypes, ProtocolContracts.allowedTypes(direction, version))
             }
         }
         val routedTypes = expected.values.flatten().toSet()

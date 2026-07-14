@@ -19,10 +19,23 @@ interface RelaySocket {
 data class RelayFeatureFlags(
     val protocolV2Enabled: Boolean = false,
     val v2WritesEnabled: Boolean = false,
+    val releaseTransactionsEnabled: Boolean = false,
 ) {
     init {
         require(!v2WritesEnabled || protocolV2Enabled) { "启用 V2 写路径前必须先启用协议 V2" }
+        require(!releaseTransactionsEnabled || protocolV2Enabled) { "启用发布事务前必须先启用协议 V2" }
     }
+}
+
+object ReleaseRelayCapabilities {
+    const val CONTROL = "release.control.v1"
+    val requiredPlugin: Set<String> = setOf(
+        "release.transaction.v1",
+        "release.signature.ed25519",
+        "release.readiness.async",
+        "release.recovery.v1",
+        "release.http-pull.v1"
+    )
 }
 
 internal fun relayCapabilities(protocolVersion: ProtocolVersion, features: RelayFeatureFlags): JsonArray {
@@ -32,6 +45,7 @@ internal fun relayCapabilities(protocolVersion: ProtocolVersion, features: Relay
     )
     if (protocolVersion == ProtocolVersion.V2) capabilities += "revision.sha256"
     if (protocolVersion == ProtocolVersion.V2 && features.v2WritesEnabled) capabilities += "file.write.v2"
+    if (protocolVersion == ProtocolVersion.V2 && features.releaseTransactionsEnabled) capabilities += "release.control.v1"
     return JsonArray(capabilities.map(::JsonPrimitive))
 }
 

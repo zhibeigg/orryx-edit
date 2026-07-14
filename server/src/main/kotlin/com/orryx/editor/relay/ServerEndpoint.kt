@@ -34,14 +34,16 @@ class ServerEndpoint(
     private val registry: SessionRegistry,
     private val licenseAccess: RelayLicenseAccess,
     private val features: RelayFeatureFlags = RelayFeatureFlags(),
-    private val onRegistered: suspend (GameServer) -> Unit = {}
+    private val onRegistered: suspend (GameServer) -> String? = { null },
+    private val onReleaseResult: suspend (GameServer, WsMessage) -> Unit = { _, _ -> }
 ) {
     constructor(
         registry: SessionRegistry,
         licenseManager: LicenseManager,
         features: RelayFeatureFlags = RelayFeatureFlags(),
-        onRegistered: suspend (GameServer) -> Unit = {}
-    ) : this(registry, LicenseManagerRelayAccess(licenseManager), features, onRegistered)
+        onRegistered: suspend (GameServer) -> String? = { null },
+        onReleaseResult: suspend (GameServer, WsMessage) -> Unit = { _, _ -> }
+    ) : this(registry, LicenseManagerRelayAccess(licenseManager), features, onRegistered, onReleaseResult)
 
     private val sessionIps = ConcurrentHashMap<RelaySocket, String>()
 
@@ -91,6 +93,14 @@ class ServerEndpoint(
             MessageTypes.SERVER_REGISTER -> handleRegister(serverSession, msg)
             MessageTypes.TOKEN_REGISTER -> handleTokenRegister(serverSession, msg)
             MessageTypes.TOKEN_REVOKE -> handleTokenRevoke(serverSession, msg)
+            MessageTypes.RELEASE_RESULT -> {
+                val server = registeredServer
+                if (server == null) {
+                    serverSession.sendText(WsResponse.error(msg.id, "SERVER_NOT_REGISTERED", "请先发送 server.register"))
+                } else {
+                    onReleaseResult(server, msg)
+                }
+            }
             else -> relayPluginMessage(serverSession, msg)
         }
     }
@@ -168,6 +178,18 @@ class ServerEndpoint(
             sendRegisterFailure(session, msg.id, "MISSING_CAPABILITY", "启用 V2 变更路径必须声明 mutation.preconditions")
             return
         }
+        if (features.releaseTransactionsEnabled) {
+            val missingReleaseCapabilities = ReleaseRelayCapabilities.requiredPlugin - capabilities
+            if (negotiatedProtocol != ProtocolVersion.V2 || missingReleaseCapabilities.isNotEmpty()) {
+                sendRegisterFailure(
+                    session,
+                    msg.id,
+                    "MISSING_RELEASE_CAPABILITY",
+                    "启用发布事务时插件必须协商 V2 并声明完整发布能力"
+                )
+                return
+            }
+        }
         val rawConnectionNonce = (data["connectionNonce"] as? JsonPrimitive)?.contentOrNull
         val connectionNonce = rawConnectionNonce?.let(RelayValidation::connectionNonce)
         if (data["connectionNonce"] != null && (rawConnectionNonce == null || connectionNonce == null)) {
@@ -205,18 +227,20 @@ class ServerEndpoint(
             capabilities = capabilities,
             connectionNonce = connectionNonce
         )
-        onRegistered(server)
+        val serverInstanceId = onRegistered(server)
+        val registered = serverInstanceId?.let { registry.bindServerInstance(session, it) } ?: server
         session.sendText(WsResponse.build(
             MessageTypes.SERVER_REGISTER_RESULT,
             msg.id,
             "success" to true,
             "serverKey" to entry.serverKey,
-            "serverId" to server.serverId,
-            "workspaceId" to server.workspaceId,
-            "negotiatedProtocol" to server.negotiatedProtocol.wireName,
-            "sessionEpoch" to server.sessionEpoch,
-            "relayCapabilities" to relayCapabilities(server.negotiatedProtocol, features),
-            "connectionNonce" to server.connectionNonce,
+            "serverId" to registered.serverId,
+            "serverInstanceId" to registered.serverInstanceId,
+            "workspaceId" to registered.workspaceId,
+            "negotiatedProtocol" to registered.negotiatedProtocol.wireName,
+            "sessionEpoch" to registered.sessionEpoch,
+            "relayCapabilities" to relayCapabilities(registered.negotiatedProtocol, features),
+            "connectionNonce" to registered.connectionNonce,
             "message" to "服务器已注册"
         ))
     }

@@ -1,6 +1,5 @@
 package com.orryx.editor.draft
 
-import com.orryx.editor.snapshot.SnapshotFile
 import com.orryx.editor.snapshot.SnapshotLimits
 import com.orryx.editor.snapshot.SnapshotManifest
 import com.orryx.editor.snapshot.SnapshotReader
@@ -12,7 +11,6 @@ import com.orryx.editor.versioning.DraftFileValidation
 import com.orryx.editor.versioning.DraftVersionSource
 import com.orryx.editor.versioning.StoredDraftVersion
 import java.time.Clock
-import java.util.Locale
 import java.util.UUID
 
 class DraftService(
@@ -21,6 +19,8 @@ class DraftService(
     private val limits: SnapshotLimits = SnapshotLimits(),
     private val clock: Clock = Clock.systemUTC()
 ) {
+    private val materializer = DraftMaterializer(repository, snapshotRepository, limits)
+
     suspend fun createDraft(command: CreateDraftCommand): Draft {
         require(command.accountId.isNotBlank()) { "accountId 不能为空" }
         require(command.serverInstanceId.isNotBlank()) { "serverInstanceId 不能为空" }
@@ -58,9 +58,8 @@ class DraftService(
             return AppendVersionResult.Conflict(command.expectedCurrentVersion, draft.currentVersion)
         }
 
-        val effective = effectiveFiles(draft, command.expectedCurrentVersion)
-        applyChanges(effective, command.files)
-        val manifestRevision = SnapshotManifest.canonicalRevision(effective.values.map(EffectiveFile::toSnapshotFile), limits)
+        val effective = materializer.materialize(draft, command.expectedCurrentVersion)
+        val manifestRevision = materializer.applyCandidate(effective, command.files).targetManifestRevision
         return repository.appendVersion(
             AppendDraftVersionRecord(
                 id = command.id,
@@ -118,55 +117,8 @@ class DraftService(
     suspend fun listVersions(draftId: UUID, limit: Int = 100): List<StoredDraftVersion> =
         repository.listVersions(draftId, limit)
 
-    private suspend fun effectiveFiles(draft: Draft, throughVersion: Long): MutableMap<String, EffectiveFile> {
-        val base = requireNotNull(snapshotRepository.find(draft.baseSnapshotId)) { "baseSnapshot 不存在" }
-        val effective = linkedMapOf<String, EffectiveFile>()
-        base.files.forEach { file -> effective[file.path.lowercase(Locale.ROOT)] = EffectiveFile(file.path, file.revision, file.size, file.content) }
-        for (number in 1..throughVersion) {
-            val stored = checkNotNull(repository.findVersion(draft.id, number)) { "draft 版本链不完整: $number" }
-            applyStoredChanges(effective, stored.files)
-        }
-        return effective
-    }
-
-    private fun applyChanges(effective: MutableMap<String, EffectiveFile>, changes: List<DraftFile>) {
-        changes.forEach { file ->
-            val key = file.path.lowercase(Locale.ROOT)
-            val current = effective[key]
-            require(current == null || current.path == file.path) {
-                "文件路径与现有路径大小写冲突: ${current?.path} 与 ${file.path}"
-            }
-            require(file.baseRevision == current?.revision) {
-                "baseRevision 冲突: ${file.path}"
-            }
-            when (file.changeType) {
-                DraftFileChangeType.UPSERT -> effective[key] = EffectiveFile(
-                    path = file.path,
-                    revision = requireNotNull(file.contentRevision),
-                    size = file.size,
-                    content = requireNotNull(file.content)
-                )
-
-                DraftFileChangeType.DELETE -> effective.remove(key)
-            }
-        }
-    }
-
-    private fun applyStoredChanges(effective: MutableMap<String, EffectiveFile>, changes: List<DraftFile>) {
-        changes.forEach { file ->
-            val key = file.path.lowercase(Locale.ROOT)
-            when (file.changeType) {
-                DraftFileChangeType.UPSERT -> effective[key] = EffectiveFile(
-                    file.path,
-                    requireNotNull(file.contentRevision),
-                    file.size,
-                    requireNotNull(file.content)
-                )
-
-                DraftFileChangeType.DELETE -> effective.remove(key)
-            }
-        }
-    }
+    suspend fun materialize(draftId: UUID, versionNumber: Long): MaterializedDraft =
+        materializer.materialize(draftId, versionNumber)
 
     private fun StoredDraftVersion.matches(command: AppendDraftVersionCommand): Boolean =
         version.id == command.id &&
@@ -177,12 +129,4 @@ class DraftService(
             (command.createdAt == null || version.createdAt == command.createdAt) &&
             files == command.files
 
-    private data class EffectiveFile(
-        val path: String,
-        val revision: String,
-        val size: Long,
-        val content: String?
-    ) {
-        fun toSnapshotFile(): SnapshotFile = SnapshotFile(path, revision, size, content)
-    }
 }

@@ -19,12 +19,14 @@ import com.orryx.editor.auth.PostgresSessionStore
 import com.orryx.editor.auth.SessionService
 import com.orryx.editor.claim.ClaimService
 import com.orryx.editor.claim.PostgresCommercialTransactionStore
+import com.orryx.editor.commercial.CommercialReleaseServices
 import com.orryx.editor.commercial.CommercialServices
 import com.orryx.editor.config.AppConfig
 import com.orryx.editor.database.DatabaseMigrator
 import com.orryx.editor.database.R2dbcDatabase
 import com.orryx.editor.database.executeFully
 import com.orryx.editor.draft.DraftArtifactSinkAdapter
+import com.orryx.editor.draft.DraftMaterializer
 import com.orryx.editor.draft.DraftService
 import com.orryx.editor.draft.PostgresDraftRepository
 import com.orryx.editor.entitlement.EntitlementService
@@ -43,10 +45,19 @@ import com.orryx.editor.payment.AlipayProvider
 import com.orryx.editor.payment.PaymentService
 import com.orryx.editor.payment.PostgresPaymentSettlementStore
 import com.orryx.editor.payment.Rsa2
+import com.orryx.editor.release.CommercialReleaseServerAccess
+import com.orryx.editor.release.Ed25519ReleaseSigner
+import com.orryx.editor.release.PostgresReleaseRepository
+import com.orryx.editor.release.ReleaseRecoveryWorker
+import com.orryx.editor.release.ReleaseService
+import com.orryx.editor.release.ReleaseSnapshotService
+import com.orryx.editor.release.ReleaseTransactionCoordinator
 import com.orryx.editor.plugins.configureRouting
 import com.orryx.editor.plugins.configureWebSockets
+import com.orryx.editor.protocol.ReleaseResultData
 import com.orryx.editor.relay.RelayFeatureFlags
 import com.orryx.editor.relay.RelayHandler
+import com.orryx.editor.relay.ReleaseRelayDispatcher
 import com.orryx.editor.relay.ServerEndpoint
 import com.orryx.editor.relay.SessionRegistry
 import com.orryx.editor.runner.KtorRunnerClient
@@ -79,8 +90,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import java.io.File
 import java.time.Instant
+import java.util.Base64
 
 data class ServerConfig(
     val port: Int,
@@ -111,7 +125,8 @@ private suspend fun createCommercialServices(
 
     val accounts = AccountService(PostgresAccountStore(database), Argon2idPasswordHasher())
     val sessions = SessionService(PostgresSessionStore(database), lifetime = config.accountWeb.sessionTtl)
-    val claims = ClaimService(PostgresCommercialTransactionStore(database))
+    val commercialStore = PostgresCommercialTransactionStore(database)
+    val claims = ClaimService(commercialStore)
     val entitlements = EntitlementService(PostgresEntitlementStore(database))
     val wallets = WalletService(PostgresWalletStore(database))
 
@@ -132,12 +147,43 @@ private suspend fun createCommercialServices(
         )
     } else null
 
-    val snapshotService = if (config.commercialFeatures.cloudDraftsEnabled) {
-        SnapshotService(PostgresSnapshotRepository(database))
+    val snapshotRepository = if (config.commercialFeatures.cloudDraftsEnabled) {
+        PostgresSnapshotRepository(database)
     } else null
-    val draftService = snapshotService?.let { snapshots ->
-        DraftService(PostgresDraftRepository(database), PostgresSnapshotRepository(database))
-    }
+    val draftRepository = snapshotRepository?.let { PostgresDraftRepository(database) }
+    val snapshotService = snapshotRepository?.let(::SnapshotService)
+    val draftService = if (snapshotRepository != null && draftRepository != null) {
+        DraftService(draftRepository, snapshotRepository)
+    } else null
+    val releaseServices = if (config.release.enabled) {
+        val releaseRepository = PostgresReleaseRepository(database)
+        val privateKey = Base64.getDecoder().decode(
+            requireNotNull(config.release.signingPrivateKeyPkcs8Base64) { "发布签名私钥缺失" }
+        )
+        val publicKey = Base64.getDecoder().decode(
+            requireNotNull(config.release.signingPublicKeyX509Base64) { "发布签名公钥缺失" }
+        )
+        val signer = try {
+            Ed25519ReleaseSigner.fromPkcs8AndX509(privateKey, publicKey)
+        } finally {
+            privateKey.fill(0)
+            publicKey.fill(0)
+        }
+        CommercialReleaseServices(
+            publisher = ReleaseService(
+                drafts = requireNotNull(draftRepository) { "发布事务依赖云端草稿" },
+                materializer = DraftMaterializer(draftRepository, requireNotNull(snapshotRepository)),
+                repository = releaseRepository,
+                signer = signer,
+                serverAccess = CommercialReleaseServerAccess(commercialStore)
+            ),
+            repository = releaseRepository,
+            snapshots = ReleaseSnapshotService(
+                releases = releaseRepository,
+                snapshots = requireNotNull(snapshotService)
+            )
+        )
+    } else null
 
     var aiService: AiJobService? = null
     var aiRepository: PostgresAiJobRepository? = null
@@ -224,6 +270,7 @@ private suspend fun createCommercialServices(
         paymentGateway = alipayConfig?.gateway,
         drafts = draftService,
         snapshots = snapshotService,
+        releases = releaseServices,
         aiJobs = aiService,
         aiJobRepository = aiRepository
     )
@@ -253,19 +300,68 @@ suspend fun main() {
         val relayFeatures = RelayFeatureFlags(
             protocolV2Enabled = config.editorProtocol.v2Enabled,
             v2WritesEnabled = config.editorProtocol.v2WritesEnabled,
+            releaseTransactionsEnabled = config.editorProtocol.releaseTransactionsEnabled,
         )
         val relayHandler = RelayHandler(registry, relaySessionStore, config.sessions.ttl.toMillis(), relayFeatures)
-        val serverEndpoint = ServerEndpoint(registry, licenseManager, relayFeatures) { server ->
-            commercialServices?.let { services ->
-                try {
-                    services.claims.registerClaimedServer(server.licenseKey, server.serverId, server.serverName)
-                } catch (failure: CancellationException) {
-                    throw failure
-                } catch (failure: Throwable) {
-                    println("commercial_server_sync_failed type=${failure::class.simpleName}")
-                }
+        val releaseCoordinator = commercialServices?.releases?.let { releases ->
+            ReleaseTransactionCoordinator(
+                repository = releases.repository,
+                dispatcher = ReleaseRelayDispatcher(registry, config.release.enabled),
+                snapshots = releases.snapshots,
+                publicBaseUrl = requireNotNull(config.release.publicBaseUrl),
+                transferTtl = config.release.transferTtl,
+                transactionLease = config.release.transactionLease,
+                readinessTimeout = config.release.readinessTimeout,
+                maxReleaseBytes = config.release.maxReleaseBytes
+            )
+        }
+        releaseCoordinator?.let { coordinator ->
+            applicationScope.launch {
+                ReleaseRecoveryWorker(
+                    coordinator = coordinator,
+                    workerId = "${config.updates.instanceId}-release",
+                    onFailure = { failure ->
+                        println("release_recovery_worker_failed type=${failure::class.simpleName}")
+                    }
+                ).run()
             }
         }
+        val releaseJson = Json { ignoreUnknownKeys = false }
+        val serverEndpoint = ServerEndpoint(
+            registry = registry,
+            licenseManager = licenseManager,
+            features = relayFeatures,
+            onRegistered = { server ->
+                commercialServices?.let { services ->
+                    try {
+                        services.claims.registerClaimedServer(server.licenseKey, server.serverId, server.serverName)
+                            ?.instance
+                            ?.id
+                    } catch (failure: CancellationException) {
+                        throw failure
+                    } catch (failure: Throwable) {
+                        println("commercial_server_sync_failed type=${failure::class.simpleName}")
+                        null
+                    }
+                }
+            },
+            onReleaseResult = { server, message ->
+                val coordinator = releaseCoordinator
+                if (coordinator != null) {
+                    try {
+                        val result = releaseJson.decodeFromJsonElement(ReleaseResultData.serializer(), message.data)
+                        val outcome = coordinator.handlePluginResult(server, result)
+                        if (outcome is com.orryx.editor.release.PluginReleaseResultOutcome.RetryableFailure) {
+                            println("release_result_retryable transaction=${result.transactionId} reason=${outcome.reason}")
+                        }
+                    } catch (failure: CancellationException) {
+                        throw failure
+                    } catch (failure: Throwable) {
+                        println("release_result_rejected type=${failure::class.simpleName}")
+                    }
+                }
+            }
+        )
 
         val updateStore = PostgresUpdateJobStore(database, config.updates.instanceId)
         val updateService = UpdateService(
@@ -317,7 +413,8 @@ suspend fun main() {
                 readinessCheck = { database.ping() && ketherDocsService.status().health != KetherDocsHealth.FAILED },
                 updateService = updateService,
                 ketherDocsService = ketherDocsService,
-                commercialServices = commercialServices
+                commercialServices = commercialServices,
+                releaseCoordinator = releaseCoordinator
             )
             configureWebSockets(relayHandler, serverEndpoint, config.security)
 

@@ -42,7 +42,6 @@ data class ServerRegisterResultData(
     val message: String? = null
 )
 
-/** Phase 0 DTO only. Relay does not persist snapshots or execute releases. */
 @Serializable
 data class ManifestSnapshotFile(
     val path: String,
@@ -58,20 +57,64 @@ data class ManifestSnapshotData(
     val createdAt: Long? = null
 )
 
-/** Phase 0 DTO only. Release transactions are intentionally not implemented. */
+@Serializable
+enum class ReleaseAction {
+    PREPARE,
+    COMMIT,
+    STATUS,
+    ROLLBACK;
+
+    val wireName: String
+        get() = name.lowercase()
+}
+
+@Serializable
+enum class ReleasePluginState {
+    PREPARING,
+    PREPARED,
+    COMMITTING,
+    READINESS_PENDING,
+    READY,
+    ROLLING_BACK,
+    ROLLED_BACK,
+    FAILED,
+    RECOVERY_REQUIRED
+}
+
 @Serializable
 data class ReleaseRequestData(
-    val manifestId: String,
-    val expectedManifestRevision: String,
-    val releaseId: String? = null
+    val action: String,
+    val transactionId: String,
+    val releaseId: String,
+    val commandId: String,
+    val canonicalVersion: String? = null,
+    val canonicalPayloadSha256: String? = null,
+    val signingKeyId: String? = null,
+    val signature: String? = null,
+    val expectedManifestRevision: String? = null,
+    val targetManifestRevision: String? = null,
+    val fileCount: Int? = null,
+    val totalBytes: Long? = null,
+    val operationsUrl: String? = null,
+    val transferToken: String? = null,
+    val transferExpiresAt: Long? = null,
+    val readinessDeadline: Long? = null,
+    val reason: String? = null
 )
 
 @Serializable
 data class ReleaseResultData(
+    val action: String,
+    val transactionId: String,
+    val releaseId: String,
+    val commandId: String,
     val success: Boolean,
-    val releaseId: String? = null,
-    val manifestRevision: String? = null,
-    val code: String? = null,
+    val pluginState: ReleasePluginState,
+    val eventId: String,
+    val eventSeq: Long,
+    val observedManifestRevision: String? = null,
+    val resultManifestRevision: String? = null,
+    val errorCode: String? = null,
     val message: String? = null
 )
 
@@ -143,12 +186,19 @@ sealed interface ContractValidationResult {
  */
 object ProtocolContracts {
     private val both = setOf(ProtocolVersion.V1, ProtocolVersion.V2)
+    private val v2Only = setOf(ProtocolVersion.V2)
 
     private fun browserRequest(type: String, response: String? = null) =
         MessageContract(type, MessageDirection.BROWSER_TO_RELAY, both, response)
 
-    private fun pluginMessage(type: String) =
-        MessageContract(type, MessageDirection.PLUGIN_TO_RELAY, both)
+    private fun pluginMessage(type: String, versions: Set<ProtocolVersion> = both) =
+        MessageContract(type, MessageDirection.PLUGIN_TO_RELAY, versions)
+
+    private fun relayToPlugin(type: String, versions: Set<ProtocolVersion> = both) =
+        MessageContract(type, MessageDirection.RELAY_TO_PLUGIN, versions)
+
+    private fun relayToBrowser(type: String, versions: Set<ProtocolVersion> = both) =
+        MessageContract(type, MessageDirection.RELAY_TO_BROWSER, versions)
 
     private val contracts = listOf(
         browserRequest(MessageTypes.AUTH, MessageTypes.AUTH_RESULT),
@@ -170,30 +220,15 @@ object ProtocolContracts {
         pluginMessage(MessageTypes.FILE_TREE),
         pluginMessage(MessageTypes.FILE_CONTENT),
         pluginMessage(MessageTypes.FILE_WRITTEN),
+        pluginMessage(MessageTypes.FILE_CHANGED),
         pluginMessage(MessageTypes.RELOAD_RESULT),
         pluginMessage(MessageTypes.LOG_SUBSCRIBE_RESULT),
         pluginMessage(MessageTypes.LOG_UNSUBSCRIBE_RESULT),
         pluginMessage(MessageTypes.LOG_ENTRY),
-        pluginMessage(MessageTypes.FILE_CHANGED),
         pluginMessage(MessageTypes.SERVER_INFO),
+        pluginMessage(MessageTypes.RELEASE_RESULT, v2Only),
         pluginMessage(MessageTypes.ERROR),
-
-        MessageContract(MessageTypes.AUTH_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.RESUME_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.FILE_TREE, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.FILE_CONTENT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.FILE_WRITTEN, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.FILE_CHANGED, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.PRESENCE_UPDATE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.PRESENCE_UPDATED, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.RELOAD_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.LOG_SUBSCRIBE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.LOG_UNSUBSCRIBE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.LOG_ENTRY, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.SERVER_INFO, MessageDirection.RELAY_TO_BROWSER, both),
-        MessageContract(MessageTypes.ERROR, MessageDirection.RELAY_TO_BROWSER, both),
-
-        MessageContract(MessageTypes.SERVER_REGISTER_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
+        relayToPlugin(MessageTypes.SERVER_REGISTER_RESULT),
         MessageContract(MessageTypes.TOKEN_REGISTER_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.TOKEN_REVOKE_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.ERROR, MessageDirection.RELAY_TO_PLUGIN, both),
@@ -205,7 +240,23 @@ object ProtocolContracts {
         MessageContract(MessageTypes.FILE_RENAME, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.RELOAD, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.LOG_SUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both),
-        MessageContract(MessageTypes.LOG_UNSUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both)
+        MessageContract(MessageTypes.LOG_UNSUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both),
+        relayToPlugin(MessageTypes.RELEASE_REQUEST, v2Only),
+
+        relayToBrowser(MessageTypes.AUTH_RESULT),
+        relayToBrowser(MessageTypes.RESUME_RESULT),
+        relayToBrowser(MessageTypes.FILE_TREE),
+        relayToBrowser(MessageTypes.FILE_CONTENT),
+        relayToBrowser(MessageTypes.FILE_WRITTEN),
+        relayToBrowser(MessageTypes.FILE_CHANGED),
+        relayToBrowser(MessageTypes.PRESENCE_UPDATE_RESULT),
+        relayToBrowser(MessageTypes.PRESENCE_UPDATED),
+        relayToBrowser(MessageTypes.RELOAD_RESULT),
+        relayToBrowser(MessageTypes.LOG_SUBSCRIBE_RESULT),
+        relayToBrowser(MessageTypes.LOG_UNSUBSCRIBE_RESULT),
+        relayToBrowser(MessageTypes.LOG_ENTRY),
+        relayToBrowser(MessageTypes.SERVER_INFO),
+        relayToBrowser(MessageTypes.ERROR)
     )
 
     private val byType = contracts.groupBy(MessageContract::type)
@@ -342,7 +393,7 @@ object MessageTypes {
     const val SERVER_INFO = "server.info"
     const val ERROR = "error"
 
-    // Phase 0 schema reservations only; no relay route or release transaction is enabled.
+    // manifest.snapshot remains reserved; release control is V2 relay↔plugin only.
     const val MANIFEST_SNAPSHOT = "manifest.snapshot"
     const val RELEASE_REQUEST = "release.request"
     const val RELEASE_RESULT = "release.result"

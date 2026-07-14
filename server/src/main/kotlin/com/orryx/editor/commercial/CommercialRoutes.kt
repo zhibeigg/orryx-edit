@@ -19,6 +19,14 @@ import com.orryx.editor.payment.PaymentProviderType
 import com.orryx.editor.payment.PaymentSettlementOutcome
 import com.orryx.editor.payment.ProductId
 import com.orryx.editor.plugins.ApiError
+import com.orryx.editor.rbac.CommercialPermission
+import com.orryx.editor.rbac.PermissionEvaluator
+import com.orryx.editor.release.PluginReleaseTransaction
+import com.orryx.editor.release.PublishReleaseCommand
+import com.orryx.editor.release.PublishReleaseResult
+import com.orryx.editor.release.ReleaseTransactionCoordinator
+import com.orryx.editor.release.ReleaseTransferToken
+import com.orryx.editor.release.SignedRelease
 import com.orryx.editor.security.constantTimeEquals
 import com.orryx.editor.snapshot.CreateSnapshotCommand
 import com.orryx.editor.snapshot.SnapshotFile
@@ -29,6 +37,7 @@ import com.orryx.editor.versioning.DraftFile
 import com.orryx.editor.versioning.DraftFileChangeType
 import com.orryx.editor.versioning.DraftVersionSource
 import com.orryx.editor.versioning.StoredDraftVersion
+import io.ktor.http.ContentType
 import io.ktor.http.Cookie
 import io.ktor.http.CookieEncoding
 import io.ktor.http.HttpHeaders
@@ -37,6 +46,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -46,6 +56,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 
@@ -53,7 +64,10 @@ private const val SESSION_COOKIE = "orryx_session"
 private const val CSRF_COOKIE = "orryx_csrf"
 private const val CSRF_HEADER = "X-CSRF-Token"
 
-fun Route.commercialRoutes(services: CommercialServices) {
+fun Route.commercialRoutes(
+    services: CommercialServices,
+    releaseCoordinator: ReleaseTransactionCoordinator? = null
+) {
     if (!services.features.accountsEnabled) return
     route("/api/v2") {
         route("/auth") {
@@ -175,6 +189,9 @@ fun Route.commercialRoutes(services: CommercialServices) {
         if (services.features.cloudDraftsEnabled && services.drafts != null && services.snapshots != null) {
             cloudDraftRoutes(services)
         }
+        if (services.releases != null && releaseCoordinator != null) {
+            releaseRoutes(services, releaseCoordinator)
+        }
         if (services.features.aiWorkbenchEnabled && services.aiJobs != null && services.aiJobRepository != null) {
             aiJobRoutes(services)
         }
@@ -276,6 +293,310 @@ private fun Route.cloudDraftRoutes(services: CommercialServices) {
         }
     }
 }
+
+private fun Route.releaseRoutes(
+    services: CommercialServices,
+    coordinator: ReleaseTransactionCoordinator
+) {
+    val releases = checkNotNull(services.releases)
+    val drafts = checkNotNull(services.drafts)
+
+    route("/releases") {
+        post {
+            val account = call.requireAccount(services, requireCsrf = true) ?: return@post
+            val idempotencyKey = call.request.headers["Idempotency-Key"]
+                ?.takeIf { it.length in 8..128 && it.matches(Regex("^[A-Za-z0-9._:-]+$")) }
+                ?: run {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ApiError("IDEMPOTENCY_KEY_REQUIRED", "发布必须提供合法的 Idempotency-Key")
+                    )
+                    return@post
+                }
+            val input = call.receive<PublishReleaseInput>()
+            val serverInstanceId = runCatching { UUID.fromString(input.serverInstanceId).toString() }.getOrNull()
+                ?: run {
+                    call.respond(HttpStatusCode.BadRequest, ApiError("INVALID_SERVER_INSTANCE", "serverInstanceId 无效"))
+                    return@post
+                }
+            if (call.requireServerPermission(
+                    services,
+                    account,
+                    serverInstanceId,
+                    CommercialPermission.RELEASE_CREATE
+                ) == null
+            ) return@post
+            val draftId = runCatching { UUID.fromString(input.draftId) }.getOrNull() ?: run {
+                call.respond(HttpStatusCode.BadRequest, ApiError("INVALID_DRAFT_ID", "draftId 无效"))
+                return@post
+            }
+            val versionId = runCatching { UUID.fromString(input.draftVersionId) }.getOrNull() ?: run {
+                call.respond(HttpStatusCode.BadRequest, ApiError("INVALID_DRAFT_VERSION_ID", "draftVersionId 无效"))
+                return@post
+            }
+            val draft = drafts.get(draftId)
+            if (draft == null || draft.accountId != account.id || draft.serverInstanceId != serverInstanceId) {
+                call.respond(HttpStatusCode.NotFound, ApiError("DRAFT_NOT_FOUND", "草稿不存在"))
+                return@post
+            }
+            val result = try {
+                releases.publisher.publish(
+                    PublishReleaseCommand(
+                        accountId = account.id,
+                        serverInstanceId = serverInstanceId,
+                        draftId = draftId,
+                        draftVersionId = versionId,
+                        expectedCurrentVersion = input.expectedCurrentVersion,
+                        expectedBaseManifestRevision = input.expectedBaseManifestRevision,
+                        idempotencyKey = idempotencyKey
+                    )
+                )
+            } catch (failure: IllegalArgumentException) {
+                val conflict = failure.message?.contains("已变化") == true ||
+                    failure.message?.contains("只能发布当前") == true ||
+                    failure.message?.contains("manifest") == true
+                call.respond(
+                    if (conflict) HttpStatusCode.Conflict else HttpStatusCode.BadRequest,
+                    ApiError(if (conflict) "RELEASE_CONFLICT" else "INVALID_RELEASE", "发布请求无效")
+                )
+                return@post
+            }
+            when (result) {
+                is PublishReleaseResult.Accepted -> call.respond(
+                    HttpStatusCode.Accepted,
+                    PublishReleaseResponse(
+                        release = result.release.toResponse(),
+                        transaction = result.transaction.toResponse(),
+                        replayed = result.replayed
+                    )
+                )
+                is PublishReleaseResult.IdempotencyConflict -> call.respond(
+                    HttpStatusCode.Conflict,
+                    ApiError(
+                        "RELEASE_IDEMPOTENCY_CONFLICT",
+                        "Idempotency-Key 已用于不同发布请求",
+                        result.existingTransactionId.toString()
+                    )
+                )
+                is PublishReleaseResult.ActiveTransactionConflict -> call.respond(
+                    HttpStatusCode.Conflict,
+                    ApiError(
+                        "RELEASE_TRANSACTION_ACTIVE",
+                        "该服务器实例已有未完成发布事务",
+                        result.existingTransactionId.toString()
+                    )
+                )
+            }
+        }
+
+        get("/{releaseId}") {
+            val account = call.requireAccount(services) ?: return@get
+            val releaseId = call.requiredUuidParameter("releaseId")?.let(UUID::fromString) ?: return@get
+            val release = releases.repository.findRelease(releaseId)
+            if (release == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_NOT_FOUND", "发布包不存在"))
+                return@get
+            }
+            if (release.accountId != account.id || call.requireServerPermission(
+                    services,
+                    account,
+                    release.serverInstanceId,
+                    CommercialPermission.RELEASE_READ
+                ) == null
+            ) return@get
+            call.respond(release.toResponse())
+        }
+
+        get("/{releaseId}/operations") {
+            val releaseId = call.requiredUuidParameter("releaseId")?.let(UUID::fromString) ?: return@get
+            val release = releases.repository.findRelease(releaseId)
+            if (release == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_NOT_FOUND", "发布包不存在"))
+                return@get
+            }
+            if (!call.authorizeReleaseTransfer(releases, release)) return@get
+            val files = releases.repository.listFiles(release.id)
+            call.noStoreReleaseResponse()
+            call.respond(
+                ReleaseOperationsResponse(
+                    canonicalVersion = "orryx-release-v1",
+                    canonicalPayloadSha256 = sha256(release.canonicalPayload),
+                    signingKeyId = release.keyId,
+                    signature = release.signature,
+                    releaseId = release.id.toString(),
+                    serverInstanceId = release.serverInstanceId,
+                    stableServerId = release.stableServerId,
+                    draftId = release.draftId.toString(),
+                    draftVersionId = release.draftVersionId.toString(),
+                    expectedManifestRevision = release.expectedBaseManifestRevision,
+                    targetManifestRevision = release.targetManifestRevision,
+                    createdAt = release.createdAt.toEpochMilli(),
+                    fileCount = files.size,
+                    totalBytes = files.sumOf { it.size },
+                    files = files.map { file ->
+                        ReleaseOperationFileResponse(
+                            ordinal = file.ordinal,
+                            path = file.path,
+                            baseRevision = file.baseRevision,
+                            contentRevision = file.contentRevision,
+                            size = file.size,
+                            contentUrl = coordinator.fileUrl(release.id, file.ordinal)
+                        )
+                    }
+                )
+            )
+        }
+
+        get("/{releaseId}/files/{ordinal}") {
+            val releaseId = call.requiredUuidParameter("releaseId")?.let(UUID::fromString) ?: return@get
+            val ordinal = call.parameters["ordinal"]?.toIntOrNull()?.takeIf { it >= 0 } ?: run {
+                call.respond(HttpStatusCode.BadRequest, ApiError("INVALID_RELEASE_FILE", "release file ordinal 无效"))
+                return@get
+            }
+            val release = releases.repository.findRelease(releaseId)
+            if (release == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_NOT_FOUND", "发布包不存在"))
+                return@get
+            }
+            if (!call.authorizeReleaseTransfer(releases, release)) return@get
+            val file = releases.repository.findFile(release.id, ordinal)
+            if (file == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_FILE_NOT_FOUND", "发布文件不存在"))
+                return@get
+            }
+            val content = file.content.toByteArray(StandardCharsets.UTF_8)
+            if (content.size.toLong() != file.size || sha256(content) != file.contentRevision) {
+                content.fill(0)
+                call.respond(HttpStatusCode.InternalServerError, ApiError("RELEASE_FILE_CORRUPT", "发布文件完整性校验失败"))
+                return@get
+            }
+            call.noStoreReleaseResponse()
+            call.respondBytes(content, ContentType.Application.OctetStream)
+        }
+    }
+
+    route("/release-transactions/{transactionId}") {
+        get {
+            val account = call.requireAccount(services) ?: return@get
+            val transactionId = call.requiredUuidParameter("transactionId")?.let(UUID::fromString) ?: return@get
+            val transaction = releases.repository.findTransaction(transactionId)
+            val release = transaction?.let { releases.repository.findRelease(it.releaseId) }
+            if (transaction == null || release == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_TRANSACTION_NOT_FOUND", "发布事务不存在"))
+                return@get
+            }
+            if (release.accountId != account.id || call.requireServerPermission(
+                    services,
+                    account,
+                    release.serverInstanceId,
+                    CommercialPermission.RELEASE_READ
+                ) == null
+            ) return@get
+            call.respond(transaction.toResponse())
+        }
+        post("/rollback") {
+            val account = call.requireAccount(services, requireCsrf = true) ?: return@post
+            val transactionId = call.requiredUuidParameter("transactionId")?.let(UUID::fromString) ?: return@post
+            val transaction = releases.repository.findTransaction(transactionId)
+            val release = transaction?.let { releases.repository.findRelease(it.releaseId) }
+            if (transaction == null || release == null) {
+                call.respond(HttpStatusCode.NotFound, ApiError("RELEASE_TRANSACTION_NOT_FOUND", "发布事务不存在"))
+                return@post
+            }
+            if (release.accountId != account.id || call.requireServerPermission(
+                    services,
+                    account,
+                    release.serverInstanceId,
+                    CommercialPermission.RELEASE_ROLLBACK
+                ) == null
+            ) return@post
+            val input = call.receive<RollbackReleaseInput>()
+            val updated = coordinator.requestRollback(transaction.id, input.reason)
+            if (updated == null) {
+                call.respond(HttpStatusCode.Conflict, ApiError("RELEASE_ROLLBACK_CONFLICT", "发布事务无法回滚"))
+            } else {
+                call.respond(HttpStatusCode.Accepted, updated.toResponse())
+            }
+        }
+    }
+}
+
+private suspend fun ApplicationCall.requireServerPermission(
+    services: CommercialServices,
+    account: Account,
+    serverInstanceId: String,
+    permission: CommercialPermission
+): ServerInstance? {
+    val instance = services.claims.findServerInstance(serverInstanceId)
+    if (instance == null) {
+        respond(HttpStatusCode.NotFound, ApiError("SERVER_INSTANCE_NOT_FOUND", "服务器实例不存在"))
+        return null
+    }
+    val membership = services.claims.memberships(instance.workspaceId).firstOrNull { it.accountId == account.id }
+    if (membership == null || !PermissionEvaluator().isAllowed(membership.role, permission)) {
+        forbid()
+        return null
+    }
+    return instance
+}
+
+private suspend fun ApplicationCall.authorizeReleaseTransfer(
+    services: CommercialReleaseServices,
+    release: SignedRelease
+): Boolean {
+    val authorization = request.headers[HttpHeaders.Authorization].orEmpty()
+    if (!authorization.startsWith("Bearer ") || authorization.length !in 48..320) {
+        response.headers.append(HttpHeaders.WWWAuthenticate, "Bearer")
+        respond(HttpStatusCode.Unauthorized, ApiError("RELEASE_TRANSFER_REQUIRED", "需要发布传输令牌"))
+        return false
+    }
+    val rawToken = authorization.removePrefix("Bearer ")
+    val grant = services.repository.authorizeTransfer(
+        releaseId = release.id,
+        tokenHash = ReleaseTransferToken.hash(rawToken),
+        serverInstanceId = release.serverInstanceId,
+        now = Instant.now()
+    )
+    if (grant == null) {
+        response.headers.append(HttpHeaders.WWWAuthenticate, "Bearer")
+        respond(HttpStatusCode.Unauthorized, ApiError("RELEASE_TRANSFER_INVALID", "发布传输令牌无效或已过期"))
+        return false
+    }
+    return true
+}
+
+private fun ApplicationCall.noStoreReleaseResponse() {
+    response.headers.append(HttpHeaders.CacheControl, "no-store")
+    response.headers.append("X-Content-Type-Options", "nosniff")
+}
+
+private fun sha256(bytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+private fun SignedRelease.toResponse() = SignedReleaseResponse(
+    id = id.toString(),
+    serverInstanceId = serverInstanceId,
+    draftId = draftId.toString(),
+    draftVersionId = draftVersionId.toString(),
+    draftVersionNumber = draftVersionNumber,
+    expectedManifestRevision = expectedBaseManifestRevision,
+    targetManifestRevision = targetManifestRevision,
+    signingKeyId = keyId,
+    canonicalPayloadSha256 = sha256(canonicalPayload),
+    createdAt = createdAt.toString()
+)
+
+private fun PluginReleaseTransaction.toResponse() = ReleaseTransactionResponse(
+    id = id.toString(),
+    releaseId = releaseId.toString(),
+    serverInstanceId = serverInstanceId,
+    status = status.name,
+    stateVersion = stateVersion,
+    errorCode = errorCode,
+    createdAt = createdAt.toString(),
+    updatedAt = updatedAt.toString(),
+    finishedAt = finishedAt?.toString()
+)
 
 private fun Route.aiJobRoutes(services: CommercialServices) {
     val jobs = checkNotNull(services.aiJobs)
@@ -487,6 +808,68 @@ private fun AiJob.toResponse() = AiJobResponse(
 @Serializable private data class DraftResponse(val id: String, val accountId: String, val serverInstanceId: String, val baseSnapshotId: String, val title: String, val status: String, val currentVersion: Long, val createdAt: String, val updatedAt: String)
 @Serializable private data class DraftVersionResponse(val id: String, val draftId: String, val versionNumber: Long, val source: String, val manifestRevision: String, val createdAt: String, val files: List<DraftFileResponse>)
 @Serializable private data class DraftFileResponse(val changeType: String, val path: String, val baseRevision: String?, val contentRevision: String?, val size: Long, val content: String?)
+
+@Serializable private data class PublishReleaseInput(
+    val serverInstanceId: String,
+    val draftId: String,
+    val draftVersionId: String,
+    val expectedCurrentVersion: Long,
+    val expectedBaseManifestRevision: String
+)
+@Serializable private data class RollbackReleaseInput(val reason: String = "USER_REQUESTED")
+@Serializable private data class PublishReleaseResponse(
+    val release: SignedReleaseResponse,
+    val transaction: ReleaseTransactionResponse,
+    val replayed: Boolean
+)
+@Serializable private data class SignedReleaseResponse(
+    val id: String,
+    val serverInstanceId: String,
+    val draftId: String,
+    val draftVersionId: String,
+    val draftVersionNumber: Long,
+    val expectedManifestRevision: String,
+    val targetManifestRevision: String,
+    val signingKeyId: String,
+    val canonicalPayloadSha256: String,
+    val createdAt: String
+)
+@Serializable private data class ReleaseTransactionResponse(
+    val id: String,
+    val releaseId: String,
+    val serverInstanceId: String,
+    val status: String,
+    val stateVersion: Long,
+    val errorCode: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val finishedAt: String?
+)
+@Serializable private data class ReleaseOperationsResponse(
+    val canonicalVersion: String,
+    val canonicalPayloadSha256: String,
+    val signingKeyId: String,
+    val signature: String,
+    val releaseId: String,
+    val serverInstanceId: String,
+    val stableServerId: String,
+    val draftId: String,
+    val draftVersionId: String,
+    val expectedManifestRevision: String,
+    val targetManifestRevision: String,
+    val createdAt: Long,
+    val fileCount: Int,
+    val totalBytes: Long,
+    val files: List<ReleaseOperationFileResponse>
+)
+@Serializable private data class ReleaseOperationFileResponse(
+    val ordinal: Int,
+    val path: String,
+    val baseRevision: String?,
+    val contentRevision: String,
+    val size: Long,
+    val contentUrl: String
+)
 
 @Serializable private data class CreateAiJobInput(
     val serverInstanceId: String,
