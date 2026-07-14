@@ -13,7 +13,9 @@ async function expectNoSeriousAxeViolations(page: import("@playwright/test").Pag
 
 test("插件门户首页在所有视口保持可读和可操作", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByRole("heading", { name: "把复杂技能系统，交给一条可审核的生产链。" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /不用想象.*真实技能/ })).toBeVisible()
+  await expect(page.getByRole("figure", { name: /Orryx Editor 技能编辑工作区实景/ })).toBeVisible()
+  await expect(page.getByRole("figure", { name: /Orryx 中心.*真实运行链路示例/ })).toBeVisible()
   await expect(page.getByRole("link", { name: "创建账户" }).first()).toHaveAttribute("href", "/register")
   await expect(page.getByText("/orryx edit").first()).toBeVisible()
   await expectNoPageOverflow(page)
