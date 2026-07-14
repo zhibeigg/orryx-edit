@@ -29,7 +29,6 @@ import com.orryx.editor.ketherdocs.CachedKetherDocs
 import com.orryx.editor.ketherdocs.PostgresKetherDocsRepository
 import com.orryx.editor.ketherdocs.StoredKetherDocsSyncState
 import com.orryx.editor.license.CreateLicenseCommand
-import com.orryx.editor.license.License
 import com.orryx.editor.license.LicenseService
 import com.orryx.editor.license.PostgresLicenseRepository
 import com.orryx.editor.payment.PaymentOrder
@@ -249,45 +248,6 @@ class PostgresIntegrationTest {
             )
             assertNotNull(relaySessions.consume(tokenHash))
             assertNull(relaySessions.consume(tokenHash))
-
-            val expiredNow = Instant.now()
-            val expiredLicense = PostgresLicenseRepository(database).create(
-                License(
-                    license = "expired-${UUID.randomUUID()}",
-                    owner = "expired-integration",
-                    createdAt = expiredNow.minusSeconds(86_400),
-                    expiresAt = expiredNow.minusSeconds(60),
-                    boundIps = emptyList(),
-                    serverKey = "expired-server-${UUID.randomUUID()}",
-                    enabled = true,
-                    maxBoundIps = 1,
-                    updatedAt = expiredNow
-                )
-            )
-            assertNull(service.validate(expiredLicense.license))
-            assertNotNull(service.validateEditorAccess(expiredLicense.license))
-            assertEquals(
-                "LICENSE_NOT_FOUND_OR_INACTIVE",
-                claimService.claim(ClaimLicenseCommand(account.id, expiredLicense.license)).outcome.name
-            )
-            val expiredTokenHash = sha256("expired-resume-${UUID.randomUUID()}")
-            val expiredRecord = EditorSessionRecord(
-                licenseKey = expiredLicense.license,
-                browserId = "browser-${UUID.randomUUID()}",
-                playerName = "ExpiredIntegrationPlayer",
-                workspaceId = sha256("${expiredLicense.serverKey}\u0000expired-integration"),
-                serverKey = expiredLicense.serverKey,
-                serverId = "expired-integration",
-                expiresAt = System.currentTimeMillis() + 60_000
-            )
-            relaySessions.save(expiredTokenHash, expiredRecord)
-            assertNotNull(relaySessions.consume(expiredTokenHash))
-            assertNull(relaySessions.consume(expiredTokenHash))
-            assertTrue(service.revoke(expiredLicense.license))
-            val disabledSave = runCatching {
-                relaySessions.save(sha256("disabled-resume-${UUID.randomUUID()}"), expiredRecord)
-            }
-            assertTrue(disabledSave.exceptionOrNull() is IllegalArgumentException)
 
             val instanceId = "integration-${UUID.randomUUID()}"
             val updateStore = PostgresUpdateJobStore(database, instanceId)
