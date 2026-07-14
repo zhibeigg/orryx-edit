@@ -548,7 +548,7 @@ class RelayIsolationTest {
     }
 
     private class AllowAllLicenses : RelayLicenseAccess {
-        override suspend fun validate(license: String, connectIp: String): RelayLicense = license()
+        override suspend fun validateEditorAccess(license: String, connectIp: String): RelayLicense = license()
         override suspend fun get(license: String): RelayLicense = license()
         override suspend fun addIp(license: String, ip: String): Boolean = true
 
@@ -556,7 +556,6 @@ class RelayIsolationTest {
             license = "license-key",
             serverKey = "shared-key",
             enabled = true,
-            expiresAt = 0,
             boundIps = emptyList()
         )
     }

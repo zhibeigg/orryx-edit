@@ -33,10 +33,9 @@ class PostgresEditorSessionRepository(
                     """
                     SELECT 1 FROM licenses
                     WHERE license_key = $1 AND server_key = $2 AND enabled = TRUE
-                      AND (expires_at IS NULL OR expires_at > $3)
                     FOR KEY SHARE
                     """.trimIndent()
-                ).bind(0, command.licenseKey).bind(1, command.serverKey).bind(2, command.now)
+                ).bind(0, command.licenseKey).bind(1, command.serverKey)
             ) { _, _ -> true } ?: false
             require(effective) { "license 无效或 serverKey 不匹配" }
             executeFully(
@@ -76,7 +75,6 @@ class PostgresEditorSessionRepository(
                       AND session.revoked_at IS NULL AND session.expires_at > $2
                       AND license.server_key = session.server_key
                       AND license.enabled = TRUE
-                      AND (license.expires_at IS NULL OR license.expires_at > $2)
                     """.trimIndent()
                 ).bind(0, hash).bind(1, now)
             ) { row, _ -> row.toEditorSession() }
@@ -96,7 +94,6 @@ class PostgresEditorSessionRepository(
                           WHERE license_key = session.license_key
                             AND server_key = session.server_key
                             AND enabled = TRUE
-                            AND (expires_at IS NULL OR expires_at > $2)
                       )
                     """.trimIndent()
                 ).bind(0, id).bind(1, now).bind(2, expiresAt)
@@ -124,7 +121,6 @@ class PostgresEditorSessionRepository(
                       AND session.revoked_at IS NULL AND session.expires_at > $2
                       AND license.server_key = session.server_key
                       AND license.enabled = TRUE
-                      AND (license.expires_at IS NULL OR license.expires_at > $2)
                     FOR UPDATE OF session
                     """.trimIndent()
                 ).bind(0, oldHash).bind(1, now)

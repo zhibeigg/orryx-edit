@@ -198,13 +198,12 @@ class ServerEndpoint(
         }
 
         val connectIp = sessionIps[session].orEmpty()
-        val entry = licenseAccess.validate(license, connectIp)
+        val entry = licenseAccess.validateEditorAccess(license, connectIp)
         if (entry == null) {
             val raw = licenseAccess.get(license)
             val code = when {
                 raw == null -> "LICENSE_NOT_FOUND"
                 !raw.enabled -> "LICENSE_DISABLED"
-                raw.isExpired() -> "LICENSE_EXPIRED"
                 !raw.isIpAllowed(connectIp) -> "IP_NOT_ALLOWED"
                 else -> "INVALID_LICENSE"
             }

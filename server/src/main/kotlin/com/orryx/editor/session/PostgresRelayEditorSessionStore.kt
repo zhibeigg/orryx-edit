@@ -18,17 +18,16 @@ class PostgresRelayEditorSessionStore(
         val now = Instant.now()
         require(expiresAt.isAfter(now)) { "resume session 已过期" }
         database.inTransaction { connection ->
-            val licenseActive = queryOne(
+            val editorAccessAllowed = queryOne(
                 connection.createStatement(
                     """
                     SELECT 1 FROM licenses
                     WHERE license_key = $1 AND server_key = $2 AND enabled = TRUE
-                      AND (expires_at IS NULL OR expires_at > $3)
                     FOR KEY SHARE
                     """.trimIndent()
-                ).bind(0, session.licenseKey).bind(1, session.serverKey).bind(2, now)
+                ).bind(0, session.licenseKey).bind(1, session.serverKey)
             ) { _, _ -> true } ?: false
-            require(licenseActive) { "license 无效、已禁用或已过期" }
+            require(editorAccessAllowed) { "license 无效、已禁用或 serverKey 不匹配" }
             executeFully(
                 connection.createStatement(
                     """
@@ -67,7 +66,6 @@ class PostgresRelayEditorSessionStore(
                       AND session.revoked_at IS NULL
                       AND session.expires_at > $2
                       AND license.enabled = TRUE
-                      AND (license.expires_at IS NULL OR license.expires_at > $2)
                     RETURNING session.*
                     """.trimIndent()
                 ).bind(0, tokenHash).bind(1, now)

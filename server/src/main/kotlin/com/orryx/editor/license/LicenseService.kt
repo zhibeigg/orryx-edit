@@ -40,6 +40,14 @@ class LicenseService(
         return license.takeIf { it.isIpAllowed(normalizedIp) }
     }
 
+    /** Editor relay 使用 License 作为服务器身份凭据，到期不影响实时编辑器访问。 */
+    suspend fun validateEditorAccess(licenseKey: String, connectIp: String = ""): License? {
+        val license = repository.find(licenseKey) ?: return null
+        if (!license.enabled) return null
+        val normalizedIp = if (connectIp.isBlank()) "" else normalizeIpAddress(connectIp) ?: return null
+        return license.takeIf { it.isIpAllowed(normalizedIp) }
+    }
+
     suspend fun get(licenseKey: String): License? = repository.find(licenseKey)
     suspend fun list(): List<License> = repository.list()
 

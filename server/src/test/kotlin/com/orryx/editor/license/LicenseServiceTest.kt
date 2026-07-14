@@ -31,6 +31,24 @@ class LicenseServiceTest {
     }
 
     @Test
+    fun `editor access ignores expiration but still enforces revocation and bound ip`() = runTest {
+        val repository = InMemoryLicenseRepository()
+        val activeService = service(repository)
+        val license = activeService.create(CreateLicenseCommand("owner", days = 1, maxBoundIps = 1))
+        assertEquals(AddIpResult.ADDED, activeService.addIp(license.license, "127.0.0.1"))
+
+        val expiredService = service(repository, now.plusSeconds(2 * 86_400L))
+        assertNull(expiredService.validate(license.license, "127.0.0.1"))
+        assertNotNull(expiredService.validateEditorAccess(license.license, "127.0.0.1"))
+        assertNull(expiredService.validateEditorAccess(license.license, "127.0.0.2"))
+        assertNull(expiredService.validateEditorAccess(license.license, "not-an-ip"))
+        assertNull(expiredService.validateEditorAccess("missing-license", "127.0.0.1"))
+
+        assertTrue(expiredService.revoke(license.license))
+        assertNull(expiredService.validateEditorAccess(license.license, "127.0.0.1"))
+    }
+
+    @Test
     fun `enforces ip upper limit transactionally`() = runTest {
         val service = service(InMemoryLicenseRepository())
         val license = service.create(CreateLicenseCommand("owner", maxBoundIps = 1))
@@ -50,9 +68,9 @@ class LicenseServiceTest {
         assertFalse(service.renew("missing", 5))
     }
 
-    private fun service(repository: LicenseRepository): LicenseService = LicenseService(
+    private fun service(repository: LicenseRepository, instant: Instant = now): LicenseService = LicenseService(
         repository = repository,
-        clock = Clock.fixed(now, ZoneOffset.UTC),
+        clock = Clock.fixed(instant, ZoneOffset.UTC),
         licenseKeyGenerator = { "license-key-00000001" },
         serverKeyGenerator = { "server-key-0000000000000000000001" }
     )

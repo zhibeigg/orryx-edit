@@ -12,7 +12,7 @@ sudo install -d -o orryx -g orryx -m 0750 /opt/orryx-editor /var/lib/orryx-edito
 2. 将发布包中的 JAR、`start.sh` 放入 `/opt/orryx-editor`：
 
 ```bash
-sudo install -o orryx -g orryx -m 0640 orryx-editor-0.9.11.jar /opt/orryx-editor/orryx-editor.jar
+sudo install -o orryx -g orryx -m 0640 orryx-editor-0.9.12.jar /opt/orryx-editor/orryx-editor.jar
 sudo install -o orryx -g orryx -m 0750 start.sh /opt/orryx-editor/start.sh
 ```
 
@@ -56,6 +56,12 @@ docker compose ps
 docker compose pull
 docker compose up -d
 ```
+
+## 实时 Editor License 策略
+
+实时 Editor relay 使用 Orryx License 识别服务器和取得中心保存的 `serverKey`。License 到期不影响插件注册、一次性 Editor Token 或 Resume 会话；License 不存在、被管理员禁用或连接 IP 不符合绑定规则时仍会拒绝。不要通过清空 `licenses.expires_at` 或批量续期实现开放，否则会同时改变商业认领和 License 管理接口的授权边界。
+
+商业 License 认领、账户/RBAC、AI、云草稿、签名发布和 `/api/license/*` 继续使用各自的有效期规则。数据库 Schema 无需因该策略变更而迁移。
 
 ## Kether 文档同步
 

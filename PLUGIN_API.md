@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.9.11）
+# Orryx Editor 插件端协议（0.9.12）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
@@ -61,6 +61,8 @@
 ```
 
 `serverId` 应为安装实例的稳定 ID。旧插件省略时服务会从 `serverName` 派生，但多个同名子服会落入同一 workspace，因此新实现必须发送稳定且唯一的 `serverId`。
+
+`license` 是中心签发的服务器身份凭据，仍为必填字段。实时 Editor relay 不以 License 到期时间作为使用门槛；已过期但仍存在、启用且满足 IP 约束的 License 可以注册服务器、签发一次性 Token 和恢复浏览器会话。不存在、显式禁用或 IP 不匹配仍会拒绝。商业认领、账户权益和 License 管理接口继续按原有效期规则执行。
 
 响应：
 
@@ -377,7 +379,6 @@ UNEXPECTED_RESPONSE_TYPE
 UNKNOWN_RELAY_REQUEST
 INVALID_LICENSE
 LICENSE_DISABLED
-LICENSE_EXPIRED
 IP_NOT_ALLOWED
 INVALID_SERVER_ID
 UNSUPPORTED_PROTOCOL

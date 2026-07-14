@@ -47,6 +47,9 @@ class LicenseManager(
     suspend fun validate(license: String, connectIp: String = ""): LicenseEntry? =
         service.validate(license, connectIp)?.toEntry()
 
+    suspend fun validateEditorAccess(license: String, connectIp: String = ""): LicenseEntry? =
+        service.validateEditorAccess(license, connectIp)?.toEntry()
+
     suspend fun renew(license: String, days: Int): Boolean = service.renew(license, days)
 
     suspend fun addIp(license: String, ip: String): Boolean = when (service.addIp(license, ip)) {

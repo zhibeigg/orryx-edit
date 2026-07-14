@@ -2,7 +2,7 @@
 
 面向 Minecraft 服主与 Orryx 开发者的商业化配置变更控制平台。浏览器通过 Ktor 服务管理账户、服务器实例、云端草稿、AI Job、审核、签名发布和不可变历史；Orryx 插件负责最终的签名验证、文件事务、主线程激活、Readiness 与崩溃恢复。
 
-当前版本：`0.9.11`，数据库 Schema：`12`，Editor 协议：V1/V2。
+当前版本：`0.9.12`，数据库 Schema：`12`，Editor 协议：V1/V2。
 
 ## 核心边界
 
@@ -12,6 +12,8 @@
 - 插件只交换 Editor allowlist 文件，不替换整个 `plugins/Orryx`；`config.yml`、数据库、`.editor` 身份和事务数据不进入发布集合。
 - 历史回退只会从旧 Snapshot 创建新草稿，不直接覆盖生产文件。
 - Provider API Key、支付宝私钥、Runner secret、发布签名私钥只来自服务端环境，不进入前端、数据库明文字段、响应或日志。
+- 实时 Editor relay 将已配置的 Orryx License 作为服务器身份凭据；License 到期不影响实时编辑、一次性 Token 或 Resume 会话，但 License 不存在、被禁用或 IP 不匹配仍会拒绝连接。
+- 商业 License 认领、账户权益、AI、云草稿、发布和 License 管理接口继续按各自有效期与 RBAC 规则执行，不因实时编辑器开放而放宽。
 
 ## 架构
 

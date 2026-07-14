@@ -15,7 +15,7 @@ class InMemoryEditorSessionRepository(
     override suspend fun create(command: CreateEditorSessionCommand): EditorSession {
         require(!command.ttl.isNegative && !command.ttl.isZero) { "session ttl 必须大于 0" }
         requireInMemoryMetadata(command)
-        val license = licenseService.validate(command.licenseKey)
+        val license = licenseService.validateEditorAccess(command.licenseKey)
         require(license != null && license.serverKey == command.serverKey) { "license 无效或 serverKey 不匹配" }
         val hash = ResumeTokenHash.sha256(command.resumeToken)
         return mutex.withLock {
@@ -44,13 +44,13 @@ class InMemoryEditorSessionRepository(
                 it.resumeTokenHash == hash && it.revokedAt == null && it.expiresAt.isAfter(now)
             }
         } ?: return null
-        return session.takeIf { licenseService.validate(it.licenseKey)?.serverKey == it.serverKey }
+        return session.takeIf { licenseService.validateEditorAccess(it.licenseKey)?.serverKey == it.serverKey }
     }
 
     override suspend fun touch(id: UUID, now: Instant, expiresAt: Instant): Boolean {
         require(expiresAt.isAfter(now)) { "expiresAt 必须晚于 now" }
         val current = mutex.withLock { sessions[id] } ?: return false
-        if (licenseService.validate(current.licenseKey)?.serverKey != current.serverKey) return false
+        if (licenseService.validateEditorAccess(current.licenseKey)?.serverKey != current.serverKey) return false
         return mutex.withLock {
             val latest = sessions[id] ?: return@withLock false
             if (latest.revokedAt != null || !latest.expiresAt.isAfter(now)) return@withLock false
@@ -74,7 +74,7 @@ class InMemoryEditorSessionRepository(
                 it.resumeTokenHash == oldHash && it.revokedAt == null && it.expiresAt.isAfter(now)
             }
         } ?: return null
-        if (licenseService.validate(current.licenseKey)?.serverKey != current.serverKey) return null
+        if (licenseService.validateEditorAccess(current.licenseKey)?.serverKey != current.serverKey) return null
         return mutex.withLock {
             val latest = sessions[current.id] ?: return@withLock null
             if (latest.resumeTokenHash != oldHash || latest.revokedAt != null || !latest.expiresAt.isAfter(now)) return@withLock null

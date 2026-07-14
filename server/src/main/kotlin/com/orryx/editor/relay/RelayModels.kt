@@ -59,22 +59,20 @@ data class RelayLicense(
     val license: String,
     val serverKey: String,
     val enabled: Boolean,
-    val expiresAt: Long,
     val boundIps: List<String>
 ) {
-    fun isExpired(now: Long = System.currentTimeMillis()): Boolean = expiresAt > 0 && now > expiresAt
     fun isIpAllowed(ip: String): Boolean = boundIps.isEmpty() || ip.isEmpty() || ip in boundIps
 }
 
 interface RelayLicenseAccess {
-    suspend fun validate(license: String, connectIp: String): RelayLicense?
+    suspend fun validateEditorAccess(license: String, connectIp: String): RelayLicense?
     suspend fun get(license: String): RelayLicense?
     suspend fun addIp(license: String, ip: String): Boolean
 }
 
 class LicenseManagerRelayAccess(private val manager: LicenseManager) : RelayLicenseAccess {
-    override suspend fun validate(license: String, connectIp: String): RelayLicense? =
-        manager.validate(license, connectIp)?.toRelayLicense()
+    override suspend fun validateEditorAccess(license: String, connectIp: String): RelayLicense? =
+        manager.validateEditorAccess(license, connectIp)?.toRelayLicense()
 
     override suspend fun get(license: String): RelayLicense? = manager.get(license)?.toRelayLicense()
 
@@ -84,7 +82,6 @@ class LicenseManagerRelayAccess(private val manager: LicenseManager) : RelayLice
         license = license,
         serverKey = serverKey,
         enabled = enabled,
-        expiresAt = expiresAt,
         boundIps = boundIps
     )
 }

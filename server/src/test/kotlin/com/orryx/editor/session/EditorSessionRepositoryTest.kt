@@ -52,6 +52,31 @@ class EditorSessionRepositoryTest {
     }
 
     @Test
+    fun `expired license keeps editor session access until disabled`() = runTest {
+        val licenseRepository = InMemoryLicenseRepository()
+        val activeService = licenseService(licenseRepository)
+        val license = activeService.create(CreateLicenseCommand("owner", days = 1))
+        val expiredService = licenseService(licenseRepository, now.plusSeconds(2 * 86_400L))
+        val sessions = InMemoryEditorSessionRepository(expiredService)
+
+        assertNull(expiredService.validate(license.license))
+        val created = sessions.create(command(license.license, license.serverKey, "resume-secret"))
+        assertNotNull(sessions.findByResumeToken("resume-secret", now.plusSeconds(1)))
+        assertTrue(sessions.touch(created.id, now.plusSeconds(2), now.plusSeconds(3_600)))
+
+        assertTrue(expiredService.revoke(license.license))
+        assertNull(sessions.findByResumeToken("resume-secret", now.plusSeconds(3)))
+        assertNull(
+            sessions.rotate(
+                resumeToken = "resume-secret",
+                replacementToken = "replacement-secret",
+                now = now.plusSeconds(3),
+                expiresAt = now.plusSeconds(3_600)
+            )
+        )
+    }
+
+    @Test
     fun `rejects session creation for ineffective license`() = runTest {
         val licenseRepository = InMemoryLicenseRepository()
         val licenseService = licenseService(licenseRepository)
@@ -76,9 +101,9 @@ class EditorSessionRepositoryTest {
         ttl = Duration.ofMinutes(30)
     )
 
-    private fun licenseService(repository: InMemoryLicenseRepository) = LicenseService(
+    private fun licenseService(repository: InMemoryLicenseRepository, instant: Instant = now) = LicenseService(
         repository = repository,
-        clock = Clock.fixed(now, ZoneOffset.UTC),
+        clock = Clock.fixed(instant, ZoneOffset.UTC),
         licenseKeyGenerator = { "license-key-00000001" },
         serverKeyGenerator = { "server-key-0000000000000000000001" }
     )
