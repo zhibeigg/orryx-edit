@@ -2,7 +2,7 @@
 
 ## 来源与运行时行为
 
-Orryx Editor 0.9.8 不再把构建时 JSON 当作唯一数据源。服务端只读取 Orryx 官方 GitHub Pages 的 `stable` 通道：
+Orryx Editor 0.9.9 不再把构建时 JSON 当作唯一数据源。服务端只读取 Orryx 官方 GitHub Pages 的 `stable` 通道：
 
 ```text
 https://zhibeigg.github.io/Orryx/kether/channels/stable.json

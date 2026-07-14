@@ -12,6 +12,7 @@ RUN cd web && npm run lint && npm run typecheck && npm run test:ci && npm run bu
 FROM eclipse-temurin:21-jdk-jammy AS server-build
 WORKDIR /workspace
 COPY VERSION ./VERSION
+COPY schemas ./schemas
 COPY server ./server
 COPY --from=web-build /workspace/server/src/main/resources/static ./server/src/main/resources/static
 RUN --mount=type=cache,target=/root/.gradle cd server && ./gradlew --no-daemon test shadowJar
