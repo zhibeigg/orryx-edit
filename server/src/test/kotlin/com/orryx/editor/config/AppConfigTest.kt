@@ -32,6 +32,42 @@ class AppConfigTest {
         assertEquals(true, config.ketherDocs.enabled)
         assertEquals(false, config.editorProtocol.v2Enabled)
         assertEquals(false, config.editorProtocol.v2WritesEnabled)
+        assertEquals(false, config.commercialFeatures.accountsEnabled)
+        assertEquals(false, config.commercialFeatures.cloudDraftsEnabled)
+        assertEquals(false, config.commercialFeatures.alipayEnabled)
+        assertEquals(false, config.commercialFeatures.runnerEnabled)
+        assertEquals(false, config.commercialFeatures.aiWorkbenchEnabled)
+    }
+
+    @Test
+    fun `commercial feature flags enforce dependency ordering`() {
+        val base = mapOf(
+            "ADMIN_KEY" to "0123456789abcdef",
+            "DATABASE_URL" to "postgresql://localhost/orryx"
+        )
+        val enabled = AppConfig.load(base + mapOf(
+            "ACCOUNTS_ENABLED" to "true",
+            "CLOUD_DRAFTS_ENABLED" to "true",
+            "RUNNER_ENABLED" to "true",
+            "AI_WORKBENCH_ENABLED" to "true",
+            "ALIPAY_ENABLED" to "true",
+            "RUNNER_SHARED_SECRET" to "0123456789abcdef",
+            "AI_PROVIDER_API_KEY" to "test-key",
+            "AI_PROVIDER_MODEL" to "test-model",
+            "ALIPAY_APP_ID" to "12345678",
+            "ALIPAY_SELLER_ID" to "12345678",
+            "ALIPAY_PRIVATE_KEY" to "test-private-key",
+            "ALIPAY_PUBLIC_KEY" to "test-public-key",
+            "ALIPAY_NOTIFY_URL" to "https://example.com/alipay/notify",
+        ))
+        assertEquals(true, enabled.commercialFeatures.aiWorkbenchEnabled)
+        assertEquals(true, enabled.commercialFeatures.alipayEnabled)
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(base + ("AI_WORKBENCH_ENABLED" to "true"))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(base + ("ALIPAY_ENABLED" to "true"))
+        }
     }
 
     @Test

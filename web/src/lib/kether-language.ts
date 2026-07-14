@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-client"
 import type { languages, editor } from "monaco-editor"
 
 export const KETHER_LANGUAGE_ID = "kether"
@@ -71,7 +72,7 @@ let deprecatedKeywords: Set<string> = new Set()
 export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema> {
   const url = baseUrl || `${window.location.origin}/api/actions-schema`
   try {
-    const res = await fetch(url, { cache: "no-cache" })
+    const res = await apiFetch(url, { cache: "no-cache" })
     if (res.ok) {
       cachedSchema = await res.json()
       rebuildFromSchema()

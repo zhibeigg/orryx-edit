@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { UpdateApiError, UpdateJob, UpdateJobAction, UpdateOverview } from "./update-types"
+import { apiFetch } from "@/lib/api-client"
 
 const ACTIVE = new Set(["QUEUED", "CHECKING", "DOWNLOADING", "VERIFYING"])
 
 async function updateApi<T>(adminKey: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/admin/update${path}`, {
+  const response = await apiFetch(`/api/admin/update${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json", ...init?.headers },
   })

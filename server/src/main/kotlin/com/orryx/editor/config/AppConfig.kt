@@ -8,6 +8,7 @@ import com.orryx.editor.security.requireSecureAdminKey
 import com.orryx.editor.update.UpdateConfig
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.net.URI
 import java.time.Duration
 
 data class DatabaseConfig(
@@ -36,6 +37,68 @@ data class EditorProtocolConfig(
     }
 }
 
+data class CommercialFeatureConfig(
+    val accountsEnabled: Boolean = false,
+    val cloudDraftsEnabled: Boolean = false,
+    val alipayEnabled: Boolean = false,
+    val runnerEnabled: Boolean = false,
+    val aiWorkbenchEnabled: Boolean = false,
+) {
+    init {
+        require(!aiWorkbenchEnabled || accountsEnabled) { "启用 AI Workbench 前必须先启用账户系统" }
+        require(!aiWorkbenchEnabled || cloudDraftsEnabled) { "AI 只能写入已启用的云端草稿" }
+        require(!aiWorkbenchEnabled || runnerEnabled) { "启用 AI Workbench 前必须启用私有 Runner" }
+        require(!alipayEnabled || accountsEnabled) { "启用支付宝前必须先启用账户系统" }
+    }
+}
+
+data class AccountWebConfig(
+    val sessionTtl: Duration,
+    val secureCookie: Boolean,
+    val cookieDomain: String?
+)
+
+data class AlipayRuntimeConfig(
+    val appId: String,
+    val sellerId: String,
+    val gateway: URI,
+    val privateKey: String,
+    val publicKey: String,
+    val notifyUrl: String,
+    val returnUrl: String?
+) {
+    init {
+        require(gateway.scheme.equals("https", true) && gateway.host != null && gateway.userInfo == null) {
+            "ALIPAY_GATEWAY 必须是无凭据的 HTTPS 地址"
+        }
+        listOfNotNull(notifyUrl, returnUrl).forEach { value ->
+            val uri = URI(value)
+            require(uri.scheme.equals("https", true) && uri.host != null && uri.userInfo == null) {
+                "支付宝回调地址必须是无凭据的 HTTPS 地址"
+            }
+        }
+    }
+}
+
+data class AiProviderRuntimeConfig(
+    val providerId: String,
+    val baseUrl: URI,
+    val apiKey: String,
+    val model: String,
+    val requestTimeout: Duration,
+    val maxResponseBytes: Long,
+    val inputCostPerMillionCents: Long,
+    val outputCostPerMillionCents: Long,
+    val usageReservationCents: Long
+)
+
+data class RunnerRuntimeConfig(
+    val endpoint: URI,
+    val sharedSecret: String,
+    val requestTimeout: Duration,
+    val maxResponseBytes: Long
+)
+
 data class AppConfig(
     val port: Int,
     val adminKey: String,
@@ -45,6 +108,11 @@ data class AppConfig(
     val security: SecuritySettings,
     val sessions: SessionConfig,
     val editorProtocol: EditorProtocolConfig,
+    val commercialFeatures: CommercialFeatureConfig,
+    val accountWeb: AccountWebConfig,
+    val alipay: AlipayRuntimeConfig?,
+    val aiProvider: AiProviderRuntimeConfig?,
+    val runner: RunnerRuntimeConfig?,
     val updates: UpdateConfig,
     val ketherDocs: KetherDocsConfig,
     val buildInfo: BuildInfo
@@ -71,6 +139,13 @@ data class AppConfig(
                 ?.let(Paths::get)
                 ?: dataDir.resolve("licenses.json")
             val port = environment.intValue(arrayOf("PORT"), 9090, 1..65535)
+            val commercialFeatures = CommercialFeatureConfig(
+                accountsEnabled = environment.booleanValue("ACCOUNTS_ENABLED", false),
+                cloudDraftsEnabled = environment.booleanValue("CLOUD_DRAFTS_ENABLED", false),
+                alipayEnabled = environment.booleanValue("ALIPAY_ENABLED", false),
+                runnerEnabled = environment.booleanValue("RUNNER_ENABLED", false),
+                aiWorkbenchEnabled = environment.booleanValue("AI_WORKBENCH_ENABLED", false),
+            )
 
             return AppConfig(
                 port = port,
@@ -111,6 +186,38 @@ data class AppConfig(
                     v2Enabled = environment.booleanValue("EDITOR_PROTOCOL_V2_ENABLED", false),
                     v2WritesEnabled = environment.booleanValue("EDITOR_V2_WRITES_ENABLED", false),
                 ),
+                commercialFeatures = commercialFeatures,
+                accountWeb = AccountWebConfig(
+                    sessionTtl = Duration.ofHours(environment.longValue("ACCOUNT_SESSION_TTL_HOURS", 168, 1L..8_760L)),
+                    secureCookie = environment.booleanValue("ACCOUNT_COOKIE_SECURE", true),
+                    cookieDomain = environment.value("ACCOUNT_COOKIE_DOMAIN")
+                ),
+                alipay = if (commercialFeatures.alipayEnabled) AlipayRuntimeConfig(
+                    appId = environment.requiredValue("ALIPAY_APP_ID"),
+                    sellerId = environment.requiredValue("ALIPAY_SELLER_ID"),
+                    gateway = URI(environment.value("ALIPAY_GATEWAY") ?: "https://openapi.alipay.com/gateway.do"),
+                    privateKey = environment.requiredValue("ALIPAY_PRIVATE_KEY"),
+                    publicKey = environment.requiredValue("ALIPAY_PUBLIC_KEY"),
+                    notifyUrl = environment.requiredValue("ALIPAY_NOTIFY_URL"),
+                    returnUrl = environment.value("ALIPAY_RETURN_URL")
+                ) else null,
+                aiProvider = if (commercialFeatures.aiWorkbenchEnabled) AiProviderRuntimeConfig(
+                    providerId = environment.value("AI_PROVIDER_ID") ?: "default",
+                    baseUrl = URI(environment.value("AI_PROVIDER_BASE_URL") ?: "https://api.openai.com/v1"),
+                    apiKey = environment.requiredValue("AI_PROVIDER_API_KEY"),
+                    model = environment.requiredValue("AI_PROVIDER_MODEL"),
+                    requestTimeout = Duration.ofSeconds(environment.longValue("AI_PROVIDER_REQUEST_TIMEOUT_SECONDS", 60, 1L..300L)),
+                    maxResponseBytes = environment.longValue("AI_PROVIDER_MAX_RESPONSE_BYTES", 2L * 1024 * 1024, 1L..16L * 1024 * 1024),
+                    inputCostPerMillionCents = environment.longValue("AI_INPUT_COST_PER_MILLION_CENTS", 0, 0L..1_000_000_000L),
+                    outputCostPerMillionCents = environment.longValue("AI_OUTPUT_COST_PER_MILLION_CENTS", 0, 0L..1_000_000_000L),
+                    usageReservationCents = environment.longValue("AI_USAGE_RESERVATION_CENTS", 100, 0L..1_000_000L)
+                ) else null,
+                runner = if (commercialFeatures.runnerEnabled) RunnerRuntimeConfig(
+                    endpoint = URI(environment.value("RUNNER_ENDPOINT") ?: "http://127.0.0.1:9781/v1/run"),
+                    sharedSecret = environment.requiredValue("RUNNER_SHARED_SECRET"),
+                    requestTimeout = Duration.ofSeconds(environment.longValue("RUNNER_REQUEST_TIMEOUT_SECONDS", 60, 1L..300L)),
+                    maxResponseBytes = environment.longValue("RUNNER_MAX_RESPONSE_BYTES", 4L * 1024 * 1024, 1L..16L * 1024 * 1024)
+                ) else null,
                 updates = UpdateConfig.fromEnvironment(environment),
                 ketherDocs = KetherDocsConfig.fromEnvironment(environment),
                 buildInfo = BuildInfo.load(environment = environment)
@@ -129,6 +236,9 @@ data class AppConfig(
 private fun Map<String, String>.value(vararg names: String): String? = names.firstNotNullOfOrNull { name ->
     this[name]?.trim().takeUnless { it.isNullOrEmpty() }
 }
+
+private fun Map<String, String>.requiredValue(name: String): String =
+    value(name) ?: throw IllegalArgumentException("$name 不能为空")
 
 private fun Map<String, String>.intValue(names: Array<String>, default: Int, range: IntRange): Int {
     val raw = value(*names)

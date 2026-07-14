@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { KetherDocsApiError, KetherDocsStatus } from "./kether-docs-types"
+import { apiFetch } from "@/lib/api-client"
 
 async function ketherDocsApi(adminKey: string, path: string, init?: RequestInit): Promise<KetherDocsStatus> {
-  const response = await fetch(`/api/admin/kether-docs${path}`, {
+  const response = await apiFetch(`/api/admin/kether-docs${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json", ...init?.headers },
   })

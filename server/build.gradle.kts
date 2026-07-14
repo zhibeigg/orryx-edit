@@ -42,7 +42,7 @@ val generateBuildInfo by tasks.registering {
             buildType=release
             deployment=source
             launcherManaged=false
-            databaseSchemaVersion=3
+            databaseSchemaVersion=11
             """.trimIndent() + "\n"
         )
     }
@@ -72,7 +72,9 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.80")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.1")

@@ -40,8 +40,11 @@ describe("登录表单语义", () => {
     expect(page).toMatch(/<h1/)
   })
 
-  it("错误和解绑确认具有可访问语义", () => {
+  it("错误和账户加载状态具有可访问语义", () => {
     expect(source("../../pages/AdminPage.tsx")).toMatch(/role="alert"[^>]*aria-live="assertive"/)
-    expect(source("../../pages/PortalPage.tsx")).toMatch(/role="alertdialog"[^>]*aria-modal="true"/)
+    const portal = source("../../pages/PortalPage.tsx")
+    expect(portal).toMatch(/role="alert"[^>]*aria-live="assertive"/)
+    expect(portal).toContain('aria-busy={submitting}')
+    expect(portal).toContain('aria-live="polite"')
   })
 })

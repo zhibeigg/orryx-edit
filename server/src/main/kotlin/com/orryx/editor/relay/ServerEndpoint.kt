@@ -33,13 +33,15 @@ private const val MAX_TOKEN_TTL_MILLIS = 600_000L
 class ServerEndpoint(
     private val registry: SessionRegistry,
     private val licenseAccess: RelayLicenseAccess,
-    private val features: RelayFeatureFlags = RelayFeatureFlags()
+    private val features: RelayFeatureFlags = RelayFeatureFlags(),
+    private val onRegistered: suspend (GameServer) -> Unit = {}
 ) {
     constructor(
         registry: SessionRegistry,
         licenseManager: LicenseManager,
-        features: RelayFeatureFlags = RelayFeatureFlags()
-    ) : this(registry, LicenseManagerRelayAccess(licenseManager), features)
+        features: RelayFeatureFlags = RelayFeatureFlags(),
+        onRegistered: suspend (GameServer) -> Unit = {}
+    ) : this(registry, LicenseManagerRelayAccess(licenseManager), features, onRegistered)
 
     private val sessionIps = ConcurrentHashMap<RelaySocket, String>()
 
@@ -203,6 +205,7 @@ class ServerEndpoint(
             capabilities = capabilities,
             connectionNonce = connectionNonce
         )
+        onRegistered(server)
         session.sendText(WsResponse.build(
             MessageTypes.SERVER_REGISTER_RESULT,
             msg.id,

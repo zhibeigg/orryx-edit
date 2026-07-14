@@ -611,6 +611,43 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .binding-panel { display: grid; gap: 13px; padding: 17px; border: 1px solid var(--industrial-border); border-radius: 2px; background: #14171c; }
 .binding-panel .section-heading { margin: 0; }
 .binding-panel > .industrial-button { justify-self: start; }
+.portal-shell--guest { align-content: center; }
+.portal-guest-grid { width: min(100%, 980px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 18px; }
+.portal-access-card, .migration-card { width: 100%; }
+.migration-card .access-header { align-items: flex-start; }
+.migration-card h2 { margin: 2px 0 5px; color: var(--industrial-text); font-size: clamp(1.15rem, 3vw, 1.4rem); }
+.auth-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+.portal-global-status { width: min(100%, 980px); box-sizing: border-box; margin-top: 14px; }
+.portal-panel--wide { width: min(100%, 1120px); }
+.portal-header-actions { display: flex; gap: 8px; }
+.portal-section-status { margin-top: 16px; }
+.account-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.portal-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.portal-control-grid .binding-panel { align-content: start; }
+.portal-control-grid .industrial-form { margin-top: 0; }
+.purchase-panel .industrial-button { justify-self: start; }
+.purchase-price { margin: 0; color: #f4f8fb; font-size: 1.8rem; font-weight: 780; font-variant-numeric: tabular-nums; }
+.purchase-price span { color: var(--industrial-muted); font-size: 0.78rem; font-weight: 600; }
+.compact-list { display: grid; gap: 7px; margin: 0; padding-left: 19px; color: var(--industrial-muted); font-size: 0.82rem; line-height: 1.45; }
+.workspace-section { padding: 18px; border: 1px solid var(--industrial-border); border-radius: 2px; background: #14171c; }
+.workspace-section > .section-heading { margin-bottom: 14px; }
+.workspace-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.workspace-card { min-width: 0; border: 1px solid var(--industrial-border); border-radius: 2px; background: var(--industrial-surface-raised); }
+.workspace-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 13px; border-bottom: 1px solid var(--industrial-border); }
+.workspace-card > header div { min-width: 0; }
+.workspace-card > header strong, .workspace-card > header code { display: block; }
+.workspace-card > header strong { margin-bottom: 4px; font-size: 0.88rem; }
+.workspace-card > header code, .server-instance-list code { overflow-wrap: anywhere; color: var(--industrial-muted); font-size: 0.7rem; }
+.workspace-card > header > span { flex: 0 0 auto; padding: 3px 6px; border: 1px solid #46515d; border-radius: 2px; color: #b8c6d2; font-size: 0.65rem; }
+.workspace-card > .empty-copy { padding: 14px; }
+.server-instance-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.server-instance-list li { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 11px 13px; border-bottom: 1px solid #30353d; }
+.server-instance-list li:last-child { border-bottom: 0; }
+.server-instance-list svg { width: 16px; height: 16px; color: #8fc7ed; }
+.server-instance-list strong, .server-instance-list code { display: block; }
+.server-instance-list strong { margin-bottom: 2px; font-size: 0.8rem; }
+.server-instance-list li > span { color: var(--industrial-muted); font-size: 0.7rem; text-align: right; }
+.legacy-license-result { display: grid; grid-template-columns: 1fr; gap: 1px; margin: 18px 0 0; border: 1px solid var(--industrial-border); background: var(--industrial-border); }
 .dialog-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 72%); }
 .confirm-dialog { width: min(100%, 440px); padding: 20px; }
 .confirm-dialog > p { color: var(--industrial-muted); line-height: 1.55; }
@@ -635,9 +672,15 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 760px) {
   .access-shell, .portal-shell { place-items: start center; padding: 14px; }
   .access-card, .portal-panel { padding: 18px; }
+  .portal-guest-grid, .portal-control-grid, .workspace-grid { grid-template-columns: 1fr; }
   .access-header { align-items: flex-start; }
   .page-heading, .portal-header { align-items: flex-start; flex-direction: column; }
   .page-heading > .industrial-button, .portal-header > .industrial-button { width: 100%; }
+  .portal-header-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .account-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .purchase-panel .industrial-button { width: 100%; }
+  .server-instance-list li { grid-template-columns: auto minmax(0, 1fr); }
+  .server-instance-list li > span { grid-column: 2; text-align: left; }
   .admin-main { width: min(100% - 24px, 1180px); padding-top: 20px; }
   .status-strip { grid-template-columns: repeat(2, 1fr); }
   .status-strip > div:nth-child(2) { border-right: 0; }
@@ -661,6 +704,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 430px) {
   .access-header { display: block; }
   .product-mark { margin-bottom: 14px; }
+  .auth-mode-switch, .portal-header-actions, .account-summary-grid { grid-template-columns: 1fr; }
   .status-strip { grid-template-columns: 1fr; }
   .status-strip > div { border-right: 0; border-bottom: 1px solid var(--industrial-border); }
   .status-strip > div:last-child { border-bottom: 0; }

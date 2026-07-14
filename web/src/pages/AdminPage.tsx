@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Ban, Check, Clock, Copy, Key, Plus, RefreshCw, RotateCcw, Shield } from "lucide-react"
 import { KetherDocsCard } from "@/features/admin/KetherDocsCard"
 import { UpdateCard } from "@/features/admin/UpdateCard"
+import { apiFetch } from "@/lib/api-client"
 
 interface License {
   license: string
@@ -20,7 +21,7 @@ interface License {
 interface Stats { servers: number; browsers: number; tokens: number; licenses: number }
 
 function api(adminKey: string, path: string, method = "GET", body?: unknown) {
-  return fetch(`/api/admin${path}`, {
+  return apiFetch(`/api/admin${path}`, {
     method,
     headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,

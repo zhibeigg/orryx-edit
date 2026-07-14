@@ -3,6 +3,8 @@ package com.orryx.editor.plugins
 import com.orryx.editor.audit.AuditEvent
 import com.orryx.editor.audit.AuditRepository
 import com.orryx.editor.build.BuildInfo
+import com.orryx.editor.commercial.CommercialServices
+import com.orryx.editor.commercial.commercialRoutes
 import com.orryx.editor.ketherdocs.KetherDocsService
 import com.orryx.editor.ketherdocs.ketherDocsAdminRoutes
 import com.orryx.editor.ketherdocs.respondKetherDocsSchema
@@ -84,7 +86,8 @@ fun Application.configureRouting(
     buildInfo: BuildInfo = BuildInfo("unknown", "source", false),
     readinessCheck: suspend () -> Boolean = { true },
     updateService: UpdateService? = null,
-    ketherDocsService: KetherDocsService? = null
+    ketherDocsService: KetherDocsService? = null,
+    commercialServices: CommercialServices? = null
 ) {
     install(ContentNegotiation) { json() }
 
@@ -134,6 +137,8 @@ fun Application.configureRouting(
             if (readinessCheck()) call.respond(HealthResponse("UP", buildInfo.version))
             else call.respond(HttpStatusCode.ServiceUnavailable, HealthResponse("NOT_READY", buildInfo.version))
         }
+
+        commercialServices?.let { commercialRoutes(it) }
 
         if (ketherDocsService != null) {
             get("/actions-schema.json") { call.respondKetherDocsSchema(ketherDocsService) }

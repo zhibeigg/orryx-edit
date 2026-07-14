@@ -3,6 +3,7 @@ import { AlertCircle, Check, KeyRound, Unlink } from "lucide-react"
 import { wsClient, type AuthSession } from "@/lib/ws-client"
 import { useConnectionStore } from "@/store/connection-store"
 import { useFileStore } from "@/store/file-store"
+import { apiFetch } from "@/lib/api-client"
 
 function extractAndScrubUrlToken(): string | null {
   const url = new URL(window.location.href)
@@ -121,7 +122,7 @@ export function ConnectPage() {
     setUnbinding(true)
     setUnbindStatus(null)
     try {
-      const response = await fetch("/api/license/ip", {
+      const response = await apiFetch("/api/license/ip", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${unbindKey.trim()}` },
       })

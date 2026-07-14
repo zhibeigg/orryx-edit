@@ -24,12 +24,21 @@ class MigrationCatalogTest {
         val sql = MigrationCatalog.migrations.flatMap { it.statements }.joinToString("\n")
         listOf(
             "licenses", "license_bound_ips", "editor_sessions", "system_audit_events",
-            "update_jobs", "legacy_imports", "kether_docs_cache", "kether_docs_sync_state"
-        ).forEach { assertTrue(sql.contains("CREATE TABLE $it")) }
+            "update_jobs", "legacy_imports", "kether_docs_cache", "kether_docs_sync_state",
+            "commercial_accounts", "commercial_account_sessions", "rbac_roles", "rbac_permissions",
+            "commercial_account_roles", "commercial_license_claims", "commercial_workspace_memberships",
+            "commercial_server_instances", "commercial_entitlements", "products", "commercial_wallets",
+            "commercial_wallet_ledger", "commercial_payment_orders", "commercial_payment_events", "ai_providers",
+            "ai_usage_reservations", "ai_jobs", "ai_job_events", "runner_executions",
+            "server_snapshots", "snapshot_files", "drafts", "draft_versions", "draft_files"
+        ).forEach { assertTrue(sql.contains("CREATE TABLE $it"), "missing table $it") }
         listOf(
             "workspace_id", "server_key", "server_id", "player_name", "browser_id", "instance_id", "lease_expires_at",
-            "release_id", "schema_sha256", "schema_json", "last_success_at", "next_attempt_at"
-        ).forEach { assertTrue(sql.contains(it)) }
+            "release_id", "schema_sha256", "schema_json", "last_success_at", "next_attempt_at",
+            "csrf_token_hash", "reserved_gift_cents", "reserved_cash_cents", "captured_cents",
+            "REFERENCES commercial_accounts(account_id)", "REFERENCES commercial_server_instances(instance_id)"
+        ).forEach { assertTrue(sql.contains(it), "missing schema contract $it") }
         assertTrue(MigrationCatalog.migrations.zipWithNext().all { it.first.version < it.second.version })
+        assertEquals(11L, MigrationCatalog.migrations.last().version)
     }
 }
