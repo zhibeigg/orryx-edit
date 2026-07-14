@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.4.5）
+# Orryx Editor 插件端协议（0.5.5）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
@@ -17,6 +17,19 @@
 - 单帧最大 1 MiB。
 - 文件路径必须为相对路径，不允许空段、`.`、`..` 或控制字符。
 - 错误统一返回 `type=error`，`data={code,message}`。
+- Relay 对浏览器/插件角色、消息方向及 V1/V2 消息类型使用硬 allowlist。未知类型返回 `UNKNOWN_MESSAGE_TYPE`，方向错误返回 `MESSAGE_DIRECTION_NOT_ALLOWED`，消息不会继续转发。
+- 机器可读的方向、revision 字段与能力合同位于 `schemas/editor-relay-contract-v2.json`；插件包内携带同名资源，双方测试会拒绝 allowlist 漂移。
+- 浏览器请求具有固定 expected response type；插件返回错误响应类型时，插件与对应浏览器请求都会收到 `UNEXPECTED_RESPONSE_TYPE`，不会静默等待超时。
+
+### 协议兼容性
+
+- 未声明 `protocolVersions` 的旧插件固定协商为 `v1`，保留 Long revision 和 relay 侧冲突计数行为。
+- 新插件可声明 `protocolVersions: ["v1", "v2"]` 与 `preferredProtocol`。服务端返回唯一的 `negotiatedProtocol`。
+- `v2` revision 必须是 64 位小写 SHA-256 字符串；它与 V1 Long revision 状态完全隔离，relay 不递增、不替换插件返回的 SHA。
+- 同一 workspace 同时只有一个 authoritative plugin session。每次成功注册产生新的 `sessionEpoch`；旧连接继续发消息会稳定收到 `STALE_PLUGIN_SESSION`。
+- 协议 V2 默认不参与协商，确保现有 V1 前端与插件写入流程不受灰度代码影响。设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 后才可协商 V2。
+- V2 的文件写入、创建、删除、重命名与 Reload 默认全部关闭；只有同时设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 和 `EDITOR_V2_WRITES_ENABLED=true` 后才会转发。
+- `manifest.snapshot`、`release.request`、`release.result` 当前仅保留 DTO/Schema，不在 relay allowlist 中，也不执行发布事务。
 
 ## 1. 注册服务器
 
@@ -27,7 +40,12 @@
   "data": {
     "license": "LICENSE_KEY",
     "serverName": "生存服-1",
-    "serverId": "survival-1"
+    "serverId": "survival-1",
+    "pluginVersion": "1.2.3",
+    "protocolVersions": ["v1", "v2"],
+    "preferredProtocol": "v2",
+    "capabilities": ["protocol.allowlist", "revision.sha256", "mutation.preconditions"],
+    "connectionNonce": "random-connection-nonce"
   }
 }
 ```
@@ -44,7 +62,15 @@
     "success": true,
     "serverKey": "...",
     "serverId": "survival-1",
-    "workspaceId": "sha256..."
+    "workspaceId": "sha256...",
+    "negotiatedProtocol": "v2",
+    "sessionEpoch": 42,
+    "relayCapabilities": [
+      "protocol.allowlist",
+      "session.epoch",
+      "revision.sha256"
+    ],
+    "connectionNonce": "random-connection-nonce"
   }
 }
 ```
@@ -92,6 +118,18 @@ https://editor.example.com/#token=<token>
 
 ## 4. 文件协议与 revision
 
+### V1 / V2 隔离
+
+| 项目 | V1 | V2 |
+|---|---|---|
+| revision 类型 | JSON Long | 64 位小写 SHA-256 字符串 |
+| revision 来源 | relay workspace/path 计数器 | 插件文件内容/状态 |
+| 写入转发字段 | `baseRevision` | 浏览器 `baseRevision` 映射为插件 `expectedRevision` |
+| 成功写入 | relay 自增并覆盖响应 revision | relay 原样保留插件 revision，不自增、不覆盖 |
+| `file.changed` | relay 填入 Long | 必须携带并保留插件 SHA revision |
+
+两套 revision 状态不可互读或转换。V2 中大写 SHA、非 64 位字符串或数字 revision 都会以 `INVALID_REVISION` 拒绝。
+
 ### 文件树
 
 ```json
@@ -113,10 +151,10 @@ https://editor.example.com/#token=<token>
 插件响应：
 
 ```json
-{"type":"file.content","id":"relay-id","data":{"path":"skills/example.yml","content":"..."}}
+{"type":"file.content","id":"relay-id","data":{"path":"skills/example.yml","content":"...","revision":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}}
 ```
 
-中心服务会向浏览器响应补充 `revision`。
+V1 插件可省略 `revision`，中心服务会向浏览器响应补充 Long revision。V2 插件必须返回 SHA revision，中心服务端到端原样保留。
 
 ### 写入
 
@@ -135,7 +173,24 @@ https://editor.example.com/#token=<token>
 }
 ```
 
-中心服务仅在 revision 匹配后转发给插件。冲突时插件不会收到请求，浏览器收到：
+上述数字示例是 V1。V2 浏览器请求使用 SHA 字符串：
+
+```json
+{
+  "type": "file.write",
+  "id": "browser-id",
+  "data": {
+    "path": "skills/example.yml",
+    "content": "...",
+    "baseRevision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "force": false
+  }
+}
+```
+
+启用 Phase 0 V2 写路径后，relay 转发给插件时删除 `baseRevision` 并写入同值的 `expectedRevision`。relay 不在 V2 执行 SHA 冲突比较；插件负责原子校验 `expectedRevision` 并返回新 SHA revision。
+
+V1 中心服务仅在 Long revision 匹配后转发给插件。冲突时插件不会收到请求，浏览器收到：
 
 ```json
 {
@@ -149,13 +204,13 @@ https://editor.example.com/#token=<token>
 }
 ```
 
-插件成功响应：
+插件成功响应（V2 必须包含新 SHA revision）：
 
 ```json
-{"type":"file.written","id":"relay-id","data":{"path":"skills/example.yml","success":true}}
+{"type":"file.written","id":"relay-id","data":{"path":"skills/example.yml","success":true,"revision":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"}}
 ```
 
-成功后中心服务递增 revision，并向同 workspace 广播：
+V1 成功后中心服务递增 Long revision。V2 成功后 relay 使用插件响应中的 SHA revision。两者都会向同 workspace 广播：
 
 ```json
 {
@@ -237,11 +292,21 @@ file.rename {oldPath,newPath}  -> file.written
 ```text
 INVALID_MESSAGE
 FRAME_TOO_LARGE
+UNKNOWN_MESSAGE_TYPE
+MESSAGE_DIRECTION_NOT_ALLOWED
+MESSAGE_NOT_SUPPORTED
+UNEXPECTED_RESPONSE_TYPE
+UNKNOWN_RELAY_REQUEST
 INVALID_LICENSE
 LICENSE_DISABLED
 LICENSE_EXPIRED
 IP_NOT_ALLOWED
 INVALID_SERVER_ID
+UNSUPPORTED_PROTOCOL
+INVALID_PREFERRED_PROTOCOL
+INVALID_CAPABILITIES
+INVALID_CONNECTION_NONCE
+STALE_PLUGIN_SESSION
 INVALID_TOKEN
 TOKEN_ALREADY_EXISTS
 NOT_AUTHENTICATED
@@ -249,7 +314,9 @@ INVALID_RESUME_TOKEN
 SERVER_OFFLINE
 INVALID_PATH
 MISSING_BASE_REVISION
+INVALID_REVISION
 REVISION_CONFLICT
+FEATURE_DISABLED
 PLUGIN_ERROR
 ```
 

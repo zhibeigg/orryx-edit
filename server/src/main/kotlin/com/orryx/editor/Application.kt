@@ -16,6 +16,7 @@ import com.orryx.editor.license.LicenseService
 import com.orryx.editor.license.PostgresLicenseRepository
 import com.orryx.editor.plugins.configureRouting
 import com.orryx.editor.plugins.configureWebSockets
+import com.orryx.editor.relay.RelayFeatureFlags
 import com.orryx.editor.relay.RelayHandler
 import com.orryx.editor.relay.ServerEndpoint
 import com.orryx.editor.relay.SessionRegistry
@@ -83,8 +84,12 @@ suspend fun main() {
         val legacyResult = LegacyLicenseImporter(database).importOnce(config.legacyLicensesFile)
 
         val registry = SessionRegistry(config.sessions.relayRequestTimeout.toMillis())
-        val relayHandler = RelayHandler(registry, relaySessionStore, config.sessions.ttl.toMillis())
-        val serverEndpoint = ServerEndpoint(registry, licenseManager)
+        val relayFeatures = RelayFeatureFlags(
+            protocolV2Enabled = config.editorProtocol.v2Enabled,
+            v2WritesEnabled = config.editorProtocol.v2WritesEnabled,
+        )
+        val relayHandler = RelayHandler(registry, relaySessionStore, config.sessions.ttl.toMillis(), relayFeatures)
+        val serverEndpoint = ServerEndpoint(registry, licenseManager, relayFeatures)
 
         val updateStore = PostgresUpdateJobStore(database, config.updates.instanceId)
         val updateService = UpdateService(

@@ -1,13 +1,20 @@
 package com.orryx.editor.relay
 
 import com.orryx.editor.license.LicenseManager
+import com.orryx.editor.protocol.ContractValidationResult
+import com.orryx.editor.protocol.MessageDirection
 import com.orryx.editor.protocol.MessageParseResult
 import com.orryx.editor.protocol.MessageTypes
+import com.orryx.editor.protocol.ProtocolContracts
 import com.orryx.editor.protocol.ProtocolLimits
+import com.orryx.editor.protocol.ProtocolRole
+import com.orryx.editor.protocol.ProtocolVersion
 import com.orryx.editor.protocol.WsMessage
 import com.orryx.editor.protocol.WsProtocol
 import com.orryx.editor.protocol.WsResponse
 import io.ktor.websocket.WebSocketSession
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -25,10 +32,14 @@ private const val MAX_TOKEN_TTL_MILLIS = 600_000L
 
 class ServerEndpoint(
     private val registry: SessionRegistry,
-    private val licenseAccess: RelayLicenseAccess
+    private val licenseAccess: RelayLicenseAccess,
+    private val features: RelayFeatureFlags = RelayFeatureFlags()
 ) {
-    constructor(registry: SessionRegistry, licenseManager: LicenseManager) :
-        this(registry, LicenseManagerRelayAccess(licenseManager))
+    constructor(
+        registry: SessionRegistry,
+        licenseManager: LicenseManager,
+        features: RelayFeatureFlags = RelayFeatureFlags()
+    ) : this(registry, LicenseManagerRelayAccess(licenseManager), features)
 
     private val sessionIps = ConcurrentHashMap<RelaySocket, String>()
 
@@ -54,18 +65,38 @@ class ServerEndpoint(
             }
         }
 
+        val registeredServer = registry.getServerBySession(serverSession)
+        val protocolVersion = registeredServer?.negotiatedProtocol ?: ProtocolVersion.V1
+        when (val validation = ProtocolContracts.validate(
+            type = msg.type,
+            role = ProtocolRole.PLUGIN,
+            direction = MessageDirection.PLUGIN_TO_RELAY,
+            version = protocolVersion
+        )) {
+            is ContractValidationResult.Rejected -> {
+                serverSession.sendText(WsResponse.error(msg.id, validation.error.code, validation.error.message))
+                return
+            }
+            is ContractValidationResult.Allowed -> Unit
+        }
+
+        if (registeredServer != null && !registry.isAuthoritative(serverSession)) {
+            serverSession.sendText(WsResponse.error(msg.id, "STALE_PLUGIN_SESSION", "插件会话已被新的 sessionEpoch 取代"))
+            return
+        }
+
         when (msg.type) {
-            "server.register" -> handleRegister(serverSession, msg)
-            "token.register" -> handleTokenRegister(serverSession, msg)
-            "token.revoke" -> handleTokenRevoke(serverSession, msg)
+            MessageTypes.SERVER_REGISTER -> handleRegister(serverSession, msg)
+            MessageTypes.TOKEN_REGISTER -> handleTokenRegister(serverSession, msg)
+            MessageTypes.TOKEN_REVOKE -> handleTokenRevoke(serverSession, msg)
             else -> relayPluginMessage(serverSession, msg)
         }
     }
 
     private suspend fun handleRegister(session: RelaySocket, msg: WsMessage) {
         val data = msg.data.jsonObject
-        val license = data["license"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-        val rawName = data["serverName"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val license = (data["license"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        val rawName = (data["serverName"] as? JsonPrimitive)?.contentOrNull.orEmpty()
         val name = RelayValidation.serverName(rawName)
         if (license.length !in 8..ProtocolLimits.MAX_TOKEN_LENGTH || license.any(Char::isWhitespace)) {
             sendRegisterFailure(session, msg.id, "INVALID_LICENSE", "license 无效")
@@ -75,7 +106,12 @@ class ServerEndpoint(
             sendRegisterFailure(session, msg.id, "INVALID_SERVER_NAME", "serverName 无效")
             return
         }
-        val explicitServerId = data["serverId"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        val rawServerId = (data["serverId"] as? JsonPrimitive)?.contentOrNull
+        if (data["serverId"] != null && rawServerId.isNullOrBlank()) {
+            sendRegisterFailure(session, msg.id, "INVALID_SERVER_ID", "serverId 无效")
+            return
+        }
+        val explicitServerId = rawServerId
         val serverId = if (explicitServerId == null) {
             RelayValidation.serverId(name) ?: "name-${RelaySecrets.sha256(name).take(32)}"
         } else {
@@ -83,6 +119,57 @@ class ServerEndpoint(
         }
         if (serverId == null) {
             sendRegisterFailure(session, msg.id, "INVALID_SERVER_ID", "serverId 无效")
+            return
+        }
+
+        val rawPluginVersion = (data["pluginVersion"] as? JsonPrimitive)?.contentOrNull
+        val pluginVersion = rawPluginVersion?.let(RelayValidation::pluginVersion)
+        if (data["pluginVersion"] != null && (rawPluginVersion == null || pluginVersion == null)) {
+            sendRegisterFailure(session, msg.id, "INVALID_PLUGIN_VERSION", "pluginVersion 无效")
+            return
+        }
+        val protocolVersions = parseProtocolVersions(data["protocolVersions"])
+        if (protocolVersions == null) {
+            sendRegisterFailure(session, msg.id, "UNSUPPORTED_PROTOCOL", "protocolVersions 必须只包含 v1/v2")
+            return
+        }
+        val rawPreferredProtocol = (data["preferredProtocol"] as? JsonPrimitive)?.contentOrNull
+        val preferredProtocol = rawPreferredProtocol?.let(ProtocolVersion::parse)
+        if (data["preferredProtocol"] != null &&
+            (rawPreferredProtocol == null || preferredProtocol == null || preferredProtocol !in protocolVersions)
+        ) {
+            sendRegisterFailure(session, msg.id, "INVALID_PREFERRED_PROTOCOL", "preferredProtocol 必须包含在 protocolVersions 中")
+            return
+        }
+        val relayProtocols = if (features.protocolV2Enabled) {
+            setOf(ProtocolVersion.V1, ProtocolVersion.V2)
+        } else {
+            setOf(ProtocolVersion.V1)
+        }
+        val commonProtocols = protocolVersions intersect relayProtocols
+        if (commonProtocols.isEmpty()) {
+            sendRegisterFailure(session, msg.id, "UNSUPPORTED_PROTOCOL", "插件与 relay 没有共同启用的协议版本")
+            return
+        }
+        val negotiatedProtocol = preferredProtocol?.takeIf { it in commonProtocols }
+            ?: commonProtocols.maxBy { it.ordinal }
+        val capabilities = parseCapabilities(data["capabilities"])
+        if (capabilities == null) {
+            sendRegisterFailure(session, msg.id, "INVALID_CAPABILITIES", "capabilities 无效")
+            return
+        }
+        if (negotiatedProtocol == ProtocolVersion.V2 && "revision.sha256" !in capabilities) {
+            sendRegisterFailure(session, msg.id, "MISSING_CAPABILITY", "协议 V2 必须声明 revision.sha256")
+            return
+        }
+        if (negotiatedProtocol == ProtocolVersion.V2 && features.v2WritesEnabled && "mutation.preconditions" !in capabilities) {
+            sendRegisterFailure(session, msg.id, "MISSING_CAPABILITY", "启用 V2 变更路径必须声明 mutation.preconditions")
+            return
+        }
+        val rawConnectionNonce = (data["connectionNonce"] as? JsonPrimitive)?.contentOrNull
+        val connectionNonce = rawConnectionNonce?.let(RelayValidation::connectionNonce)
+        if (data["connectionNonce"] != null && (rawConnectionNonce == null || connectionNonce == null)) {
+            sendRegisterFailure(session, msg.id, "INVALID_CONNECTION_NONCE", "connectionNonce 无效")
             return
         }
 
@@ -105,16 +192,52 @@ class ServerEndpoint(
             licenseAccess.addIp(license, connectIp)
         }
 
-        val server = registry.registerServer(license, entry.serverKey, name, serverId, session)
+        val server = registry.registerServer(
+            licenseKey = license,
+            serverKey = entry.serverKey,
+            serverName = name,
+            serverId = serverId,
+            session = session,
+            pluginVersion = pluginVersion,
+            negotiatedProtocol = negotiatedProtocol,
+            capabilities = capabilities,
+            connectionNonce = connectionNonce
+        )
         session.sendText(WsResponse.build(
-            "server.register.result",
+            MessageTypes.SERVER_REGISTER_RESULT,
             msg.id,
             "success" to true,
             "serverKey" to entry.serverKey,
             "serverId" to server.serverId,
             "workspaceId" to server.workspaceId,
+            "negotiatedProtocol" to server.negotiatedProtocol.wireName,
+            "sessionEpoch" to server.sessionEpoch,
+            "relayCapabilities" to relayCapabilities(server.negotiatedProtocol, features),
+            "connectionNonce" to server.connectionNonce,
             "message" to "服务器已注册"
         ))
+    }
+
+    private fun parseProtocolVersions(element: JsonElement?): Set<ProtocolVersion>? {
+        if (element == null) return setOf(ProtocolVersion.V1)
+        val values = element as? JsonArray ?: return null
+        if (values.isEmpty()) return null
+        val parsed = values.map { value ->
+            val wireName = (value as? JsonPrimitive)?.contentOrNull ?: return null
+            ProtocolVersion.parse(wireName) ?: return null
+        }.toSet()
+        return parsed.takeIf { it.size == values.size }
+    }
+
+    private fun parseCapabilities(element: JsonElement?): Set<String>? {
+        if (element == null) return emptySet()
+        val values = element as? JsonArray ?: return null
+        if (values.size > ProtocolLimits.MAX_CAPABILITIES) return null
+        val parsed = values.map { value ->
+            val capability = (value as? JsonPrimitive)?.contentOrNull ?: return null
+            RelayValidation.capability(capability) ?: return null
+        }.toSet()
+        return parsed.takeIf { it.size == values.size }
     }
 
     private suspend fun handleTokenRegister(session: RelaySocket, msg: WsMessage) {
@@ -142,15 +265,16 @@ class ServerEndpoint(
         }
 
         if (!registry.registerToken(token, session, playerName, expiresIn)) {
-            session.sendText(WsResponse.error(msg.id, "TOKEN_ALREADY_EXISTS", "token 已存在"))
+            session.sendText(WsResponse.error(msg.id, "TOKEN_ALREADY_EXISTS", "token 已存在或插件会话已失效"))
             return
         }
         session.sendText(WsResponse.build(
-            "token.register.result",
+            MessageTypes.TOKEN_REGISTER_RESULT,
             msg.id,
             "success" to true,
             "token" to token,
             "workspaceId" to server.workspaceId,
+            "sessionEpoch" to server.sessionEpoch,
             "expiresIn" to expiresIn
         ))
     }
@@ -166,7 +290,7 @@ class ServerEndpoint(
             return
         }
         registry.revokeToken(token, session)
-        session.sendText(WsResponse.build("token.revoke.result", msg.id, "success" to true))
+        session.sendText(WsResponse.build(MessageTypes.TOKEN_REVOKE_RESULT, msg.id, "success" to true))
     }
 
     private suspend fun relayPluginMessage(serverSession: RelaySocket, msg: WsMessage) {
@@ -176,14 +300,34 @@ class ServerEndpoint(
             return
         }
 
-        val pending = registry.takePendingRequest(msg.id, serverSession)
+        val pending = msg.id.takeIf(String::isNotEmpty)?.let { registry.takePendingRequest(it, serverSession) }
         if (pending != null) {
+            if (msg.type != pending.expectedResponseType && msg.type != MessageTypes.ERROR) {
+                rejectPluginResponse(
+                    pending = pending,
+                    pluginSession = serverSession,
+                    pluginRequestId = msg.id,
+                    code = "UNEXPECTED_RESPONSE_TYPE",
+                    message = "期望 ${pending.expectedResponseType}，实际 ${msg.type}",
+                )
+                return
+            }
             relayCorrelatedResponse(server, pending, msg)
             return
         }
 
-        if (msg.type !in BROADCAST_TYPES) return
-        val broadcastMessage = sanitizeWorkspaceBroadcast(server, msg) ?: return
+        if (msg.id.isNotEmpty()) {
+            serverSession.sendText(WsResponse.error(msg.id, "UNKNOWN_RELAY_REQUEST", "relay request 不存在或已过期"))
+            return
+        }
+        if (msg.type !in BROADCAST_TYPES) {
+            serverSession.sendText(WsResponse.error(msg.id, "MESSAGE_DIRECTION_NOT_ALLOWED", "该插件消息不能广播"))
+            return
+        }
+        val broadcastMessage = sanitizeWorkspaceBroadcast(server, msg) ?: run {
+            serverSession.sendText(WsResponse.error(msg.id, "INVALID_REVISION", "广播 revision 无效"))
+            return
+        }
         registry.getBrowsersForWorkspace(server.workspaceId).forEach { browser ->
             try {
                 browser.sendText(broadcastMessage)
@@ -195,10 +339,29 @@ class ServerEndpoint(
 
     private suspend fun relayCorrelatedResponse(server: GameServer, pending: PendingRequest, msg: WsMessage) {
         val data = msg.data.jsonObject
+        val v2Revision = if (pending.protocolVersion == ProtocolVersion.V2) {
+            val rawRevision = (data["revision"] as? JsonPrimitive)?.contentOrNull
+            val validatedRevision = rawRevision?.let(RelayValidation::sha256Revision)
+            if ((rawRevision != null && validatedRevision == null) ||
+                (rawRevision == null && requiresV2Revision(pending, msg, data))
+            ) {
+                rejectPluginResponse(
+                    pending = pending,
+                    pluginSession = server.session,
+                    pluginRequestId = msg.id,
+                    code = "INVALID_REVISION",
+                    message = "V2 revision 必须是 64 位小写 SHA-256",
+                )
+                return
+            }
+            validatedRevision
+        } else {
+            null
+        }
         val successfulWrite = pending.type == MessageTypes.FILE_WRITE &&
             msg.type == MessageTypes.FILE_WRITTEN &&
-            data["success"]?.jsonPrimitive?.booleanOrNull != false
-        val newRevision = registry.finishRequest(pending, successfulWrite)
+            (data["success"] as? JsonPrimitive)?.booleanOrNull != false
+        val newV1Revision = registry.finishRequest(pending, successfulWrite)
 
         val responseType: String
         val responseData: JsonObject
@@ -210,11 +373,11 @@ class ServerEndpoint(
             ))
         } else {
             responseType = msg.type
-            val additions = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
-            if (pending.type == MessageTypes.FILE_READ && pending.path != null) {
+            val additions = mutableMapOf<String, JsonElement>()
+            if (pending.protocolVersion == ProtocolVersion.V1 && pending.type == MessageTypes.FILE_READ && pending.path != null) {
                 additions["revision"] = JsonPrimitive(registry.currentRevision(pending.workspaceId, pending.path))
             }
-            if (newRevision != null) additions["revision"] = JsonPrimitive(newRevision)
+            if (newV1Revision != null) additions["revision"] = JsonPrimitive(newV1Revision)
             responseData = JsonObject(data + additions)
         }
 
@@ -224,20 +387,55 @@ class ServerEndpoint(
             registry.unbindBrowser(pending.browserSession)
         }
 
-        if (newRevision != null && pending.path != null) {
-            broadcastFileChanged(server.workspaceId, pending.path, newRevision, pending.browserId)
+        if (successfulWrite && pending.path != null) {
+            val revision = newV1Revision?.let(::JsonPrimitive) ?: v2Revision?.let(::JsonPrimitive)
+            if (revision != null) {
+                broadcastFileChanged(server.workspaceId, pending.path, revision, pending.browserId)
+            }
+        }
+    }
+
+    private fun requiresV2Revision(pending: PendingRequest, msg: WsMessage, data: JsonObject): Boolean =
+        (pending.type == MessageTypes.FILE_READ && msg.type == MessageTypes.FILE_CONTENT) ||
+            (pending.type == MessageTypes.FILE_WRITE && msg.type == MessageTypes.FILE_WRITTEN &&
+                (data["success"] as? JsonPrimitive)?.booleanOrNull != false)
+
+    private suspend fun rejectPluginResponse(
+        pending: PendingRequest,
+        pluginSession: RelaySocket,
+        pluginRequestId: String,
+        code: String,
+        message: String,
+    ) {
+        registry.finishRequest(pending, successfulWrite = false)
+        try {
+            pending.browserSession.sendText(WsResponse.error(pending.originalId, code, message))
+        } catch (_: Exception) {
+            registry.unbindBrowser(pending.browserSession)
+        }
+        try {
+            pluginSession.sendText(WsResponse.error(pluginRequestId, code, message))
+        } catch (_: Exception) {
+            // WebSocket lifecycle will remove a disconnected plugin session.
         }
     }
 
     private fun sanitizeWorkspaceBroadcast(server: GameServer, msg: WsMessage): String? {
         val data = msg.data.jsonObject
-        val additions = mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
+        val additions = mutableMapOf<String, JsonElement>(
             "workspaceId" to JsonPrimitive(server.workspaceId)
         )
         if (msg.type == MessageTypes.FILE_CHANGED) {
-            val path = RelayValidation.path(data["path"]?.jsonPrimitive?.contentOrNull.orEmpty()) ?: return null
+            val path = RelayValidation.path((data["path"] as? JsonPrimitive)?.contentOrNull.orEmpty()) ?: return null
             additions["path"] = JsonPrimitive(path)
-            additions["revision"] = JsonPrimitive(registry.currentRevision(server.workspaceId, path))
+            additions["revision"] = when (server.negotiatedProtocol) {
+                ProtocolVersion.V1 -> JsonPrimitive(registry.currentRevision(server.workspaceId, path))
+                ProtocolVersion.V2 -> {
+                    val revision = (data["revision"] as? JsonPrimitive)?.contentOrNull
+                        ?.let(RelayValidation::sha256Revision) ?: return null
+                    JsonPrimitive(revision)
+                }
+            }
         }
         return WsProtocol.encode(WsMessage(msg.type, "", JsonObject(data + additions)))
     }
@@ -245,7 +443,7 @@ class ServerEndpoint(
     private suspend fun broadcastFileChanged(
         workspaceId: String,
         path: String,
-        revision: Long,
+        revision: JsonElement,
         browserId: String
     ) {
         val message = WsResponse.build(
@@ -267,7 +465,7 @@ class ServerEndpoint(
 
     private suspend fun sendRegisterFailure(session: RelaySocket, id: String, code: String, message: String) {
         session.sendText(WsResponse.build(
-            "server.register.result",
+            MessageTypes.SERVER_REGISTER_RESULT,
             id,
             "success" to false,
             "code" to code,
@@ -284,8 +482,9 @@ class ServerEndpoint(
     suspend fun onServerDisconnect(session: RelaySocket) {
         sessionIps.remove(session)
         val workspaceId = registry.getServerBySession(session)?.workspaceId
+        val wasAuthoritative = registry.isAuthoritative(session)
         registry.unregisterServer(session)
-        if (workspaceId != null) broadcastPresence(workspaceId)
+        if (workspaceId != null && wasAuthoritative) broadcastPresence(workspaceId)
     }
 
     private suspend fun broadcastPresence(workspaceId: String) {
@@ -322,8 +521,8 @@ class ServerEndpoint(
     private companion object {
         val BROADCAST_TYPES = setOf(
             MessageTypes.LOG_ENTRY,
-            MessageTypes.PRESENCE_UPDATED,
-            MessageTypes.FILE_CHANGED
+            MessageTypes.FILE_CHANGED,
+            MessageTypes.SERVER_INFO
         )
     }
 }

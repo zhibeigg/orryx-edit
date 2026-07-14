@@ -13,8 +13,18 @@ application {
     mainClass.set("com.orryx.editor.ApplicationKt")
 }
 
+tasks.named<Jar>("jar") {
+    archiveClassifier.set("plain")
+}
+
 tasks.named<Jar>("shadowJar") {
     archiveFileName.set("orryx-editor-server-${project.version}.jar")
+}
+
+listOf("startScripts", "distTar", "distZip").forEach { taskName ->
+    tasks.named(taskName) {
+        dependsOn("shadowJar")
+    }
 }
 
 val generatedBuildInfo = layout.buildDirectory.dir("generated-resources/build-info")

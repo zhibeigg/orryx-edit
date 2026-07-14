@@ -1,12 +1,18 @@
 package com.orryx.editor.relay
 
+import com.orryx.editor.protocol.ContractValidationResult
+import com.orryx.editor.protocol.MessageDirection
 import com.orryx.editor.protocol.MessageParseResult
 import com.orryx.editor.protocol.MessageTypes
+import com.orryx.editor.protocol.ProtocolContracts
+import com.orryx.editor.protocol.ProtocolRole
+import com.orryx.editor.protocol.ProtocolVersion
 import com.orryx.editor.protocol.WsMessage
 import com.orryx.editor.protocol.WsProtocol
 import com.orryx.editor.protocol.WsResponse
 import io.ktor.websocket.WebSocketSession
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -22,7 +28,8 @@ private const val DEFAULT_RESUME_TTL_MILLIS = 24 * 60 * 60_000L
 class RelayHandler(
     private val registry: SessionRegistry,
     private val sessionStore: EditorSessionStore = InMemoryEditorSessionStore(),
-    private val resumeTtlMillis: Long = DEFAULT_RESUME_TTL_MILLIS
+    private val resumeTtlMillis: Long = DEFAULT_RESUME_TTL_MILLIS,
+    private val features: RelayFeatureFlags = RelayFeatureFlags()
 ) {
     suspend fun handleBrowserMessage(browserSession: WebSocketSession, text: String) {
         handleBrowserMessage(registry.socket(browserSession), text)
@@ -38,6 +45,20 @@ class RelayHandler(
             }
         }
 
+        val protocolVersion = registry.getBrowserBinding(browserSession)?.protocolVersion ?: ProtocolVersion.V1
+        val contract = when (val validation = ProtocolContracts.validate(
+            type = msg.type,
+            role = ProtocolRole.BROWSER,
+            direction = MessageDirection.BROWSER_TO_RELAY,
+            version = protocolVersion
+        )) {
+            is ContractValidationResult.Allowed -> validation.contract
+            is ContractValidationResult.Rejected -> {
+                browserSession.sendText(WsResponse.error(msg.id, validation.error.code, validation.error.message))
+                return
+            }
+        }
+
         when (msg.type) {
             MessageTypes.AUTH -> {
                 val data = msg.data.jsonObject
@@ -49,7 +70,7 @@ class RelayHandler(
             }
             MessageTypes.RESUME -> handleResume(browserSession, msg, MessageTypes.RESUME_RESULT)
             MessageTypes.PRESENCE_UPDATE -> handlePresenceUpdate(browserSession, msg)
-            else -> forwardBrowserRequest(browserSession, msg)
+            else -> forwardBrowserRequest(browserSession, msg, contract.expectedResponseType)
         }
     }
 
@@ -96,6 +117,9 @@ class RelayHandler(
             "browserId" to binding.browserId,
             "playerName" to binding.playerName,
             "resumeToken" to resumeToken,
+            "negotiatedProtocol" to server.negotiatedProtocol.wireName,
+            "sessionEpoch" to server.sessionEpoch,
+            "relayCapabilities" to relayCapabilities(server.negotiatedProtocol, features),
             "onlineCount" to registry.getPresence(server.workspaceId).size,
             "permissions" to buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("*")) },
             "collaborators" to collaborators(binding)
@@ -136,6 +160,9 @@ class RelayHandler(
             "browserId" to binding.browserId,
             "playerName" to binding.playerName,
             "resumeToken" to rotatedToken,
+            "negotiatedProtocol" to server.negotiatedProtocol.wireName,
+            "sessionEpoch" to server.sessionEpoch,
+            "relayCapabilities" to relayCapabilities(server.negotiatedProtocol, features),
             "onlineCount" to registry.getPresence(server.workspaceId).size,
             "collaborators" to collaborators(binding)
         ))
@@ -159,7 +186,7 @@ class RelayHandler(
         }
         val updated = registry.updatePresence(browserSession, currentFile) ?: return
         if (msg.id.isNotEmpty()) {
-            browserSession.sendText(WsResponse.build("presence.update.result", msg.id, "success" to true))
+            browserSession.sendText(WsResponse.build(MessageTypes.PRESENCE_UPDATE_RESULT, msg.id, "success" to true))
         }
         broadcastPresence(binding.workspaceId, updated)
     }
@@ -181,7 +208,11 @@ class RelayHandler(
         return rawToken
     }
 
-    private suspend fun forwardBrowserRequest(browserSession: RelaySocket, msg: WsMessage) {
+    private suspend fun forwardBrowserRequest(
+        browserSession: RelaySocket,
+        msg: WsMessage,
+        expectedResponseType: String?
+    ) {
         val binding = registry.getBrowserBinding(browserSession)
         if (binding == null) {
             browserSession.sendText(WsResponse.error(msg.id, "NOT_AUTHENTICATED", "未认证，请先发送 auth 消息"))
@@ -191,6 +222,15 @@ class RelayHandler(
             browserSession.sendText(WsResponse.error("", "MISSING_REQUEST_ID", "请求 ID 不能为空"))
             return
         }
+        if (expectedResponseType == null) {
+            browserSession.sendText(WsResponse.error(msg.id, "MISSING_RESPONSE_CONTRACT", "消息缺少响应契约"))
+            return
+        }
+        if (binding.protocolVersion == ProtocolVersion.V2 && isMutation(msg.type) && !features.v2WritesEnabled) {
+            browserSession.sendText(WsResponse.error(msg.id, "FEATURE_DISABLED", "V2 变更路径尚未启用"))
+            return
+        }
+
         val data = msg.data.jsonObject
         val rawPath = data["path"]?.jsonPrimitive?.contentOrNull
         val path = when {
@@ -204,7 +244,7 @@ class RelayHandler(
             }
             else -> null
         }
-        val normalizedData = if (msg.type == MessageTypes.FILE_RENAME) {
+        var normalizedData = if (msg.type == MessageTypes.FILE_RENAME) {
             val oldPath = RelayValidation.path(data["oldPath"]?.jsonPrimitive?.contentOrNull.orEmpty())
             val newPath = RelayValidation.path(data["newPath"]?.jsonPrimitive?.contentOrNull.orEmpty())
             if (oldPath == null || newPath == null) {
@@ -212,26 +252,55 @@ class RelayHandler(
                 return
             }
             JsonObject(data + mapOf(
-                "oldPath" to kotlinx.serialization.json.JsonPrimitive(oldPath),
-                "newPath" to kotlinx.serialization.json.JsonPrimitive(newPath)
+                "oldPath" to JsonPrimitive(oldPath),
+                "newPath" to JsonPrimitive(newPath)
             ))
         } else if (path != null && rawPath != path) {
-            JsonObject(data + ("path" to kotlinx.serialization.json.JsonPrimitive(path)))
+            JsonObject(data + ("path" to JsonPrimitive(path)))
         } else {
             data
         }
+
         val force = data["force"]?.jsonPrimitive?.booleanOrNull ?: false
-        val baseRevision = data["baseRevision"]?.jsonPrimitive?.longOrNull
-        if (msg.type == MessageTypes.FILE_WRITE && !force && baseRevision == null) {
-            browserSession.sendText(WsResponse.error(msg.id, "MISSING_BASE_REVISION", "file.write 需要 baseRevision"))
-            return
+        var v1BaseRevision: Long? = null
+        if (msg.type == MessageTypes.FILE_WRITE) {
+            when (binding.protocolVersion) {
+                ProtocolVersion.V1 -> {
+                    v1BaseRevision = data["baseRevision"]?.jsonPrimitive?.longOrNull
+                    if (!force && v1BaseRevision == null) {
+                        browserSession.sendText(WsResponse.error(msg.id, "MISSING_BASE_REVISION", "file.write 需要 Long baseRevision"))
+                        return
+                    }
+                    normalizedData = JsonObject(normalizedData - "expectedRevision")
+                }
+                ProtocolVersion.V2 -> {
+                    val rawBaseRevision = data["baseRevision"]?.jsonPrimitive?.contentOrNull
+                    val baseRevision = rawBaseRevision?.let(RelayValidation::sha256Revision)
+                    if (rawBaseRevision != null && baseRevision == null) {
+                        browserSession.sendText(WsResponse.error(msg.id, "INVALID_REVISION", "V2 revision 必须是 64 位小写 SHA-256"))
+                        return
+                    }
+                    if (!force && baseRevision == null) {
+                        browserSession.sendText(WsResponse.error(msg.id, "MISSING_BASE_REVISION", "file.write 需要 SHA-256 baseRevision"))
+                        return
+                    }
+                    val forwardedData = normalizedData - "baseRevision" - "expectedRevision"
+                    normalizedData = if (force || baseRevision == null) {
+                        JsonObject(forwardedData)
+                    } else {
+                        JsonObject(forwardedData + ("expectedRevision" to JsonPrimitive(baseRevision)))
+                    }
+                }
+            }
         }
+
         when (val reservation = registry.reserveRequest(
             browserSession = browserSession,
             originalId = msg.id,
             type = msg.type,
+            expectedResponseType = expectedResponseType,
             path = path,
-            baseRevision = baseRevision,
+            v1BaseRevision = v1BaseRevision,
             force = force
         )) {
             RequestReservation.BrowserNotBound -> {
@@ -330,6 +399,14 @@ class RelayHandler(
         MessageTypes.FILE_READ,
         MessageTypes.FILE_WRITE,
         MessageTypes.FILE_CREATE,
-        MessageTypes.FILE_DELETE
+        MessageTypes.FILE_DELETE,
+    )
+
+    private fun isMutation(type: String): Boolean = type in setOf(
+        MessageTypes.FILE_WRITE,
+        MessageTypes.FILE_CREATE,
+        MessageTypes.FILE_DELETE,
+        MessageTypes.FILE_RENAME,
+        MessageTypes.RELOAD,
     )
 }

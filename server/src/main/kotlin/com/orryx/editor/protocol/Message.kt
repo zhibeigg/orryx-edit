@@ -16,6 +16,65 @@ data class WsMessage(
     val data: JsonElement
 )
 
+@Serializable
+data class ServerRegisterData(
+    val license: String,
+    val serverName: String,
+    val serverId: String? = null,
+    val pluginVersion: String? = null,
+    val protocolVersions: List<String>? = null,
+    val preferredProtocol: String? = null,
+    val capabilities: List<String>? = null,
+    val connectionNonce: String? = null
+)
+
+@Serializable
+data class ServerRegisterResultData(
+    val success: Boolean,
+    val serverKey: String? = null,
+    val serverId: String? = null,
+    val workspaceId: String? = null,
+    val negotiatedProtocol: String? = null,
+    val sessionEpoch: Long? = null,
+    val relayCapabilities: List<String> = emptyList(),
+    val connectionNonce: String? = null,
+    val code: String? = null,
+    val message: String? = null
+)
+
+/** Phase 0 DTO only. Relay does not persist snapshots or execute releases. */
+@Serializable
+data class ManifestSnapshotFile(
+    val path: String,
+    val revision: String,
+    val size: Long? = null
+)
+
+@Serializable
+data class ManifestSnapshotData(
+    val manifestId: String,
+    val revision: String,
+    val files: List<ManifestSnapshotFile>,
+    val createdAt: Long? = null
+)
+
+/** Phase 0 DTO only. Release transactions are intentionally not implemented. */
+@Serializable
+data class ReleaseRequestData(
+    val manifestId: String,
+    val expectedManifestRevision: String,
+    val releaseId: String? = null
+)
+
+@Serializable
+data class ReleaseResultData(
+    val success: Boolean,
+    val releaseId: String? = null,
+    val manifestRevision: String? = null,
+    val code: String? = null,
+    val message: String? = null
+)
+
 object ProtocolLimits {
     const val MAX_FRAME_BYTES = 1_048_576
     const val MAX_MESSAGE_TYPE_LENGTH = 64
@@ -27,6 +86,10 @@ object ProtocolLimits {
     const val MAX_SERVER_ID_LENGTH = 128
     const val MAX_BROWSER_ID_LENGTH = 128
     const val MAX_PLAYER_NAME_LENGTH = 100
+    const val MAX_PLUGIN_VERSION_LENGTH = 64
+    const val MAX_CAPABILITY_LENGTH = 64
+    const val MAX_CAPABILITIES = 64
+    const val MAX_CONNECTION_NONCE_LENGTH = 128
 }
 
 data class ProtocolError(val code: String, val message: String)
@@ -34,6 +97,154 @@ data class ProtocolError(val code: String, val message: String)
 sealed interface MessageParseResult {
     data class Success(val message: WsMessage) : MessageParseResult
     data class Failure(val error: ProtocolError) : MessageParseResult
+}
+
+enum class ProtocolRole {
+    BROWSER,
+    PLUGIN,
+    RELAY
+}
+
+enum class MessageDirection {
+    BROWSER_TO_RELAY,
+    PLUGIN_TO_RELAY,
+    RELAY_TO_BROWSER,
+    RELAY_TO_PLUGIN
+}
+
+enum class ProtocolVersion(val wireName: String) {
+    V1("v1"),
+    V2("v2");
+
+    companion object {
+        fun parse(value: String?): ProtocolVersion? = when (value?.trim()?.lowercase()) {
+            "1", "v1" -> V1
+            "2", "v2" -> V2
+            else -> null
+        }
+    }
+}
+
+data class MessageContract(
+    val type: String,
+    val direction: MessageDirection,
+    val versions: Set<ProtocolVersion>,
+    val expectedResponseType: String? = null
+)
+
+sealed interface ContractValidationResult {
+    data class Allowed(val contract: MessageContract) : ContractValidationResult
+    data class Rejected(val error: ProtocolError) : ContractValidationResult
+}
+
+/**
+ * Protocol hard allowlist. A syntactically valid type is not routable unless a contract below
+ * explicitly allows the connection role, direction and negotiated protocol version.
+ */
+object ProtocolContracts {
+    private val both = setOf(ProtocolVersion.V1, ProtocolVersion.V2)
+
+    private fun browserRequest(type: String, response: String? = null) =
+        MessageContract(type, MessageDirection.BROWSER_TO_RELAY, both, response)
+
+    private fun pluginMessage(type: String) =
+        MessageContract(type, MessageDirection.PLUGIN_TO_RELAY, both)
+
+    private val contracts = listOf(
+        browserRequest(MessageTypes.AUTH, MessageTypes.AUTH_RESULT),
+        browserRequest(MessageTypes.RESUME, MessageTypes.RESUME_RESULT),
+        browserRequest(MessageTypes.FILE_LIST, MessageTypes.FILE_TREE),
+        browserRequest(MessageTypes.FILE_READ, MessageTypes.FILE_CONTENT),
+        browserRequest(MessageTypes.FILE_WRITE, MessageTypes.FILE_WRITTEN),
+        browserRequest(MessageTypes.FILE_CREATE, MessageTypes.FILE_WRITTEN),
+        browserRequest(MessageTypes.FILE_DELETE, MessageTypes.FILE_WRITTEN),
+        browserRequest(MessageTypes.FILE_RENAME, MessageTypes.FILE_WRITTEN),
+        browserRequest(MessageTypes.RELOAD, MessageTypes.RELOAD_RESULT),
+        browserRequest(MessageTypes.LOG_SUBSCRIBE, MessageTypes.LOG_SUBSCRIBE_RESULT),
+        browserRequest(MessageTypes.LOG_UNSUBSCRIBE, MessageTypes.LOG_UNSUBSCRIBE_RESULT),
+        browserRequest(MessageTypes.PRESENCE_UPDATE, MessageTypes.PRESENCE_UPDATE_RESULT),
+
+        pluginMessage(MessageTypes.SERVER_REGISTER),
+        pluginMessage(MessageTypes.TOKEN_REGISTER),
+        pluginMessage(MessageTypes.TOKEN_REVOKE),
+        pluginMessage(MessageTypes.FILE_TREE),
+        pluginMessage(MessageTypes.FILE_CONTENT),
+        pluginMessage(MessageTypes.FILE_WRITTEN),
+        pluginMessage(MessageTypes.RELOAD_RESULT),
+        pluginMessage(MessageTypes.LOG_SUBSCRIBE_RESULT),
+        pluginMessage(MessageTypes.LOG_UNSUBSCRIBE_RESULT),
+        pluginMessage(MessageTypes.LOG_ENTRY),
+        pluginMessage(MessageTypes.FILE_CHANGED),
+        pluginMessage(MessageTypes.SERVER_INFO),
+        pluginMessage(MessageTypes.ERROR),
+
+        MessageContract(MessageTypes.AUTH_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.RESUME_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.FILE_TREE, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.FILE_CONTENT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.FILE_WRITTEN, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.FILE_CHANGED, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.PRESENCE_UPDATE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.PRESENCE_UPDATED, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.RELOAD_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.LOG_SUBSCRIBE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.LOG_UNSUBSCRIBE_RESULT, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.LOG_ENTRY, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.SERVER_INFO, MessageDirection.RELAY_TO_BROWSER, both),
+        MessageContract(MessageTypes.ERROR, MessageDirection.RELAY_TO_BROWSER, both),
+
+        MessageContract(MessageTypes.SERVER_REGISTER_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.TOKEN_REGISTER_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.TOKEN_REVOKE_RESULT, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.ERROR, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_LIST, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_READ, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_WRITE, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_CREATE, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_DELETE, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.FILE_RENAME, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.RELOAD, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.LOG_SUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both),
+        MessageContract(MessageTypes.LOG_UNSUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both)
+    )
+
+    private val byType = contracts.groupBy(MessageContract::type)
+
+    fun validate(
+        type: String,
+        role: ProtocolRole,
+        direction: MessageDirection,
+        version: ProtocolVersion
+    ): ContractValidationResult {
+        val typeContracts = byType[type]
+            ?: return ContractValidationResult.Rejected(ProtocolError("UNKNOWN_MESSAGE_TYPE", "未知消息类型"))
+        val roleMatchesDirection = when (role) {
+            ProtocolRole.BROWSER -> direction == MessageDirection.BROWSER_TO_RELAY
+            ProtocolRole.PLUGIN -> direction == MessageDirection.PLUGIN_TO_RELAY
+            ProtocolRole.RELAY -> direction == MessageDirection.RELAY_TO_BROWSER || direction == MessageDirection.RELAY_TO_PLUGIN
+        }
+        if (!roleMatchesDirection) {
+            return ContractValidationResult.Rejected(ProtocolError("MESSAGE_DIRECTION_NOT_ALLOWED", "消息方向不允许"))
+        }
+        val directionContracts = typeContracts.filter { it.direction == direction }
+        if (directionContracts.isEmpty()) {
+            return ContractValidationResult.Rejected(ProtocolError("MESSAGE_DIRECTION_NOT_ALLOWED", "消息方向不允许"))
+        }
+        val contract = directionContracts.firstOrNull { version in it.versions }
+            ?: return ContractValidationResult.Rejected(ProtocolError("MESSAGE_NOT_SUPPORTED", "协商协议不支持该消息"))
+        return ContractValidationResult.Allowed(contract)
+    }
+
+    fun expectedResponseType(type: String, version: ProtocolVersion): String? =
+        contracts.firstOrNull {
+            it.type == type && it.direction == MessageDirection.BROWSER_TO_RELAY && version in it.versions
+        }?.expectedResponseType
+
+    fun allowedTypes(direction: MessageDirection, version: ProtocolVersion): Set<String> =
+        contracts.asSequence()
+            .filter { it.direction == direction && version in it.versions }
+            .map(MessageContract::type)
+            .toSet()
 }
 
 object WsProtocol {
@@ -107,6 +318,14 @@ object MessageTypes {
     const val LOG_UNSUBSCRIBE = "log.unsubscribe"
     const val PRESENCE_UPDATE = "presence.update"
 
+    // 插件 → relay 控制消息
+    const val SERVER_REGISTER = "server.register"
+    const val SERVER_REGISTER_RESULT = "server.register.result"
+    const val TOKEN_REGISTER = "token.register"
+    const val TOKEN_REGISTER_RESULT = "token.register.result"
+    const val TOKEN_REVOKE = "token.revoke"
+    const val TOKEN_REVOKE_RESULT = "token.revoke.result"
+
     // relay / 插件 → 浏览器
     const val AUTH_RESULT = "auth.result"
     const val RESUME_RESULT = "session.resume.result"
@@ -114,9 +333,17 @@ object MessageTypes {
     const val FILE_CONTENT = "file.content"
     const val FILE_WRITTEN = "file.written"
     const val FILE_CHANGED = "file.changed"
+    const val PRESENCE_UPDATE_RESULT = "presence.update.result"
     const val PRESENCE_UPDATED = "presence.updated"
     const val RELOAD_RESULT = "reload.result"
+    const val LOG_SUBSCRIBE_RESULT = "log.subscribe.result"
+    const val LOG_UNSUBSCRIBE_RESULT = "log.unsubscribe.result"
     const val LOG_ENTRY = "log.entry"
     const val SERVER_INFO = "server.info"
     const val ERROR = "error"
+
+    // Phase 0 schema reservations only; no relay route or release transaction is enabled.
+    const val MANIFEST_SNAPSHOT = "manifest.snapshot"
+    const val RELEASE_REQUEST = "release.request"
+    const val RELEASE_RESULT = "release.result"
 }

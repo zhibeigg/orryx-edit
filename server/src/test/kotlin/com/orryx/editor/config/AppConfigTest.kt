@@ -30,6 +30,28 @@ class AppConfigTest {
         assertEquals(Paths.get("build/legacy/licenses.json").toAbsolutePath().normalize(), config.legacyLicensesFile)
         assertEquals(12, config.ketherDocs.syncInterval.toHours())
         assertEquals(true, config.ketherDocs.enabled)
+        assertEquals(false, config.editorProtocol.v2Enabled)
+        assertEquals(false, config.editorProtocol.v2WritesEnabled)
+    }
+
+    @Test
+    fun `editor protocol v2 flags are opt in and strictly parsed`() {
+        val base = mapOf(
+            "ADMIN_KEY" to "0123456789abcdef",
+            "DATABASE_URL" to "postgresql://localhost/orryx"
+        )
+        val enabled = AppConfig.load(base + mapOf(
+            "EDITOR_PROTOCOL_V2_ENABLED" to "true",
+            "EDITOR_V2_WRITES_ENABLED" to "true",
+        ))
+        assertEquals(true, enabled.editorProtocol.v2Enabled)
+        assertEquals(true, enabled.editorProtocol.v2WritesEnabled)
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(base + ("EDITOR_PROTOCOL_V2_ENABLED" to "yes"))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(base + ("EDITOR_V2_WRITES_ENABLED" to "true"))
+        }
     }
 
     @Test

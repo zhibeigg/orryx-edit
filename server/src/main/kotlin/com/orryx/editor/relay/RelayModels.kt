@@ -2,8 +2,11 @@ package com.orryx.editor.relay
 
 import com.orryx.editor.license.LicenseEntry
 import com.orryx.editor.license.LicenseManager
+import com.orryx.editor.protocol.ProtocolVersion
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.send
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -11,6 +14,25 @@ import java.util.concurrent.ConcurrentHashMap
 
 interface RelaySocket {
     suspend fun sendText(text: String)
+}
+
+data class RelayFeatureFlags(
+    val protocolV2Enabled: Boolean = false,
+    val v2WritesEnabled: Boolean = false,
+) {
+    init {
+        require(!v2WritesEnabled || protocolV2Enabled) { "启用 V2 写路径前必须先启用协议 V2" }
+    }
+}
+
+internal fun relayCapabilities(protocolVersion: ProtocolVersion, features: RelayFeatureFlags): JsonArray {
+    val capabilities = mutableListOf(
+        "protocol.allowlist",
+        "session.epoch",
+    )
+    if (protocolVersion == ProtocolVersion.V2) capabilities += "revision.sha256"
+    if (protocolVersion == ProtocolVersion.V2 && features.v2WritesEnabled) capabilities += "file.write.v2"
+    return JsonArray(capabilities.map(::JsonPrimitive))
 }
 
 internal class KtorRelaySocket(val session: WebSocketSession) : RelaySocket {

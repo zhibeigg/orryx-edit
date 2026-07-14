@@ -4,6 +4,8 @@ import com.orryx.editor.protocol.ProtocolLimits
 
 internal object RelayValidation {
     private val serverIdPattern = Regex("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+    private val capabilityPattern = Regex("^[a-z][a-z0-9._-]{0,63}$")
+    private val sha256Pattern = Regex("^[0-9a-f]{64}$")
 
     fun serverName(value: String): String? = value.trim().takeIf {
         it.isNotEmpty() &&
@@ -33,6 +35,24 @@ internal object RelayValidation {
             it.none(Char::isWhitespace) &&
             it.none(Char::isISOControl)
     }
+
+    fun pluginVersion(value: String): String? = value.trim().takeIf {
+        it.isNotEmpty() &&
+            it.length <= ProtocolLimits.MAX_PLUGIN_VERSION_LENGTH &&
+            it.none(Char::isISOControl)
+    }
+
+    fun capability(value: String): String? = value.takeIf {
+        it.length <= ProtocolLimits.MAX_CAPABILITY_LENGTH && capabilityPattern.matches(it)
+    }
+
+    fun connectionNonce(value: String): String? = value.takeIf {
+        it.length in ProtocolLimits.MIN_TOKEN_LENGTH..ProtocolLimits.MAX_CONNECTION_NONCE_LENGTH &&
+            it.none(Char::isWhitespace) &&
+            it.none(Char::isISOControl)
+    }
+
+    fun sha256Revision(value: String): String? = value.takeIf(sha256Pattern::matches)
 
     fun path(value: String): String? {
         if (value.isEmpty() || value.length > ProtocolLimits.MAX_PATH_LENGTH || value.any(Char::isISOControl)) return null

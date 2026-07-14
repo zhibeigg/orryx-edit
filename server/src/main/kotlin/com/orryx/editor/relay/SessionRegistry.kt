@@ -1,8 +1,10 @@
 package com.orryx.editor.relay
 
+import com.orryx.editor.protocol.ProtocolVersion
 import io.ktor.websocket.WebSocketSession
 import kotlinx.coroutines.sync.Mutex
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 private const val DEFAULT_REQUEST_TIMEOUT_MILLIS = 30_000L
 
@@ -13,6 +15,11 @@ data class GameServer(
     val serverId: String,
     val workspaceId: String,
     val session: RelaySocket,
+    val pluginVersion: String? = null,
+    val negotiatedProtocol: ProtocolVersion = ProtocolVersion.V1,
+    val capabilities: Set<String> = emptySet(),
+    val connectionNonce: String? = null,
+    val sessionEpoch: Long,
     val registeredAt: Long = System.currentTimeMillis()
 )
 
@@ -21,6 +28,7 @@ data class RegisteredToken(
     val pluginSession: RelaySocket,
     val serverId: String,
     val workspaceId: String,
+    val sessionEpoch: Long,
     val playerName: String,
     val createdAt: Long = System.currentTimeMillis(),
     val expiresAt: Long
@@ -32,6 +40,8 @@ data class BrowserBinding(
     val workspaceId: String,
     val serverId: String,
     val pluginSession: RelaySocket,
+    val protocolVersion: ProtocolVersion,
+    val sessionEpoch: Long,
     val browserSession: RelaySocket,
     val currentFile: String? = null,
     val lastActiveAt: Long = System.currentTimeMillis()
@@ -41,6 +51,9 @@ data class PendingRequest(
     val relayId: String,
     val originalId: String,
     val type: String,
+    val expectedResponseType: String,
+    val protocolVersion: ProtocolVersion,
+    val sessionEpoch: Long,
     val browserSession: RelaySocket,
     val pluginSession: RelaySocket,
     val workspaceId: String,
@@ -65,12 +78,14 @@ class SessionRegistry(
     private val sessions = ConcurrentHashMap<RelaySocket, GameServer>()
     private val serverSessions = ConcurrentHashMap<String, MutableSet<RelaySocket>>()
     private val workspaceSessions = ConcurrentHashMap<String, MutableSet<RelaySocket>>()
+    private val authoritativeWorkspaceSessions = ConcurrentHashMap<String, RelaySocket>()
+    private val sessionEpochSequence = AtomicLong(0)
     private val tokens = ConcurrentHashMap<String, RegisteredToken>()
     private val browserBindings = ConcurrentHashMap<RelaySocket, BrowserBinding>()
     private val workspaceBrowsers = ConcurrentHashMap<String, MutableSet<RelaySocket>>()
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest>()
-    private val revisions = ConcurrentHashMap<RevisionKey, Long>()
-    private val revisionLocks = ConcurrentHashMap<RevisionKey, Mutex>()
+    private val v1Revisions = ConcurrentHashMap<RevisionKey, Long>()
+    private val v1RevisionLocks = ConcurrentHashMap<RevisionKey, Mutex>()
 
     fun socket(session: WebSocketSession): RelaySocket =
         ktorSockets.computeIfAbsent(session) { KtorRelaySocket(it) }
@@ -79,26 +94,56 @@ class SessionRegistry(
         ktorSockets.remove(session)
     }
 
+    @Synchronized
     fun registerServer(
         licenseKey: String,
         serverKey: String,
         serverName: String,
         serverId: String,
-        session: RelaySocket
+        session: RelaySocket,
+        pluginVersion: String? = null,
+        negotiatedProtocol: ProtocolVersion = ProtocolVersion.V1,
+        capabilities: Set<String> = emptySet(),
+        connectionNonce: String? = null
     ): GameServer {
         unregisterServer(session)
+        val workspaceId = RelaySecrets.workspaceId(serverKey, serverId)
+        val sessionEpoch = sessionEpochSequence.incrementAndGet()
         val server = GameServer(
             licenseKey = licenseKey,
             serverKey = serverKey,
             serverName = serverName,
             serverId = serverId,
-            workspaceId = RelaySecrets.workspaceId(serverKey, serverId),
-            session = session
+            workspaceId = workspaceId,
+            session = session,
+            pluginVersion = pluginVersion,
+            negotiatedProtocol = negotiatedProtocol,
+            capabilities = capabilities,
+            connectionNonce = connectionNonce,
+            sessionEpoch = sessionEpoch
         )
+        val previousAuthoritative = authoritativeWorkspaceSessions.put(workspaceId, session)
         sessions[session] = server
         serverSessions.computeIfAbsent(serverKey) { ConcurrentHashMap.newKeySet() }.add(session)
-        workspaceSessions.computeIfAbsent(server.workspaceId) { ConcurrentHashMap.newKeySet() }.add(session)
-        workspaceBrowsers.computeIfAbsent(server.workspaceId) { ConcurrentHashMap.newKeySet() }
+        workspaceSessions.computeIfAbsent(workspaceId) { ConcurrentHashMap.newKeySet() }.add(session)
+        workspaceBrowsers.computeIfAbsent(workspaceId) { ConcurrentHashMap.newKeySet() }
+
+        if (previousAuthoritative != null && previousAuthoritative !== session) {
+            tokens.entries.removeIf { it.value.pluginSession === previousAuthoritative }
+            removePendingRequests { it.pluginSession === previousAuthoritative }
+        }
+        browserBindings.forEach { (browserSession, binding) ->
+            if (binding.workspaceId == workspaceId) {
+                browserBindings.computeIfPresent(browserSession) { _, current ->
+                    if (current.workspaceId != workspaceId) current else current.copy(
+                        pluginSession = session,
+                        protocolVersion = negotiatedProtocol,
+                        sessionEpoch = sessionEpoch,
+                        lastActiveAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
         return server
     }
 
@@ -108,6 +153,7 @@ class SessionRegistry(
     fun registerServer(serverKey: String, serverName: String, session: RelaySocket): GameServer =
         registerServer(serverKey, serverKey, serverName, serverName, session)
 
+    @Synchronized
     fun unregisterServer(session: RelaySocket) {
         val server = sessions.remove(session) ?: return
         serverSessions[server.serverKey]?.let { set ->
@@ -118,11 +164,14 @@ class SessionRegistry(
             set.remove(session)
             if (set.isEmpty()) workspaceSessions.remove(server.workspaceId, set)
         }
+        val wasAuthoritative = authoritativeWorkspaceSessions.remove(server.workspaceId, session)
         tokens.entries.removeIf { it.value.pluginSession === session }
         removePendingRequests { it.pluginSession === session }
-        browserBindings.values
-            .filter { it.pluginSession === session }
-            .forEach { unbindBrowser(it.browserSession) }
+        if (wasAuthoritative) {
+            browserBindings.values
+                .filter { it.pluginSession === session && it.sessionEpoch == server.sessionEpoch }
+                .forEach { unbindBrowser(it.browserSession) }
+        }
     }
 
     fun unregisterServer(session: WebSocketSession) = unregisterServer(socket(session))
@@ -133,25 +182,32 @@ class SessionRegistry(
         return sessions[socket]
     }
 
+    fun isAuthoritative(session: RelaySocket): Boolean {
+        val server = sessions[session] ?: return false
+        return authoritativeWorkspaceSessions[server.workspaceId] === session
+    }
+
+    fun getAuthoritativeServer(workspaceId: String): GameServer? =
+        authoritativeWorkspaceSessions[workspaceId]?.let(sessions::get)
+
     fun getServerSessions(serverKey: String): Set<RelaySocket> = serverSessions[serverKey]?.toSet() ?: emptySet()
 
     fun getWorkspaceSessions(workspaceId: String): Set<RelaySocket> =
-        workspaceSessions[workspaceId]?.toSet() ?: emptySet()
+        authoritativeWorkspaceSessions[workspaceId]?.let(::setOf) ?: emptySet()
 
     fun getServerForResume(workspaceId: String, serverId: String): GameServer? =
-        workspaceSessions[workspaceId]
-            ?.asSequence()
-            ?.mapNotNull { sessions[it] }
-            ?.firstOrNull { it.serverId == serverId }
+        getAuthoritativeServer(workspaceId)?.takeIf { it.serverId == serverId }
 
     fun registerToken(token: String, pluginSession: RelaySocket, playerName: String, expiresIn: Long): Boolean {
         val server = sessions[pluginSession] ?: return false
+        if (!isAuthoritative(pluginSession)) return false
         val tokenHash = RelaySecrets.sha256(token)
         val entry = RegisteredToken(
             tokenHash = tokenHash,
             pluginSession = pluginSession,
             serverId = server.serverId,
             workspaceId = server.workspaceId,
+            sessionEpoch = server.sessionEpoch,
             playerName = playerName,
             expiresAt = System.currentTimeMillis() + expiresIn
         )
@@ -169,7 +225,10 @@ class SessionRegistry(
         val entry = consumed ?: return null
         if (System.currentTimeMillis() > entry.expiresAt) return null
         val server = sessions[entry.pluginSession] ?: return null
-        if (server.workspaceId != entry.workspaceId || server.serverId != entry.serverId) return null
+        if (!isAuthoritative(entry.pluginSession)) return null
+        if (server.workspaceId != entry.workspaceId || server.serverId != entry.serverId || server.sessionEpoch != entry.sessionEpoch) {
+            return null
+        }
         return entry
     }
 
@@ -204,6 +263,8 @@ class SessionRegistry(
             workspaceId = server.workspaceId,
             serverId = server.serverId,
             pluginSession = server.session,
+            protocolVersion = server.negotiatedProtocol,
+            sessionEpoch = server.sessionEpoch,
             browserSession = browserSession
         )
         browserBindings[browserSession] = binding
@@ -244,26 +305,31 @@ class SessionRegistry(
         browserSession: RelaySocket,
         originalId: String,
         type: String,
+        expectedResponseType: String,
         path: String?,
-        baseRevision: Long?,
+        v1BaseRevision: Long?,
         force: Boolean
     ): RequestReservation {
         cleanupExpiredRequests()
         val initialBinding = browserBindings[browserSession] ?: return RequestReservation.BrowserNotBound
         val relayId = RelaySecrets.newToken(24)
         var lock: Mutex? = null
-        if (type == "file.write" && path != null) {
+        if (initialBinding.protocolVersion == ProtocolVersion.V1 && type == "file.write" && path != null) {
             val key = RevisionKey(initialBinding.workspaceId, path)
-            lock = revisionLocks.computeIfAbsent(key) { Mutex() }
+            lock = v1RevisionLocks.computeIfAbsent(key) { Mutex() }
             lock.lock(relayId)
-            val current = revisions[key] ?: 0L
-            if (!force && baseRevision != current) {
+            val current = v1Revisions[key] ?: 0L
+            if (!force && v1BaseRevision != current) {
                 lock.unlock(relayId)
                 return RequestReservation.Conflict(current)
             }
         }
         val binding = browserBindings[browserSession]
-        if (binding == null || binding != initialBinding || sessions[binding.pluginSession] == null) {
+        val server = binding?.pluginSession?.let(sessions::get)
+        if (
+            binding == null || binding != initialBinding || server == null ||
+            !isAuthoritative(binding.pluginSession) || server.sessionEpoch != binding.sessionEpoch
+        ) {
             if (lock?.isLocked == true) lock.unlock(relayId)
             return RequestReservation.BrowserNotBound
         }
@@ -271,6 +337,9 @@ class SessionRegistry(
             relayId = relayId,
             originalId = originalId,
             type = type,
+            expectedResponseType = expectedResponseType,
+            protocolVersion = binding.protocolVersion,
+            sessionEpoch = binding.sessionEpoch,
             browserSession = browserSession,
             pluginSession = binding.pluginSession,
             workspaceId = binding.workspaceId,
@@ -297,17 +366,17 @@ class SessionRegistry(
 
     fun finishRequest(request: PendingRequest, successfulWrite: Boolean): Long? {
         var revision: Long? = null
-        if (request.type == "file.write" && request.path != null) {
+        if (request.protocolVersion == ProtocolVersion.V1 && request.type == "file.write" && request.path != null) {
             if (successfulWrite) {
                 val key = RevisionKey(request.workspaceId, request.path)
-                revision = revisions.merge(key, 1L, Long::plus)
+                revision = v1Revisions.merge(key, 1L, Long::plus)
             }
             unlockRequest(request)
         }
         return revision
     }
 
-    fun currentRevision(workspaceId: String, path: String): Long = revisions[RevisionKey(workspaceId, path)] ?: 0L
+    fun currentRevision(workspaceId: String, path: String): Long = v1Revisions[RevisionKey(workspaceId, path)] ?: 0L
 
     fun cleanupExpiredTokens(): Int {
         val now = System.currentTimeMillis()
@@ -340,7 +409,7 @@ class SessionRegistry(
     fun tokenCount(): Int = tokens.size
     fun browserCount(): Int = browserBindings.size
     fun pendingRequestCount(): Int = pendingRequests.size
-    fun isServerOnline(serverKey: String): Boolean = !serverSessions[serverKey].isNullOrEmpty()
-    fun onlineSessionCount(serverKey: String): Int = serverSessions[serverKey]?.size ?: 0
-    fun getOnlineServerKeys(): Set<String> = serverSessions.keys.filter { !serverSessions[it].isNullOrEmpty() }.toSet()
+    fun isServerOnline(serverKey: String): Boolean = serverSessions[serverKey]?.any(::isAuthoritative) == true
+    fun onlineSessionCount(serverKey: String): Int = serverSessions[serverKey]?.count(::isAuthoritative) ?: 0
+    fun getOnlineServerKeys(): Set<String> = serverSessions.keys.filter { isServerOnline(it) }.toSet()
 }

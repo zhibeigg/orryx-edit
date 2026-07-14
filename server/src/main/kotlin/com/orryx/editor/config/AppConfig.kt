@@ -27,6 +27,15 @@ data class SessionConfig(
     val relayRequestTimeout: Duration
 )
 
+data class EditorProtocolConfig(
+    val v2Enabled: Boolean = false,
+    val v2WritesEnabled: Boolean = false,
+) {
+    init {
+        require(!v2WritesEnabled || v2Enabled) { "启用 V2 写路径前必须先启用协议 V2" }
+    }
+}
+
 data class AppConfig(
     val port: Int,
     val adminKey: String,
@@ -35,6 +44,7 @@ data class AppConfig(
     val legacyLicensesFile: Path,
     val security: SecuritySettings,
     val sessions: SessionConfig,
+    val editorProtocol: EditorProtocolConfig,
     val updates: UpdateConfig,
     val ketherDocs: KetherDocsConfig,
     val buildInfo: BuildInfo
@@ -97,6 +107,10 @@ data class AppConfig(
                     cleanupInterval = Duration.ofMinutes(environment.longValue("EDITOR_SESSION_CLEANUP_MINUTES", 15, 1L..1_440L)),
                     relayRequestTimeout = Duration.ofSeconds(environment.longValue("RELAY_REQUEST_TIMEOUT_SECONDS", 15, 5L..120L))
                 ),
+                editorProtocol = EditorProtocolConfig(
+                    v2Enabled = environment.booleanValue("EDITOR_PROTOCOL_V2_ENABLED", false),
+                    v2WritesEnabled = environment.booleanValue("EDITOR_V2_WRITES_ENABLED", false),
+                ),
                 updates = UpdateConfig.fromEnvironment(environment),
                 ketherDocs = KetherDocsConfig.fromEnvironment(environment),
                 buildInfo = BuildInfo.load(environment = environment)
@@ -128,6 +142,11 @@ private fun Map<String, String>.longValue(name: String, default: Long, range: Lo
     val parsed = raw?.toLongOrNull() ?: if (raw == null) default else throw IllegalArgumentException("$name 必须是整数")
     require(parsed in range) { "$name 必须在 ${range.first}..${range.last} 范围内" }
     return parsed
+}
+
+private fun Map<String, String>.booleanValue(name: String, default: Boolean): Boolean {
+    val raw = value(name) ?: return default
+    return raw.toBooleanStrictOrNull() ?: throw IllegalArgumentException("$name 必须是 true 或 false")
 }
 
 private fun Map<String, String>.durationSeconds(
