@@ -9,6 +9,9 @@ const schema = normalizeSchema({
     any: { widget: "text", color: "#fff", extends: [], ketherFillable: true, inputStrategy: "expression", serialization: "raw" },
     text: { widget: "text", color: "#fff", extends: ["any"], ketherFillable: true, inputStrategy: "expression", serialization: "quoted" },
     number: { widget: "number", color: "#fff", extends: ["any"], ketherFillable: true, inputStrategy: "expression", serialization: "token" },
+    long: { widget: "number", color: "#fff", extends: ["number"], ketherFillable: true, inputStrategy: "expression", serialization: "token" },
+    keyword: { widget: "select", color: "#fff", extends: ["any"], ketherFillable: false, inputStrategy: "literal", serialization: "token" },
+    container: { widget: "text", color: "#fff", extends: ["any"], ketherFillable: true, inputStrategy: "expression", serialization: "raw" },
     boolean: { widget: "toggle", color: "#fff", extends: ["any"], ketherFillable: true, inputStrategy: "expression", serialization: "token" },
     location: { widget: "location", color: "#fff", extends: ["any"], ketherFillable: false, inputStrategy: "raw", serialization: "raw" },
   },
@@ -16,6 +19,7 @@ const schema = normalizeSchema({
   actions: [
     { id: "test.action.report", variantId: "test.action.report", name: "report", aliases: [], category: "test", namespace: "test", description: "report", syntax: "report <number>", flow: "normal", shape: "reporter", inputs: [{ name: "value", key: "value", type: "number", accepts: ["number"], required: true, default: 0 }], output: { type: "number" } },
     { id: "test.action.use", variantId: "test.action.use", name: "use", aliases: [], category: "test", namespace: "test", description: "use", syntax: "use <number>", flow: "normal", shape: "command", inputs: [{ name: "value", key: "value", type: "number", accepts: ["number"], required: true, default: 0 }], output: null },
+    { id: "test.action.buff-send", variantId: "test.action.buff-send", name: "buff", aliases: [], category: "test", namespace: "test", description: "buff send", syntax: "buff send <text> [long] [they <container>]", flow: "normal", shape: "command", inputs: [{ name: "send", key: "send", type: "keyword", accepts: ["keyword"], required: true, default: null, keyword: "send", keywords: { mode: "flag", alternatives: ["send"] } }, { name: "buff", key: "buff", type: "text", accepts: ["text"], required: true, default: null }, { name: "duration", key: "duration", type: "long", accepts: ["long"], required: false, default: null }, { name: "target", key: "target", type: "container", accepts: ["container"], required: false, default: null, keyword: "they", keywords: { mode: "value", alternatives: ["they"] } }], output: null },
     { id: "test.action.opaque", variantId: "test.action.opaque", name: "opaque", aliases: [], category: "test", namespace: "test", description: "opaque", syntax: "opaque <raw...>", flow: "normal", shape: "raw", inputs: [{ name: "arguments", key: "arguments", type: "raw", accepts: ["raw"], required: false, default: null }], output: null, grammar: { localRawRemainder: true } },
     { id: "test.action.grammar-only", variantId: "test.action.grammar-only", name: "grammar-only", aliases: [], category: "test", namespace: "test", description: "grammar only", syntax: "grammar-only <value> then <action>", flow: "normal", shape: "command", inputs: [], output: null, grammar: { sequence: ["grammar-only", { input: "value" }, "then", { input: "body" }] } },
   ],
@@ -72,6 +76,12 @@ describe("BlockDocument", () => {
     expect(rawBlocks).toHaveLength(1)
     expect(rawBlocks[0]?.source).toBe("opaque alpha [ beta ]")
     expect(serializeBlockDocument(document, schema)).toBe(source)
+  })
+
+  it("按 Schema 顺序保存前置关键字、位置参数与后置关键字，不静默重排或丢参", () => {
+    const source = "buff send 石更 200\nbuff send 超级石更 they @self"
+    const document = parseBlockDocument(source, schema)
+    expect(serializeBlockDocument(document, schema)).toBe('buff send "石更" 200\nbuff send "超级石更" they @self')
   })
 
   it("grammar 参数无法映射到公开输入时整段 raw，禁止保存时静默丢参", () => {

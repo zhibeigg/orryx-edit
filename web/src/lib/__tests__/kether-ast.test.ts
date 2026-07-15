@@ -52,6 +52,17 @@ const parserSchema: ActionsSchema = {
       params: [],
     },
     {
+      id: "test.action.buff-send",
+      variantId: "test.action.buff-send.default",
+      name: "buff",
+      params: [
+        { name: "发送标识符", type: "keyword", optional: false, keyword: "send" },
+        { name: "buff 名", type: "text", optional: false },
+        { name: "持续时长", type: "long", optional: true },
+        { name: "目标容器", type: "container", optional: true, keyword: "they" },
+      ],
+    },
+    {
       id: "test.action.ping",
       variantId: "test.action.ping.default",
       name: "ping",
@@ -137,6 +148,22 @@ describe("Kether AST TabooLib cursor semantics", () => {
     expect(ast.body).toHaveLength(2)
     expect(ast.body[0]).toEqual(expect.objectContaining({ type: "action_call", name: "player" }))
     expect(ast.body[1]).toEqual(expect.objectContaining({ type: "action_call", name: "tell" }))
+  })
+
+  it("保留关键字与位置参数顺序，且可选位置参数不会吞掉后续关键字", () => {
+    const source = [
+      "buff send 石更 200",
+      "buff send 超级石更 they @self",
+    ].join("\n")
+    const ast = parseKether(source, parserSchema)
+
+    expect(ast.body).toHaveLength(2)
+    expect(ast.body[1]).toEqual(expect.objectContaining({
+      type: "action_call",
+      args: [expect.objectContaining({ type: "identifier", name: "超级石更" })],
+      keywordArgs: expect.objectContaining({ send: expect.any(Object), they: expect.objectContaining({ type: "identifier", name: "@self" }) }),
+    }))
+    expect(stringifyKether(ast)).toBe(source)
   })
 
   it("支持递归 action list、匿名块、引号内括号、重复双引号、单引号与 \\s", () => {

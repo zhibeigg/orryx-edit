@@ -20,6 +20,10 @@ export interface ScriptNode extends BaseNode {
   body: ASTNode[]
 }
 
+export type ActionArgumentOrderItem =
+  | { kind: "argument"; index: number }
+  | { kind: "keyword"; key: string }
+
 export interface ActionCallNode extends BaseNode {
   type: "action_call"
   name: string
@@ -27,6 +31,8 @@ export interface ActionCallNode extends BaseNode {
   variantId: string | null
   args: ASTNode[]
   keywordArgs: Record<string, ASTNode>
+  /** 保留关键字与位置参数在源文本中的相对顺序，避免 stringify 改变语义。 */
+  argumentOrder?: ActionArgumentOrderItem[]
 }
 
 export interface SetNode extends BaseNode {
@@ -851,14 +857,19 @@ class KetherParser {
     return action?.variantId ?? action?.id ?? null
   }
 
-  private parseActionCandidate(action: SchemaAction, consumedName: string): { args: ASTNode[]; keywordArgs: Record<string, ASTNode> } {
+  private parseActionCandidate(action: SchemaAction, consumedName: string): {
+    args: ASTNode[]
+    keywordArgs: Record<string, ASTNode>
+    argumentOrder?: ActionArgumentOrderItem[]
+  } {
     const args: ASTNode[] = []
     const keywordArgs: Record<string, ASTNode> = {}
+    const argumentOrder: ActionArgumentOrderItem[] = []
     const grammar = action.grammar ?? {}
     if (grammar.localRawRemainder === true) throw new UnsupportedGrammarError(`${consumedName} 使用 localRawRemainder`)
     if (Array.isArray(grammar.sequence)) this.parseGrammarSequence(grammar.sequence, action, consumedName, args)
-    else this.parseSchemaParams(action.params, args, keywordArgs)
-    return { args, keywordArgs }
+    else this.parseSchemaParams(action.params, args, keywordArgs, argumentOrder)
+    return { args, keywordArgs, argumentOrder: argumentOrder.length > 0 ? argumentOrder : undefined }
   }
 
   // ---- Action 调用：对每个同名候选实际试解析，成功后按消费范围与声明完整度选择。 ----
@@ -873,6 +884,7 @@ class KetherParser {
       action: SchemaAction
       args: ASTNode[]
       keywordArgs: Record<string, ASTNode>
+      argumentOrder?: ActionArgumentOrderItem[]
       end: number
     }> = []
     let firstError: unknown = null
@@ -909,6 +921,7 @@ class KetherParser {
       variantId: selected.action.variantId ?? selected.action.id ?? null,
       args: selected.args,
       keywordArgs: selected.keywordArgs,
+      argumentOrder: selected.argumentOrder,
       start,
       end: this.reader.getPosition(),
     }
@@ -966,8 +979,13 @@ class KetherParser {
     throw new UnsupportedGrammarError(`${action.name} 包含未支持的 grammar 描述符`)
   }
 
-  private parseSchemaParams(params: SchemaParam[], args: ASTNode[], keywordArgs: Record<string, ASTNode>) {
-    for (const param of params) {
+  private parseSchemaParams(
+    params: SchemaParam[],
+    args: ASTNode[],
+    keywordArgs: Record<string, ASTNode>,
+    argumentOrder: ActionArgumentOrderItem[],
+  ) {
+    params.forEach((param, paramIndex) => {
       const alternatives = this.keywordAlternatives(param)
       if (alternatives.length > 0) {
         this.reader.mark()
@@ -979,17 +997,31 @@ class KetherParser {
           } else {
             keywordArgs[actualKeyword] = this.parseParamValue(param)
           }
+          argumentOrder.push({ kind: "keyword", key: actualKeyword })
           this.reader.unmark()
         } catch (error) {
           this.reader.reset()
           if (!param.optional) throw error
         }
-        continue
+        return
       }
 
-      if (param.optional && !this.reader.hasNextOnLine()) continue
+      // 可选位置参数先检查物理行边界；isStructure() 会按 TabooLib 语义跳过全部空白（含换行）。
+      if (param.optional && !this.reader.hasNextOnLine()) return
+      const atStructureBoundary = this.reader.isStructure("]") || this.reader.isStructure("}")
+      if (atStructureBoundary) {
+        if (param.optional) return
+        throw new KetherParseError(`${param.name} 缺少必需参数`)
+      }
+
+      const futureKeywords = new Set(params.slice(paramIndex + 1).flatMap((candidate) => (
+        this.keywordAlternatives(candidate).map((keyword) => keyword.toLowerCase())
+      )))
+      if (param.optional && futureKeywords.has(this.reader.peekToken().toLowerCase())) return
+
       args.push(this.parseParamValue(param))
-    }
+      argumentOrder.push({ kind: "argument", index: args.length - 1 })
+    })
   }
 
   private parseParamValue(param: SchemaParam): ASTNode {
@@ -1139,12 +1171,34 @@ class KetherStringifier {
 
   private actionCall(node: ActionCallNode, statement: boolean): string {
     const parts = [(statement ? this.pad() : "") + node.name]
-    for (const argument of node.args) parts.push(this.node(argument, false))
-    for (const [keyword, value] of Object.entries(node.keywordArgs)) {
+    const emittedArguments = new Set<number>()
+    const emittedKeywords = new Set<string>()
+    const appendKeyword = (keyword: string) => {
+      const value = node.keywordArgs[keyword]
+      if (!value) return
       parts.push(this.token(keyword))
       const keywordOnly = value.type === "identifier" && value.name === keyword
       if (!keywordOnly) parts.push(this.node(value, false))
+      emittedKeywords.add(keyword)
     }
+
+    for (const item of node.argumentOrder ?? []) {
+      if (item.kind === "argument") {
+        const argument = node.args[item.index]
+        if (argument && !emittedArguments.has(item.index)) {
+          parts.push(this.node(argument, false))
+          emittedArguments.add(item.index)
+        }
+      } else if (!emittedKeywords.has(item.key)) {
+        appendKeyword(item.key)
+      }
+    }
+    node.args.forEach((argument, index) => {
+      if (!emittedArguments.has(index)) parts.push(this.node(argument, false))
+    })
+    Object.keys(node.keywordArgs).forEach((keyword) => {
+      if (!emittedKeywords.has(keyword)) appendKeyword(keyword)
+    })
     return parts.join(" ")
   }
 
