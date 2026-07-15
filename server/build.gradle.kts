@@ -80,7 +80,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.1")
     implementation("org.postgresql:r2dbc-postgresql:1.0.7.RELEASE")
     implementation("io.r2dbc:r2dbc-pool:1.0.2.RELEASE")
-    implementation("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-classic:1.5.38")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
