@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
 import { ActionsEditor } from "./ActionsEditor"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -44,15 +45,14 @@ export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
     rawYamlRef.current = content
   }, [content])
 
-  const data = useMemo<StateFileData>(() => {
-    try { return parseYaml<StateFileData>(content) }
-    catch { return { GlobalStates: {} } }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<StateFileData>(content), [content])
+  const data = useMemo<StateFileData>(() => parsed.ok
+    ? { ...parsed.data, GlobalStates: parsed.data.GlobalStates ?? {} }
+    : { GlobalStates: {} }, [parsed])
 
   const updateData = useCallback((updater: (d: StateFileData) => StateFileData) => {
     const updated = updater(data)
-    try { onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(updated)) }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [data, onChange])
 
   const stateNames = Object.keys(data.GlobalStates ?? {})
@@ -71,6 +71,8 @@ export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-hidden flex">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+        <div className="flex h-full w-full">
         <div className="w-48 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
           <div className="p-2 space-y-0.5">
             {stateNames.map((name) => (
@@ -92,6 +94,8 @@ export function StateFileEditor({ content, onChange }: StateFileEditorProps) {
             <div className="p-4 text-sm text-muted-foreground">从左侧选择一个全局状态进行编辑</div>
           )}
         </div>
+        </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

@@ -1,5 +1,6 @@
 import type { FileTreeNode, WsMessage } from "@/types"
 import { MSG } from "@/types"
+import type { RevisionToken } from "@/types/protocol"
 
 export interface CollaboratorPresence {
   browserId: string
@@ -8,16 +9,32 @@ export interface CollaboratorPresence {
   lastActiveAt: number
 }
 
+export type NegotiatedProtocol = "v1" | "v2"
+
+export interface RelayServerInfo {
+  online: boolean
+  workspaceId: string
+  serverId: string
+  serverName?: string
+  negotiatedProtocol: NegotiatedProtocol
+  sessionEpoch: number
+  relayCapabilities: string[]
+}
+
 export interface AuthSession {
   success: boolean
   code?: string
   permissions?: string[]
   serverName?: string
+  serverId?: string
   onlineCount?: number
   workspaceId?: string
   browserId?: string
   playerName?: string
   resumeToken?: string
+  negotiatedProtocol?: NegotiatedProtocol
+  sessionEpoch?: number
+  relayCapabilities?: string[]
   collaborators?: CollaboratorPresence[]
   message?: string
 }
@@ -25,20 +42,20 @@ export interface AuthSession {
 export interface FileReadResult {
   path: string
   content: string
-  revision: number
+  revision: RevisionToken
 }
 
 export interface FileWriteResult {
   path: string
   success: boolean
-  revision: number
+  revision: RevisionToken
 }
 
 export interface WsErrorData {
   code?: string
   message?: string
   path?: string
-  currentRevision?: number
+  currentRevision?: RevisionToken
   [key: string]: unknown
 }
 
@@ -54,6 +71,10 @@ export class WsRequestError extends Error {
   }
 }
 
+export function isPermanentAuthenticationError(error: unknown): error is WsRequestError {
+  return error instanceof WsRequestError && PERMANENT_AUTHENTICATION_ERROR_CODES.has(error.code)
+}
+
 type MessageHandler = (msg: WsMessage) => void
 type PendingRequest = {
   resolve: (data: unknown) => void
@@ -66,6 +87,12 @@ const REQUEST_TIMEOUT_MS = 10_000
 const MAX_RECONNECT_ATTEMPTS = 10
 const RECONNECT_BASE_DELAY_MS = 1_000
 const RECONNECT_MAX_DELAY_MS = 30_000
+const PERMANENT_AUTHENTICATION_ERROR_CODES = new Set([
+  "INVALID_SESSION",
+  "INVALID_RESUME_TOKEN",
+  "SESSION_EXPIRED",
+  "LICENSE_INACTIVE",
+])
 
 let socket: WebSocket | null = null
 let connectionPromise: Promise<void> | null = null
@@ -75,12 +102,13 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectAttempts = 0
 let manuallyClosed = false
 let authenticated = false
+let resumeBlockedUntilReload = false
 let resumeToken: string | null = sessionStorage.getItem(RESUME_TOKEN_KEY)
 
 const pendingRequests = new Map<string, PendingRequest>()
 const listeners = new Map<string, Set<MessageHandler>>()
 let onStatusChange: ((connected: boolean) => void) | null = null
-let onReconnectFailed: (() => void) | null = null
+let onReconnectFailed: ((error: WsRequestError) => void) | null = null
 let onReconnected: ((session: AuthSession) => void) | null = null
 let onAuthenticationLost: ((error: WsRequestError) => void) | null = null
 
@@ -108,6 +136,13 @@ function persistResumeToken(value: string | null) {
   resumeToken = value
   if (value) sessionStorage.setItem(RESUME_TOKEN_KEY, value)
   else sessionStorage.removeItem(RESUME_TOKEN_KEY)
+}
+
+function loseAuthentication(error: WsRequestError) {
+  authenticated = false
+  resumeBlockedUntilReload = false
+  persistResumeToken(null)
+  onAuthenticationLost?.(error)
 }
 
 function dispatchMessage(msg: WsMessage) {
@@ -145,7 +180,12 @@ function scheduleReconnect() {
   if (manuallyClosed || !authenticated || !resumeToken || reconnectTimer) return
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     authenticated = false
-    onReconnectFailed?.()
+    resumeBlockedUntilReload = true
+    manuallyClosed = true
+    onReconnectFailed?.(new WsRequestError({
+      code: "RECONNECT_ATTEMPTS_EXHAUSTED",
+      message: "恢复连接重试次数已耗尽",
+    }))
     return
   }
 
@@ -161,10 +201,7 @@ function scheduleReconnect() {
       reconnectAttempts = 0
       onReconnected?.(session)
     } catch (error) {
-      if (error instanceof WsRequestError && ["INVALID_SESSION", "SESSION_EXPIRED", "LICENSE_INACTIVE"].includes(error.code)) {
-        authenticated = false
-        persistResumeToken(null)
-        onAuthenticationLost?.(error)
+      if (isPermanentAuthenticationError(error)) {
         disconnect(false)
         return
       }
@@ -181,7 +218,7 @@ export function setReconnectedHandler(handler: (session: AuthSession) => void) {
   onReconnected = handler
 }
 
-export function setReconnectFailedHandler(handler: () => void) {
+export function setReconnectFailedHandler(handler: (error: WsRequestError) => void) {
   onReconnectFailed = handler
 }
 
@@ -233,7 +270,10 @@ export function disconnect(clearSession = true) {
   authenticated = false
   clearReconnectTimer()
   rejectPendingRequests(new Error("WebSocket 连接已关闭"))
-  if (clearSession) persistResumeToken(null)
+  if (clearSession) {
+    resumeBlockedUntilReload = false
+    persistResumeToken(null)
+  }
   const current = socket
   socket = null
   connectionPromise = null
@@ -291,13 +331,22 @@ export function on(type: string, handler: MessageHandler): () => void {
 async function applyAuthResult(result: AuthSession): Promise<AuthSession> {
   if (!result.success) throw new WsRequestError({ code: result.code ?? "AUTH_FAILED", message: result.message ?? "认证失败" })
   authenticated = true
+  resumeBlockedUntilReload = false
   if (result.resumeToken) persistResumeToken(result.resumeToken)
   return result
 }
 
 async function authenticateResume(): Promise<AuthSession> {
+  if (resumeBlockedUntilReload) {
+    throw new WsRequestError({ code: "RECONNECT_RELOAD_REQUIRED", message: "请刷新页面后恢复编辑会话" })
+  }
   if (!resumeToken) throw new WsRequestError({ code: "INVALID_SESSION", message: "没有可恢复会话" })
-  return applyAuthResult(await request<AuthSession>(MSG.AUTH, { resumeToken }))
+  try {
+    return await applyAuthResult(await request<AuthSession>(MSG.AUTH, { resumeToken }))
+  } catch (error) {
+    if (isPermanentAuthenticationError(error)) loseAuthentication(error)
+    throw error
+  }
 }
 
 export const wsClient = {
@@ -312,10 +361,11 @@ export const wsClient = {
   setAuthenticationLostHandler,
 
   hasResumeSession() {
-    return Boolean(resumeToken)
+    return Boolean(resumeToken) && !resumeBlockedUntilReload
   },
 
   clearResumeSession() {
+    resumeBlockedUntilReload = false
     persistResumeToken(null)
   },
 
@@ -339,12 +389,12 @@ export const wsClient = {
     return request<FileReadResult>(MSG.FILE_READ, { path })
   },
 
-  async fileWrite(path: string, content: string, baseRevision: number, force = false) {
+  async fileWrite(path: string, content: string, baseRevision: RevisionToken, force = false) {
     return request<FileWriteResult>(MSG.FILE_WRITE, { path, content, baseRevision, force })
   },
 
   async fileCreate(path: string, isDirectory = false) {
-    return request<{ path: string; success: boolean; revision?: number }>(MSG.FILE_CREATE, { path, isDirectory })
+    return request<{ path: string; success: boolean; revision?: RevisionToken }>(MSG.FILE_CREATE, { path, isDirectory })
   },
 
   async fileDelete(path: string) {

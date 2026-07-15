@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlPaths, type YamlPathMutation } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedTextInput } from "./BufferedTextInput"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
@@ -15,36 +17,34 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
     rawRef.current = content
   }, [content])
 
+  const parsed = useMemo(() => safeParseYaml<Record<string, { Description?: string[] }>>(content), [content])
   const buffs = useMemo(() => {
-    try {
-      const data = parseYaml<Record<string, { Description?: string[] }>>(content)
-      return Object.entries(data).map(([key, val]) => ({ key, description: val?.Description ?? [] }))
-    } catch { return [] }
-  }, [content])
+    if (!parsed.ok) return []
+    return Object.entries(parsed.data).map(([key, value]) => ({ key, description: value?.Description ?? [] }))
+  }, [parsed])
 
-  const save = useCallback((entries: { key: string; description: string[] }[]) => {
-    const obj: Record<string, { Description: string[] }> = {}
-    for (const e of entries) obj[e.key] = { Description: e.description }
-    try { onChange(updateYamlFromObject(rawRef.current, obj as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(obj)) }
+  const mutate = useCallback((mutations: YamlPathMutation[]) => {
+    onChange(updateYamlPaths(rawRef.current, mutations))
   }, [onChange])
 
   const addBuff = () => {
     const key = `新Buff_${Date.now() % 1000}`
-    save([...buffs, { key, description: ["&f描述行"] }])
+    mutate([{ type: "set", path: [key], value: { Description: ["&f描述行"] } }])
     setEditingKey(key)
   }
 
-  const removeBuff = (key: string) => save(buffs.filter((b) => b.key !== key))
+  const removeBuff = (key: string) => mutate([{ type: "delete", path: [key] }])
 
-  const renameBuff = (oldKey: string, newKey: string) => {
-    if (!newKey.trim() || (newKey !== oldKey && buffs.some((b) => b.key === newKey))) return
-    save(buffs.map((b) => (b.key === oldKey ? { ...b, key: newKey } : b)))
+  const renameBuff = (oldKey: string, newKey: string): boolean => {
+    const trimmed = newKey.trim()
+    if (!trimmed || (trimmed !== oldKey && buffs.some((buff) => buff.key === trimmed))) return false
+    mutate([{ type: "rename", path: [oldKey], newKey: trimmed }])
     setEditingKey(null)
+    return true
   }
 
   const updateDesc = (key: string, description: string[]) => {
-    save(buffs.map((b) => (b.key === key ? { ...b, description } : b)))
+    mutate([{ type: "set", path: [key, "Description"], value: description }])
   }
 
   return (
@@ -55,6 +55,7 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-3 max-w-3xl">
             <div className="flex justify-end">
               <button onClick={addBuff} className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded">添加 Buff</button>
@@ -63,10 +64,8 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
               <div key={buff.key} className="border border-border rounded-md overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b border-border">
                   {editingKey === buff.key ? (
-                    <input autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
-                      defaultValue={buff.key}
-                      onBlur={(e) => renameBuff(buff.key, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") renameBuff(buff.key, e.currentTarget.value); if (e.key === "Escape") setEditingKey(null) }} />
+                    <BufferedTextInput autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
+                      value={buff.key} onCommit={(value) => renameBuff(buff.key, value)} onCancel={() => setEditingKey(null)} />
                   ) : (
                     <span className="flex-1 text-sm font-semibold cursor-pointer hover:text-primary" onClick={() => setEditingKey(buff.key)}>{buff.key}</span>
                   )}
@@ -84,6 +83,7 @@ export function BuffsEditor({ content, onChange }: BuffsEditorProps) {
             ))}
             {buffs.length === 0 && <div className="text-sm text-muted-foreground py-8 text-center">暂无 Buff 配置</div>}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

@@ -7,6 +7,7 @@ interface FileState {
 
   setFileTree: (files: FileTreeNode[]) => void
   setLoading: (loading: boolean) => void
+  reset: () => void
 }
 
 export const useFileStore = create<FileState>((set) => ({
@@ -15,4 +16,5 @@ export const useFileStore = create<FileState>((set) => ({
 
   setFileTree: (files) => set({ fileTree: files, loading: false }),
   setLoading: (loading) => set({ loading }),
+  reset: () => set({ fileTree: [], loading: false }),
 }))

@@ -29,6 +29,7 @@ describe("云端草稿版本隔离", () => {
     globalThis.fetch = fetchMock
 
     const file: OpenFile = {
+      workspaceId: "workspace-a",
       path: "skills/fire.yml",
       name: "fire.yml",
       content: "old: true",

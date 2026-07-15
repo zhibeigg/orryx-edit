@@ -51,6 +51,26 @@ class PostgresRelayEditorSessionStore(
         }
     }
 
+    override suspend fun lookup(tokenHash: String): EditorSessionRecord? {
+        requireTokenHash(tokenHash)
+        return database.withConnection { connection ->
+            queryOne(
+                connection.createStatement(
+                    """
+                    SELECT session.*
+                    FROM editor_sessions AS session
+                    JOIN licenses AS license
+                      ON session.license_key = license.license_key
+                     AND session.server_key = license.server_key
+                    WHERE session.resume_token_hash = $1
+                      AND session.revoked_at IS NULL
+                      AND license.enabled = TRUE
+                    """.trimIndent()
+                ).bind(0, tokenHash)
+            ) { row, _ -> row.toRelayRecord() }
+        }
+    }
+
     override suspend fun consume(tokenHash: String): EditorSessionRecord? {
         requireTokenHash(tokenHash)
         val now = Instant.now()

@@ -2,12 +2,12 @@ import { Wifi, WifiOff, Server, RefreshCw, Users } from "lucide-react"
 import { useConnectionStore } from "@/store/connection-store"
 
 export function Header() {
-  const { connected, reconnecting, serverName, collaborators, browserId } = useConnectionStore()
+  const { connected, reconnecting, serverOnline, serverName, collaborators, browserId } = useConnectionStore()
   const activeCollaborators = collaborators.filter((member) => member.browserId !== browserId)
 
-  const statusColor = connected ? "text-green-400" : reconnecting ? "text-yellow-400" : "text-red-400"
-  const statusText = connected ? "已连接" : reconnecting ? "重连中..." : "未连接"
-  const StatusIcon = connected ? Wifi : reconnecting ? RefreshCw : WifiOff
+  const statusColor = connected && serverOnline ? "text-green-400" : reconnecting ? "text-yellow-400" : "text-red-400"
+  const statusText = !connected ? (reconnecting ? "重连中..." : "未连接") : serverOnline ? "已连接" : "服务器离线"
+  const StatusIcon = connected && serverOnline ? Wifi : reconnecting ? RefreshCw : WifiOff
   const collaboratorLabel = activeCollaborators.length
     ? activeCollaborators.map((member) => member.currentFile ? `${member.playerName} · ${member.currentFile}` : member.playerName).join("\n")
     : "当前没有其他协作者"

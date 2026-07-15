@@ -36,14 +36,15 @@ function NarrowEditorNotice() {
 
 export function EditorRoute() {
   const authenticated = useConnectionStore((state) => state.authenticated)
+  const workspaceId = useConnectionStore((state) => state.workspaceId)
   const narrow = useNarrowEditorViewport()
 
-  if (!authenticated) return <ConnectPage />
+  if (!authenticated || !workspaceId) return <ConnectPage />
   if (narrow) return <NarrowEditorNotice />
 
   return (
     <Suspense fallback={<main id="main-content" className="route-loading" aria-live="polite">正在加载编辑器工作区…</main>}>
-      <AuthenticatedEditor />
+      <AuthenticatedEditor workspaceId={workspaceId} />
     </Suspense>
   )
 }

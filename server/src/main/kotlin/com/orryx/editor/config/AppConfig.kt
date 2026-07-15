@@ -36,6 +36,7 @@ data class EditorProtocolConfig(
     init {
         require(!v2WritesEnabled || v2Enabled) { "启用 V2 写路径前必须先启用协议 V2" }
         require(!releaseTransactionsEnabled || v2Enabled) { "启用发布事务前必须先启用协议 V2" }
+        require(!releaseTransactionsEnabled || v2WritesEnabled) { "启用发布事务前必须启用 V2 写路径" }
     }
 }
 

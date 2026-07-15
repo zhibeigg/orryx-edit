@@ -1,5 +1,7 @@
 // WebSocket 消息协议类型
 
+export type RevisionToken = number | string
+
 export interface WsMessage<T = unknown> {
   type: string
   id: string
@@ -24,7 +26,7 @@ export interface FileReadRequest {
 export interface FileWriteRequest {
   path: string
   content: string
-  baseRevision: number
+  baseRevision: RevisionToken
   force?: boolean
 }
 
@@ -81,13 +83,13 @@ export interface FileTreeResponse {
 export interface FileContentResponse {
   path: string
   content: string
-  revision: number
+  revision: RevisionToken
 }
 
 export interface FileWrittenResponse {
   path: string
   success: boolean
-  revision?: number
+  revision?: RevisionToken
   message?: string
 }
 
@@ -104,7 +106,7 @@ export interface PresenceUpdated {
 
 export interface FileChanged {
   path: string
-  revision: number
+  revision: RevisionToken
   browserId?: string
 }
 

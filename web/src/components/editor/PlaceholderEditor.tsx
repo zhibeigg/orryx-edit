@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Copy, Check } from "lucide-react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlPaths, type YamlPathMutation } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedTextInput } from "./BufferedTextInput"
 import { ActionsEditor } from "./ActionsEditor"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
@@ -23,43 +25,34 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
     rawYamlRef.current = content
   }, [content])
 
+  const parsed = useMemo(() => safeParseYaml<Record<string, string>>(content), [content])
   const entries = useMemo<PlaceholderEntry[]>(() => {
-    try {
-      const data = parseYaml<Record<string, string>>(content)
-      return Object.entries(data).map(([key, script]) => ({ key, script: String(script) }))
-    } catch {
-      return []
-    }
-  }, [content])
+    if (!parsed.ok) return []
+    return Object.entries(parsed.data).map(([key, script]) => ({ key, script: String(script) }))
+  }, [parsed])
 
-  const updateEntries = useCallback((newEntries: PlaceholderEntry[]) => {
-    const obj: Record<string, string> = {}
-    for (const e of newEntries) obj[e.key] = e.script
-    try {
-      onChange(updateYamlFromObject(rawYamlRef.current, obj as unknown as Record<string, unknown>))
-    } catch {
-      onChange(stringifyYaml(obj))
-    }
+  const mutate = useCallback((mutations: YamlPathMutation[]) => {
+    onChange(updateYamlPaths(rawYamlRef.current, mutations))
   }, [onChange])
 
   const addEntry = () => {
     const key = `新占位符_${Date.now() % 1000}`
-    updateEntries([...entries, { key, script: "0" }])
+    mutate([{ type: "set", path: [key], value: "0" }])
     setEditingKey(key)
   }
 
-  const removeEntry = (key: string) => {
-    updateEntries(entries.filter((e) => e.key !== key))
-  }
+  const removeEntry = (key: string) => mutate([{ type: "delete", path: [key] }])
 
-  const renameEntry = (oldKey: string, newKey: string) => {
-    if (!newKey.trim() || (newKey !== oldKey && entries.some((e) => e.key === newKey))) return
-    updateEntries(entries.map((e) => (e.key === oldKey ? { ...e, key: newKey } : e)))
+  const renameEntry = (oldKey: string, newKey: string): boolean => {
+    const trimmed = newKey.trim()
+    if (!trimmed || (trimmed !== oldKey && entries.some((entry) => entry.key === trimmed))) return false
+    mutate([{ type: "rename", path: [oldKey], newKey: trimmed }])
     setEditingKey(null)
+    return true
   }
 
   const updateScript = (key: string, script: string) => {
-    updateEntries(entries.map((e) => (e.key === key ? { ...e, script } : e)))
+    mutate([{ type: "set", path: [key], value: script }])
   }
 
   return (
@@ -70,6 +63,7 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-3 max-w-4xl">
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
@@ -94,15 +88,12 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
                 <div className="flex items-center gap-0 px-3 py-1.5 bg-muted/50 border-b border-border">
                   <span className="text-xs text-muted-foreground font-mono">%orryx_</span>
                   {editingKey === entry.key ? (
-                    <input
+                    <BufferedTextInput
                       autoFocus
                       className="bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono w-48"
-                      defaultValue={entry.key}
-                      onBlur={(e) => renameEntry(entry.key, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") renameEntry(entry.key, e.currentTarget.value)
-                        if (e.key === "Escape") setEditingKey(null)
-                      }}
+                      value={entry.key}
+                      onCommit={(value) => renameEntry(entry.key, value)}
+                      onCancel={() => setEditingKey(null)}
                     />
                   ) : (
                     <span
@@ -130,6 +121,7 @@ export function PlaceholderEditor({ content, onChange }: PlaceholderEditorProps)
               </div>
             ))}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

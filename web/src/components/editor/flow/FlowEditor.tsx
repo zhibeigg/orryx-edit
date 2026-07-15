@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react"
 import {
   ReactFlow, Background, Controls, MiniMap, Panel,
-  addEdge, applyEdgeChanges, applyNodeChanges,
+  applyEdgeChanges, applyNodeChanges,
   useNodesState, useEdgesState, useReactFlow, ReactFlowProvider,
   type Connection, type EdgeChange, type NodeChange, type NodeTypes
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import type { ActionsSchemaV2 } from "@/types/schema"
-import { stringifyKether, type ActionsSchema } from "@/lib/kether-ast"
-import type { KetherNode, KetherEdge } from "./flow-types"
-import { astToFlow, flowToAst } from "@/lib/kether-flow"
-import { parseKether } from "@/lib/kether-ast"
+import { stringifyKether } from "@/lib/kether-ast"
+import type { KetherNode, KetherEdge, KetherInputKind } from "./flow-types"
+import { applyConnectionToFlow, flowToAst, inferEditedInputKind, inferInputKind, initializeFlowFromText } from "@/lib/kether-flow"
 import { ActionNode } from "./nodes/ActionNode"
 import { DataNode } from "./nodes/DataNode"
 import { CalcNode } from "./nodes/CalcNode"
@@ -21,6 +20,9 @@ import { SchemaProvider } from "./SchemaContext"
 import { BookmarkPlus, History, Link2, Sparkles, Undo2, Redo2, X } from "lucide-react"
 import { NodePalette } from "./NodePalette"
 import type { SchemaAction } from "@/types/schema"
+import { bindFlowNodeInteractions, hasSemanticFlowChange } from "./flow-history"
+import { createDeferredSemanticWriteback, type DeferredSemanticWriteback } from "@/lib/deferred-semantic-writeback"
+import { useEditorInputFlush } from "@/lib/editor-input-flush"
 
 const nodeTypes: NodeTypes = {
   actionNode: ActionNode,
@@ -40,6 +42,10 @@ interface FlowEditorProps {
 interface FlowSnapshot {
   nodes: KetherNode[]
   edges: KetherEdge[]
+}
+
+interface PendingFlowWriteback extends FlowSnapshot {
+  schema: ActionsSchemaV2
 }
 
 interface HistoryEntry {
@@ -85,7 +91,7 @@ function normalizeSnapshotNodes(nodes: KetherNode[]): KetherNode[] {
     data: {
       ...node.data,
       onSlotDrop: undefined,
-      onInlineEdit: undefined,
+      onInputChange: undefined,
     },
   }))
 }
@@ -189,11 +195,13 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   const checkpointImportRef = useRef<HTMLInputElement | null>(null)
   const positionsRef = useRef(new Map<string, { x: number; y: number }>())
   const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const emitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastInternalYamlRef = useRef<string | null>(null)
   const nodesRef = useRef<KetherNode[]>([])
   const edgesRef = useRef<KetherEdge[]>([])
-  const suppressNodeSyncRef = useRef(false)
+  const readOnlyReasonsRef = useRef<string[]>([])
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  const writebackRef = useRef<DeferredSemanticWriteback<PendingFlowWriteback> | null>(null)
   const restoringRef = useRef(false)
   const draggingRef = useRef(false)
   const inlineMergeActiveRef = useRef(false)
@@ -201,6 +209,26 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   const historyPastRef = useRef<HistoryEntry[]>([])
   const historyFutureRef = useRef<HistoryEntry[]>([])
   const historyKeyRef = useRef("")
+
+  valueRef.current = value
+  onChangeRef.current = onChange
+  if (!writebackRef.current) {
+    writebackRef.current = createDeferredSemanticWriteback(220, (snapshot) => {
+      if (readOnlyReasonsRef.current.length > 0) return false
+      try {
+        const ast = flowToAst({ nodes: snapshot.nodes, edges: snapshot.edges }, snapshot.schema)
+        const text = stringifyKether(ast)
+        if (text !== valueRef.current) {
+          lastInternalYamlRef.current = text
+          onChangeRef.current(text)
+        }
+        return true
+      } catch {
+        return false
+      }
+    })
+  }
+
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [undoLabel, setUndoLabel] = useState<string | null>(null)
@@ -213,6 +241,9 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   const [checkpoints, setCheckpoints] = useState<HistoryCheckpoint[]>([])
   const [editingCheckpointId, setEditingCheckpointId] = useState<string | null>(null)
   const [editingCheckpointName, setEditingCheckpointName] = useState("")
+  const [readOnlyReasons, setReadOnlyReasons] = useState<string[]>([])
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const isReadOnly = readOnlyReasons.length > 0
 
   const undoGroups = useMemo(() => groupTimeline(undoTimeline), [undoTimeline])
   const redoGroups = useMemo(() => groupTimeline(redoTimeline), [redoTimeline])
@@ -245,22 +276,15 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     edgesRef.current = edges
   }, [edges])
 
+  const flushSemanticWriteback = useCallback(() => writebackRef.current?.flush() ?? true, [])
+  useEditorInputFlush(flushSemanticWriteback)
+
   const pushToText = useCallback((nextNodes: KetherNode[], nextEdges: KetherEdge[]) => {
-    historyKeyRef.current = snapshotKey(cloneSnapshot(nextNodes, nextEdges))
-    if (emitTimerRef.current) clearTimeout(emitTimerRef.current)
-    emitTimerRef.current = setTimeout(() => {
-      try {
-        const ast = flowToAst({ nodes: nextNodes, edges: nextEdges }, schema)
-        const text = stringifyKether(ast)
-        if (text !== value) {
-          lastInternalYamlRef.current = text
-          onChange(text)
-        }
-      } catch {
-        return
-      }
-    }, 220)
-  }, [onChange, schema, value])
+    if (readOnlyReasonsRef.current.length > 0) return
+    const snapshot = cloneSnapshot(nextNodes, nextEdges)
+    historyKeyRef.current = snapshotKey(snapshot)
+    writebackRef.current?.schedule({ ...snapshot, schema })
+  }, [schema])
 
   const refreshHistoryState = useCallback(() => {
     setCanUndo(historyPastRef.current.length > 0)
@@ -304,14 +328,16 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
 
   const restoreSnapshot = useCallback((snapshot: FlowSnapshot) => {
     restoringRef.current = true
-    suppressNodeSyncRef.current = true
-    const nodesValue = cloneSnapshot(snapshot.nodes, snapshot.edges).nodes
-    const edgesValue = cloneSnapshot(snapshot.nodes, snapshot.edges).edges
+    const currentSnapshot = cloneSnapshot(nodesRef.current, edgesRef.current)
+    const restored = cloneSnapshot(snapshot.nodes, snapshot.edges)
+    const nodesValue = restored.nodes
+    const edgesValue = restored.edges
+    const semanticChanged = hasSemanticFlowChange(currentSnapshot, restored)
     setNodes(nodesValue)
     setEdges(edgesValue)
     nodesRef.current = nodesValue
     edgesRef.current = edgesValue
-    pushToText(nodesValue, edgesValue)
+    if (semanticChanged) pushToText(nodesValue, edgesValue)
     queueMicrotask(() => {
       restoringRef.current = false
     })
@@ -383,6 +409,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   }, [])
 
   const jumpToCheckpoint = useCallback((checkpoint: HistoryCheckpoint) => {
+    if (readOnlyReasonsRef.current.length > 0) return
     rememberBeforeChange("跳转检查点")
     restoreSnapshot(checkpoint.snapshot)
     refreshHistoryState()
@@ -452,73 +479,89 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     cancelRenameCheckpoint()
   }, [editingCheckpointName, cancelRenameCheckpoint])
 
-  useEffect(() => {
-    if (suppressNodeSyncRef.current) {
-      suppressNodeSyncRef.current = false
-      return
-    }
-    if (nodesRef.current.length === 0 && edgesRef.current.length === 0) return
-    pushToText(nodes, edgesRef.current)
-  }, [nodes, pushToText])
-
   const handleNodesChange = useCallback((changes: NodeChange<KetherNode>[]) => {
     if (changes.length === 0) return
-    if (!draggingRef.current) {
-      rememberBeforeChange(getNodeChangeLabel(changes))
+    const semanticChanges = changes.filter((change) => change.type === "remove" || change.type === "add" || change.type === "replace")
+    const applicableChanges = isReadOnly
+      ? changes.filter((change) => change.type !== "remove" && change.type !== "add" && change.type !== "replace")
+      : changes
+    const effectiveSemanticChanges = isReadOnly ? [] : semanticChanges
+    if (applicableChanges.length === 0) return
+
+    if (effectiveSemanticChanges.length > 0) {
+      rememberBeforeChange(getNodeChangeLabel(effectiveSemanticChanges))
+      inlineMergeActiveRef.current = false
     }
-    inlineMergeActiveRef.current = false
+
     setNodes((current) => {
-      const next = applyNodeChanges(changes, current)
+      const next = applyNodeChanges(applicableChanges, current)
       const removed = new Set(
-        changes
+        effectiveSemanticChanges
           .filter((change) => change.type === "remove")
           .map((change) => change.id)
       )
+      let nextEdges = edgesRef.current
       if (removed.size > 0) {
-        setEdges((currentEdges) => {
-          const filteredEdges = currentEdges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target))
-          edgesRef.current = filteredEdges
-          return filteredEdges
-        })
+        nextEdges = edgesRef.current.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target))
+        edgesRef.current = nextEdges
+        setEdges(nextEdges)
       }
-      pushToText(next, edgesRef.current)
+      if (effectiveSemanticChanges.length > 0) pushToText(next, nextEdges)
       return next
     })
-  }, [rememberBeforeChange, setEdges, setNodes, pushToText])
+  }, [isReadOnly, rememberBeforeChange, setEdges, setNodes, pushToText])
 
   const handleEdgesChange = useCallback((changes: EdgeChange<KetherEdge>[]) => {
     if (changes.length === 0) return
-    rememberBeforeChange(getEdgeChangeLabel(changes))
-    inlineMergeActiveRef.current = false
+    const semanticChanges = changes.filter((change) => change.type === "remove" || change.type === "add" || change.type === "replace")
+    const applicableChanges = isReadOnly
+      ? changes.filter((change) => change.type !== "remove" && change.type !== "add" && change.type !== "replace")
+      : changes
+    const effectiveSemanticChanges = isReadOnly ? [] : semanticChanges
+    if (applicableChanges.length === 0) return
+    if (effectiveSemanticChanges.length > 0) {
+      rememberBeforeChange(getEdgeChangeLabel(effectiveSemanticChanges))
+      inlineMergeActiveRef.current = false
+    }
     setEdges((current) => {
-      const next = applyEdgeChanges(changes, current)
+      const next = applyEdgeChanges(applicableChanges, current)
       edgesRef.current = next
-      pushToText(nodesRef.current, next)
+      if (effectiveSemanticChanges.length > 0) pushToText(nodesRef.current, next)
       return next
     })
-  }, [rememberBeforeChange, setEdges, pushToText])
+  }, [isReadOnly, rememberBeforeChange, setEdges, pushToText])
 
   const handleConnect = useCallback((connection: Connection) => {
-    rememberBeforeChange("创建连线")
+    if (isReadOnly) return
+    const result = applyConnectionToFlow(
+      { nodes: nodesRef.current, edges: edgesRef.current },
+      connection,
+      `${connection.source ?? "src"}-${connection.target ?? "dst"}-${Date.now()}`
+    )
+    if (!result.accepted) {
+      setConnectionError(result.reason)
+      return
+    }
+
+    rememberBeforeChange(result.kind === "data" ? "连接参数" : "创建执行连线")
     inlineMergeActiveRef.current = false
-    setEdges((current) => {
-      const next = addEdge(
-        {
-          ...connection,
-          id: `${connection.source ?? "src"}-${connection.target ?? "dst"}-${Date.now()}`,
-          animated: true,
-          style: { stroke: "#38bdf8", strokeWidth: 1.5 },
-        },
-        current
-      )
-      edgesRef.current = next
-      pushToText(nodesRef.current, next)
-      return next
-    })
-  }, [rememberBeforeChange, setEdges, pushToText])
+    setConnectionError(null)
+    nodesRef.current = result.state.nodes
+    edgesRef.current = result.state.edges
+    setNodes(result.state.nodes)
+    setEdges(result.state.edges)
+    pushToText(result.state.nodes, result.state.edges)
+  }, [isReadOnly, rememberBeforeChange, setEdges, setNodes, pushToText])
 
   const createActionNode = useCallback((action: SchemaAction, x: number, y: number): KetherNode => {
-    const inputs = Object.fromEntries((action.inputs ?? []).map((item) => [item.key, item.default ?? ""]))
+    const inputs: Record<string, unknown> = {}
+    const inputKinds: Record<string, KetherInputKind> = {}
+    for (const input of action.inputs) {
+      if (!input.required && input.default == null) continue
+      const value = input.default ?? ""
+      inputs[input.key] = value
+      inputKinds[input.key] = inferInputKind(input, value)
+    }
     return {
       id: nextNodeId("action"),
       type: "actionNode",
@@ -527,6 +570,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         label: action.name,
         schemaAction: action,
         inputs,
+        inputKinds,
         slotChildren: {},
         onSlotDrop: undefined,
         nodeKind: "action",
@@ -541,10 +585,9 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
           id: nextNodeId("set"),
           type: "setNode",
           position: { x, y },
-          data: { label: "set", schemaAction: null, inputs: { variable: "x", value: "" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "set" },
+          data: { label: "set", schemaAction: null, inputs: { variable: "x", value: "" }, inputKinds: { variable: "identifier", value: "string" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "set" },
         }
       case "if":
-      case "case":
         return {
           id: nextNodeId("branch"),
           type: "branchNode",
@@ -553,6 +596,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             label: builtin,
             schemaAction: null,
             inputs: { condition: "true" },
+            inputKinds: { condition: "boolean" },
             slotChildren: { then: [], else: [] },
             onSlotDrop: undefined,
             nodeKind: "branch",
@@ -567,6 +611,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             label: "for",
             schemaAction: null,
             inputs: { variable: "i", iterable: "&list" },
+            inputKinds: { variable: "identifier", iterable: "var_ref" },
             slotChildren: { body: [] },
             onSlotDrop: undefined,
             nodeKind: "loop",
@@ -578,7 +623,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
           id: nextNodeId("calc"),
           type: "calcNode",
           position: { x, y },
-          data: { label: "calc", schemaAction: null, inputs: { formula: "" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "calc" },
+          data: { label: "calc", schemaAction: null, inputs: { formula: "" }, inputKinds: { formula: "string" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "calc" },
         }
       default:
         return null
@@ -591,6 +636,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   }, [createActionNode, createBuiltinNode])
 
   const handleSlotDrop = useCallback((parentId: string, slot: string, payload: SchemaAction | { builtin: string }) => {
+    if (readOnlyReasonsRef.current.length > 0) return
     rememberBeforeChange("插入子节点")
     inlineMergeActiveRef.current = false
     setNodes((current) => {
@@ -628,31 +674,41 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     })
   }, [createNodeFromPayload, rememberBeforeChange, setNodes, pushToText])
 
-  useEffect(() => {
+  const handleNodeInputChange = useCallback((nodeId: string, key: string, value: unknown, kind?: KetherInputKind) => {
+    if (readOnlyReasonsRef.current.length > 0) return
+    notifyInlineEdit()
     setNodes((current) => {
-      let changed = false
       const next = current.map((node) => {
-        const needsSlotDrop = (node.type === "branchNode" || node.type === "loopNode") && typeof node.data.onSlotDrop !== "function"
-        const needsInlineEdit = typeof node.data.onInlineEdit !== "function"
-        if (!needsSlotDrop && !needsInlineEdit) return node
-        changed = true
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            onSlotDrop: node.type === "branchNode" || node.type === "loopNode"
-              ? (slot: string, payload: SchemaAction | { builtin: string }) => handleSlotDrop(node.id, slot, payload)
-              : undefined,
-            onInlineEdit: notifyInlineEdit,
-          },
-        }
+        if (node.id !== nodeId) return node
+        const nextKind = kind ?? inferEditedInputKind(node.data.inputKinds[key], value)
+        const inputKinds = { ...node.data.inputKinds, [key]: nextKind }
+        const inputs = { ...node.data.inputs, [key]: value }
+        const label = node.data.nodeKind === "data"
+          ? String(value ?? "")
+          : node.data.nodeKind === "set" && key === "variable"
+            ? `set ${String(value ?? "")}`
+            : node.data.nodeKind === "loop" && key === "variable"
+              ? `for ${String(value ?? "")}`
+              : node.data.label
+        const provides = node.data.nodeKind === "loop" && key === "variable"
+          ? { [String(value ?? "")]: String(value ?? "") }
+          : node.data.provides
+        return { ...node, data: { ...node.data, inputs, inputKinds, label, provides } }
       })
-      return changed ? next : current
+      nodesRef.current = next
+      pushToText(next, edgesRef.current)
+      return next
     })
-  }, [setNodes, handleSlotDrop, notifyInlineEdit])
+  }, [notifyInlineEdit, setNodes, pushToText])
+
+  const interactiveNodes = useMemo(
+    () => bindFlowNodeInteractions(nodes, handleSlotDrop, handleNodeInputChange),
+    [nodes, handleSlotDrop, handleNodeInputChange]
+  )
 
   const handleDrop = useCallback((event: DragEvent) => {
     event.preventDefault()
+    if (readOnlyReasonsRef.current.length > 0) return
     const raw = event.dataTransfer.getData("application/kether-node")
     if (!raw) return
     try {
@@ -680,13 +736,20 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       lastInternalYamlRef.current = null
       return
     }
+    if (writebackRef.current?.hasPending()) {
+      if (!flushSemanticWriteback()) return
+      // flush 已同步提交当前节点语义；等待父级 value 回传后再解析，避免用旧 value 覆盖节点。
+      return
+    }
     if (parseTimerRef.current) clearTimeout(parseTimerRef.current)
     parseTimerRef.current = setTimeout(() => {
       try {
-        const ast = parseKether(value, schema as unknown as ActionsSchema)
-        const flow = astToFlow(ast, schema, positionsRef.current)
-        suppressNodeSyncRef.current = true
+        const flow = initializeFlowFromText(value, schema, positionsRef.current)
+        const reasons = flow.readOnlyReasons ?? []
         inlineMergeActiveRef.current = false
+        readOnlyReasonsRef.current = reasons
+        setReadOnlyReasons(reasons)
+        setConnectionError(null)
         setNodes(flow.nodes)
         setEdges(flow.edges)
         nodesRef.current = flow.nodes
@@ -695,7 +758,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       } catch { /* 解析失败时保持当前状态 */ }
     }, 0) // 使用0ms超时确保在渲染后执行
     return () => { if (parseTimerRef.current) clearTimeout(parseTimerRef.current) }
-  }, [value, schema, setNodes, setEdges, resetHistory])
+  }, [value, schema, setNodes, setEdges, resetHistory, flushSemanticWriteback])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -725,7 +788,8 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
 
   useEffect(() => {
     return () => {
-      if (emitTimerRef.current) clearTimeout(emitTimerRef.current)
+      // 卸载前同步提交有效的语义快照；dispose 不会因清理定时器而丢弃 pending。
+      writebackRef.current?.dispose()
       if (inlineMergeTimerRef.current) clearTimeout(inlineMergeTimerRef.current)
     }
   }, [])
@@ -738,7 +802,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   }
 
   const onNodeDragStart = () => {
-    if (draggingRef.current) return
+    if (isReadOnly || draggingRef.current) return
     draggingRef.current = true
     rememberBeforeChange("移动节点")
   }
@@ -750,7 +814,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         <div className="h-8 px-3 border-b border-[#2f3136] bg-[#1b1d22]/95 flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-2 text-[#a6adbb]">
             <Sparkles className="w-3.5 h-3.5 text-[#56b6c2]" />
-            拖拽左侧节点到画布，连线后将自动同步到脚本文本
+            {isReadOnly ? "当前脚本仅提供只读节点预览" : "拖拽左侧节点到画布，显式编辑后同步到脚本文本"}
           </div>
           <div className="flex items-center gap-1 text-[#7f8795]">
             <button
@@ -783,9 +847,19 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               重做
             </button>
             <Link2 className="w-3 h-3" />
-            已启用连接与回写
+            {isReadOnly ? "已禁用回写" : "已启用显式连接与回写"}
           </div>
         </div>
+        {isReadOnly && (
+          <div className="absolute z-20 top-10 left-1/2 -translate-x-1/2 max-w-[70%] rounded-md border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-[11px] text-amber-100 shadow-lg">
+            节点回写已禁用：{readOnlyReasons.join("；")}
+          </div>
+        )}
+        {!isReadOnly && connectionError && (
+          <div className="absolute z-20 top-10 left-1/2 -translate-x-1/2 rounded-md border border-red-500/50 bg-red-950/90 px-3 py-2 text-[11px] text-red-100 shadow-lg">
+            连线已拒绝：{connectionError}
+          </div>
+        )}
         {showHistory && (
           <div className="absolute z-20 top-10 right-3 w-64 rounded-lg border border-[#2f3136] bg-[#171a21]/95 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm">
             <input
@@ -946,7 +1020,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         )}
         <div className="h-[calc(100%-2rem)] max-md:h-[calc(100%-4.25rem)]">
           <ReactFlow
-            nodes={nodes}
+            nodes={interactiveNodes}
             edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
@@ -959,15 +1033,16 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               event.dataTransfer.dropEffect = "move"
             }}
             nodeTypes={nodeTypes}
-            nodesDraggable
-            nodesConnectable
+            nodesDraggable={!isReadOnly}
+            nodesConnectable={!isReadOnly}
+            deleteKeyCode={isReadOnly ? null : ["Backspace", "Delete"]}
             elementsSelectable
             fitView
             fitViewOptions={{ padding: 0.24, duration: 300 }}
             className="bg-[linear-gradient(160deg,#16181d_0%,#101216_100%)]"
           >
             <Panel position="top-right" className="max-md:hidden rounded-md border border-[#2f3136] bg-[#181a1f]/90 px-2 py-1 text-[10px] text-[#99a0ad] shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
-              节点更改 220ms 自动保存
+              {isReadOnly ? "复杂脚本：只读预览" : "仅显式语义修改 220ms 保存"}
             </Panel>
             <Background color="#2f3743" gap={18} size={1.1} />
             <Controls showInteractive={false} className="!bg-[#1c1f24] !border !border-[#2f3136] !text-[#d2d7df]" />

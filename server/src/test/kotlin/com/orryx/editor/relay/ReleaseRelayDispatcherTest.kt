@@ -6,6 +6,11 @@ import com.orryx.editor.protocol.ProtocolVersion
 import com.orryx.editor.protocol.ReleaseRequestData
 import com.orryx.editor.protocol.WsProtocol
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -23,7 +28,7 @@ class ReleaseRelayDispatcherTest {
             serverId = "stable-server-id",
             session = socket,
             negotiatedProtocol = ProtocolVersion.V2,
-            capabilities = ReleaseRelayCapabilities.requiredPlugin + "revision.sha256"
+            capabilities = ReleaseRelayCapabilities.requiredPlugin + V2EditorPluginCapabilities.required
         )
         assertNotNull(registry.bindServerInstance(server.session, "11111111-1111-4111-8111-111111111111"))
 
@@ -63,13 +68,52 @@ class ReleaseRelayDispatcherTest {
             serverId = "stable-v2-id",
             session = v2Socket,
             negotiatedProtocol = ProtocolVersion.V2,
-            capabilities = setOf("revision.sha256")
+            capabilities = V2EditorPluginCapabilities.required
         )
         registry.bindServerInstance(v2.session, "33333333-3333-4333-8333-333333333333")
         val missing = assertIs<ReleaseDispatchResult.MissingCapabilities>(
             ReleaseRelayDispatcher(registry, true).dispatch("33333333-3333-4333-8333-333333333333", request())
         )
         assertEquals(ReleaseRelayCapabilities.requiredPlugin, missing.capabilities)
+    }
+
+    @Test
+    fun `missing release capabilities reject dispatch without rejecting registration`() = runTest {
+        val registry = SessionRegistry()
+        val socket = RecordingSocket()
+        val serverInstanceId = "44444444-4444-4444-8444-444444444444"
+        val features = RelayFeatureFlags(
+            protocolV2Enabled = true,
+            v2WritesEnabled = true,
+            releaseTransactionsEnabled = true,
+        )
+        val endpoint = ServerEndpoint(
+            registry = registry,
+            licenseAccess = AllowAllLicenses(),
+            features = features,
+            onRegistered = { serverInstanceId },
+        )
+
+        endpoint.handleServerMessage(
+            socket,
+            """{"type":"server.register","id":"release-reg","data":{"license":"license-12345678","serverName":"No Release","serverId":"no-release","protocolVersions":["v1","v2"],"preferredProtocol":"v2","capabilities":["revision.sha256","file.write.v2","mutation.preconditions"],"connectionNonce":"nonce-12345678"}}"""
+        )
+
+        val registration = assertIs<MessageParseResult.Success>(WsProtocol.parse(socket.messages.single())).message
+        val registrationData = registration.data.jsonObject
+        assertEquals(true, registrationData["success"]?.jsonPrimitive?.booleanOrNull)
+        assertEquals("v2", registrationData["negotiatedProtocol"]?.jsonPrimitive?.contentOrNull)
+        val relayCapabilities = registrationData["relayCapabilities"] as JsonArray
+        assertEquals(
+            true,
+            relayCapabilities.any { it.jsonPrimitive.contentOrNull == RelayCapabilities.RELEASE_CONTROL_V1 }
+        )
+
+        val missing = assertIs<ReleaseDispatchResult.MissingCapabilities>(
+            ReleaseRelayDispatcher(registry, enabled = true).dispatch(serverInstanceId, request())
+        )
+        assertEquals(ReleaseRelayCapabilities.requiredPlugin, missing.capabilities)
+        assertEquals(1, socket.messages.size)
     }
 
     private fun request() = ReleaseRequestData(
@@ -85,5 +129,18 @@ class ReleaseRelayDispatcherTest {
         override suspend fun sendText(text: String) {
             messages += text
         }
+    }
+
+    private class AllowAllLicenses : RelayLicenseAccess {
+        override suspend fun validateEditorAccess(license: String, connectIp: String): RelayLicense = license()
+        override suspend fun get(license: String): RelayLicense = license()
+        override suspend fun addIp(license: String, ip: String): Boolean = true
+
+        private fun license() = RelayLicense(
+            license = "license-12345678",
+            serverKey = "server-key",
+            enabled = true,
+            boundIps = emptyList(),
+        )
     }
 }

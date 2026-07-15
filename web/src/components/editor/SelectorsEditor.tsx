@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Copy, Check } from "lucide-react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlPaths, type YamlPathMutation } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedTextInput } from "./BufferedTextInput"
 import { ActionsEditor } from "./ActionsEditor"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
@@ -13,6 +15,7 @@ interface SelectorsEditorProps {
 interface SelectorEntry {
   key: string
   actions: string
+  objectValue: boolean
 }
 
 export function SelectorsEditor({ content, onChange }: SelectorsEditorProps) {
@@ -22,39 +25,38 @@ export function SelectorsEditor({ content, onChange }: SelectorsEditorProps) {
     rawRef.current = content
   }, [content])
 
+  const parsed = useMemo(() => safeParseYaml<Record<string, { Actions?: string } | string>>(content), [content])
   const entries = useMemo<SelectorEntry[]>(() => {
-    try {
-      const data = parseYaml<Record<string, { Actions?: string }>>(content)
-      return Object.entries(data).map(([key, val]) => ({
-        key,
-        actions: typeof val === "object" && val !== null ? (val.Actions ?? "") : String(val),
-      }))
-    } catch { return [] }
-  }, [content])
+    if (!parsed.ok) return []
+    return Object.entries(parsed.data).map(([key, value]) => ({
+      key,
+      actions: typeof value === "object" && value !== null ? (value.Actions ?? "") : String(value),
+      objectValue: typeof value === "object" && value !== null,
+    }))
+  }, [parsed])
 
-  const save = useCallback((newEntries: SelectorEntry[]) => {
-    const obj: Record<string, { Actions: string }> = {}
-    for (const e of newEntries) obj[e.key] = { Actions: e.actions }
-    try { onChange(updateYamlFromObject(rawRef.current, obj as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(obj)) }
+  const mutate = useCallback((mutations: YamlPathMutation[]) => {
+    onChange(updateYamlPaths(rawRef.current, mutations))
   }, [onChange])
 
   const addSelector = () => {
     const key = `新选择器_${Date.now() % 1000}`
-    save([...entries, { key, actions: "container" }])
+    mutate([{ type: "set", path: [key], value: { Actions: "container" } }])
     setEditingKey(key)
   }
 
-  const removeSelector = (key: string) => save(entries.filter((e) => e.key !== key))
+  const removeSelector = (key: string) => mutate([{ type: "delete", path: [key] }])
 
-  const renameSelector = (oldKey: string, newKey: string) => {
-    if (!newKey.trim() || (newKey !== oldKey && entries.some((e) => e.key === newKey))) return
-    save(entries.map((e) => (e.key === oldKey ? { ...e, key: newKey } : e)))
+  const renameSelector = (oldKey: string, newKey: string): boolean => {
+    const trimmed = newKey.trim()
+    if (!trimmed || (trimmed !== oldKey && entries.some((entry) => entry.key === trimmed))) return false
+    mutate([{ type: "rename", path: [oldKey], newKey: trimmed }])
     setEditingKey(null)
+    return true
   }
 
-  const updateActions = (key: string, actions: string) => {
-    save(entries.map((e) => (e.key === key ? { ...e, actions } : e)))
+  const updateActions = (entry: SelectorEntry, actions: string) => {
+    mutate([{ type: "set", path: entry.objectValue ? [entry.key, "Actions"] : [entry.key], value: actions }])
   }
 
   return (
@@ -65,6 +67,7 @@ export function SelectorsEditor({ content, onChange }: SelectorsEditorProps) {
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-3 max-w-4xl">
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
@@ -78,10 +81,8 @@ export function SelectorsEditor({ content, onChange }: SelectorsEditorProps) {
                 <div className="flex items-center gap-0 px-3 py-1.5 bg-muted/50 border-b border-border">
                   <span className="text-xs text-muted-foreground font-mono">@</span>
                   {editingKey === entry.key ? (
-                    <input autoFocus className="bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono w-48"
-                      defaultValue={entry.key}
-                      onBlur={(e) => renameSelector(entry.key, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") renameSelector(entry.key, e.currentTarget.value); if (e.key === "Escape") setEditingKey(null) }} />
+                    <BufferedTextInput autoFocus className="bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono w-48"
+                      value={entry.key} onCommit={(value) => renameSelector(entry.key, value)} onCancel={() => setEditingKey(null)} />
                   ) : (
                     <span className="text-sm font-mono font-semibold cursor-pointer hover:text-primary"
                       onClick={() => setEditingKey(entry.key)}>{entry.key}</span>
@@ -90,11 +91,12 @@ export function SelectorsEditor({ content, onChange }: SelectorsEditorProps) {
                   <div className="flex-1" />
                   <button onClick={() => removeSelector(entry.key)} className="text-xs text-red-400 hover:text-red-300">删除</button>
                 </div>
-                <ActionsEditor value={entry.actions} onChange={(v) => updateActions(entry.key, v)} height="120px" />
+                <ActionsEditor value={entry.actions} onChange={(v) => updateActions(entry, v)} height="120px" />
               </div>
             ))}
             {entries.length === 0 && <div className="text-sm text-muted-foreground py-8 text-center">暂无自定义选择器</div>}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

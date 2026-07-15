@@ -79,7 +79,9 @@ class PostgresEditorLicensePolicyIntegrationTest {
                 expiresAt = System.currentTimeMillis() + 60_000
             )
             sessions.save(tokenHash, record)
+            assertNotNull(sessions.lookup(tokenHash))
             assertNotNull(sessions.consume(tokenHash))
+            assertNull(sessions.lookup(tokenHash))
             assertNull(sessions.consume(tokenHash))
 
             assertTrue(service.revoke(license.license))

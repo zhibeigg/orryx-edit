@@ -40,13 +40,16 @@ data class BrowserBinding(
     val playerName: String,
     val workspaceId: String,
     val serverId: String,
-    val pluginSession: RelaySocket,
+    val pluginSession: RelaySocket?,
     val protocolVersion: ProtocolVersion,
     val sessionEpoch: Long,
     val browserSession: RelaySocket,
     val currentFile: String? = null,
     val lastActiveAt: Long = System.currentTimeMillis()
-)
+) {
+    val suspended: Boolean
+        get() = pluginSession == null
+}
 
 data class PendingRequest(
     val relayId: String,
@@ -68,6 +71,7 @@ sealed interface RequestReservation {
     data class Reserved(val request: PendingRequest) : RequestReservation
     data class Conflict(val currentRevision: Long) : RequestReservation
     data object BrowserNotBound : RequestReservation
+    data object ServerOffline : RequestReservation
 }
 
 private data class RevisionKey(val workspaceId: String, val path: String)
@@ -169,9 +173,17 @@ class SessionRegistry(
         tokens.entries.removeIf { it.value.pluginSession === session }
         removePendingRequests { it.pluginSession === session }
         if (wasAuthoritative) {
-            browserBindings.values
-                .filter { it.pluginSession === session && it.sessionEpoch == server.sessionEpoch }
-                .forEach { unbindBrowser(it.browserSession) }
+            browserBindings.forEach { (browserSession, binding) ->
+                if (binding.pluginSession === session && binding.sessionEpoch == server.sessionEpoch) {
+                    browserBindings.computeIfPresent(browserSession) { _, current ->
+                        if (current.pluginSession !== session || current.sessionEpoch != server.sessionEpoch) {
+                            current
+                        } else {
+                            current.copy(pluginSession = null)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -340,13 +352,18 @@ class SessionRegistry(
             }
         }
         val binding = browserBindings[browserSession]
-        val server = binding?.pluginSession?.let(sessions::get)
-        if (
-            binding == null || binding != initialBinding || server == null ||
-            !isAuthoritative(binding.pluginSession) || server.sessionEpoch != binding.sessionEpoch
-        ) {
+        if (binding == null || binding != initialBinding) {
             if (lock?.isLocked == true) lock.unlock(relayId)
             return RequestReservation.BrowserNotBound
+        }
+        val pluginSession = binding.pluginSession
+        val server = pluginSession?.let(sessions::get)
+        if (
+            pluginSession == null || server == null || !isAuthoritative(pluginSession) ||
+            server.sessionEpoch != binding.sessionEpoch
+        ) {
+            if (lock?.isLocked == true) lock.unlock(relayId)
+            return RequestReservation.ServerOffline
         }
         val pending = PendingRequest(
             relayId = relayId,
@@ -356,7 +373,7 @@ class SessionRegistry(
             protocolVersion = binding.protocolVersion,
             sessionEpoch = binding.sessionEpoch,
             browserSession = browserSession,
-            pluginSession = binding.pluginSession,
+            pluginSession = pluginSession,
             workspaceId = binding.workspaceId,
             browserId = binding.browserId,
             path = path,

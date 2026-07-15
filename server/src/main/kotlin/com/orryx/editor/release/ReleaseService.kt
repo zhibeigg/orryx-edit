@@ -3,6 +3,7 @@ package com.orryx.editor.release
 import com.orryx.editor.claim.CommercialTransactionStore
 import com.orryx.editor.draft.DraftMaterializer
 import com.orryx.editor.draft.DraftRepository
+import com.orryx.editor.protocol.ProtocolLimits
 import com.orryx.editor.snapshot.SnapshotManifest
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -94,6 +95,9 @@ class ReleaseService(
         require(version.version.versionNumber == command.expectedCurrentVersion) { "只能发布当前 draft version" }
 
         val materialized = materializer.materialize(draft, command.expectedCurrentVersion)
+        require(materialized.files.size <= ProtocolLimits.MAX_MANIFEST_FILES) {
+            "release 文件数量超过协议上限 ${ProtocolLimits.MAX_MANIFEST_FILES}"
+        }
         require(materialized.baseManifestRevision == command.expectedBaseManifestRevision) {
             "base manifest 已变化"
         }

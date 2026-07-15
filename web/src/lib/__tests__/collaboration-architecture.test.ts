@@ -46,14 +46,16 @@ describe("workspace 草稿与 revision 冲突", () => {
   const fileSave = source("../file-save.ts")
   const editorStore = source("../../store/editor-store.ts")
 
-  it("IndexedDB 草稿键包含 workspaceId", () => {
+  it("IndexedDB 草稿键显式包含 workspaceId，且不会回退到 unbound", () => {
     expect(drafts).toContain('const DRAFT_PREFIX = "draft:v2:"')
     expect(drafts).toContain("workspaceId")
-    expect(drafts).toContain("currentWorkspaceId")
+    expect(drafts).not.toContain("currentWorkspaceId")
+    expect(drafts).not.toContain('"unbound"')
   })
 
-  it("所有写入携带 base revision 并将冲突交给显式 UI", () => {
-    expect(fileSave).toContain("file.revision")
+  it("所有写入使用调用时捕获的 base revision，并将冲突交给显式 UI", () => {
+    expect(fileSave).toContain("captureFileSaveSnapshot")
+    expect(fileSave).toContain("snapshot.baseRevision")
     expect(fileSave).toContain('error.code === "REVISION_CONFLICT"')
     expect(editorStore).toContain("saveConflict")
     expect(editorStore).toContain("externalRevision")

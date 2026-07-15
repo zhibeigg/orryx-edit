@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useEditorStore } from "@/store/editor-store"
-import { saveEditorFile } from "@/lib/file-save"
+import { saveAllEditorFiles, saveEditorFile } from "@/lib/file-save"
+import { flushEditorInputs } from "@/lib/editor-input-flush"
 
 /**
  * 全局快捷键 Hook
@@ -40,20 +41,21 @@ export function useKeyboardShortcuts() {
         if (key === "w") {
           // Ctrl+K W：全部关闭
           e.preventDefault()
-          useEditorStore.getState().closeAllFiles()
+          await useEditorStore.getState().closeAllFiles()
           return
         }
         if (key === "u") {
           // Ctrl+K U：关闭已保存
           e.preventDefault()
-          useEditorStore.getState().closeSavedFiles()
+          await useEditorStore.getState().closeSavedFiles()
           return
         }
         if (key === "s") {
           // Ctrl+K S：全部保存并关闭
           e.preventDefault()
-          await saveAllFiles()
-          useEditorStore.getState().closeAllFiles()
+          if (await saveAllEditorFiles()) {
+            await useEditorStore.getState().closeAllFiles()
+          }
           return
         }
       }
@@ -61,7 +63,7 @@ export function useKeyboardShortcuts() {
       // ── Ctrl+Shift+S：全部保存 ──
       if (ctrl && e.shiftKey && e.key === "S") {
         e.preventDefault()
-        await saveAllFiles()
+        await saveAllEditorFiles()
         return
       }
 
@@ -76,7 +78,7 @@ export function useKeyboardShortcuts() {
       if (ctrl && e.key === "w") {
         e.preventDefault()
         const { activeFilePath, closeFile } = useEditorStore.getState()
-        if (activeFilePath) closeFile(activeFilePath)
+        if (activeFilePath) await closeFile(activeFilePath)
         return
       }
 
@@ -119,24 +121,17 @@ export function useKeyboardShortcuts() {
 
 /** 保存当前活动文件 */
 async function saveActiveFile() {
+  if (!flushEditorInputs()) return
   const { openFiles, activeFilePath } = useEditorStore.getState()
-  const activeFile = openFiles.find((f) => f.path === activeFilePath)
+  const activeFile = openFiles.find((file) => file.path === activeFilePath)
   if (!activeFile?.dirty || activeFile.draft == null) return
 
   try {
-    await saveEditorFile(activeFile, activeFile.draft)
+    await saveEditorFile(activeFile, activeFile.draft, {
+      baseRevision: activeFile.revision,
+      draftVersion: activeFile.draftVersion ?? 0,
+    })
   } catch (err) {
     console.error("保存失败:", err)
-  }
-}
-
-/** 保存所有未保存的文件 */
-async function saveAllFiles() {
-  const store = useEditorStore.getState()
-  for (const f of store.openFiles.filter((f) => f.dirty)) {
-    try {
-      const content = f.draft ?? f.content
-      await saveEditorFile(f, content)
-    } catch { /* skip */ }
   }
 }

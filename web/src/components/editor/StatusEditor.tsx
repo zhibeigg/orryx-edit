@@ -1,5 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
+import { BufferedListInput } from "./BufferedListInput"
+import { parseCommaListDraft } from "./editor-input-utils"
 import { ActionsEditor } from "./ActionsEditor"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
@@ -85,15 +89,14 @@ export function StatusEditor({ content, onChange, filePath }: StatusEditorProps)
     rawYamlRef.current = content
   }, [content])
 
-  const data = useMemo<StatusData>(() => {
-    try { return parseYaml<StatusData>(content) }
-    catch { return { Options: {}, States: {}, Action: "" } }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<StatusData>(content), [content])
+  const data = useMemo<StatusData>(() => parsed.ok
+    ? { ...parsed.data, Options: parsed.data.Options ?? {}, States: parsed.data.States ?? {} }
+    : { Options: {}, States: {}, Action: "" }, [parsed])
 
   const updateData = useCallback((updater: (d: StatusData) => StatusData) => {
     const updated = updater(data)
-    try { onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(updated)) }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [data, onChange])
 
   const stateNames = Object.keys(data.States ?? {})
@@ -109,10 +112,14 @@ export function StatusEditor({ content, onChange, filePath }: StatusEditorProps)
       </TabsList>
 
       <TabsContent value="overview" className="flex-1 overflow-y-auto">
-        <OverviewPanel data={data} stateNames={stateNames} onChange={(opts) => updateData((d) => ({ ...d, Options: opts }))} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <OverviewPanel data={data} stateNames={stateNames} onChange={(opts) => updateData((d) => ({ ...d, Options: opts }))} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="states" className="flex-1 overflow-hidden flex">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+        <div className="flex h-full w-full">
         <div className="w-52 border-r border-border overflow-y-auto shrink-0 bg-muted/30">
           <div className="p-2 space-y-0.5">
             {stateNames.map((name) => (
@@ -136,15 +143,19 @@ export function StatusEditor({ content, onChange, filePath }: StatusEditorProps)
             <div className="p-4 text-sm text-muted-foreground">从左侧选择一个状态</div>
           )}
         </div>
+        </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="dispatch" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
         <div className="h-full flex flex-col">
           <div className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
             输入分发脚本 — 可用变量: &input (按键输入)。用 running "状态名" 切换状态
           </div>
           <div className="flex-1"><ActionsEditor value={data.Action ?? ""} onChange={(v) => updateData((d) => ({ ...d, Action: v }))} height="100%" /></div>
         </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="refs" className="flex-1 overflow-y-auto">
@@ -186,8 +197,8 @@ function OverviewPanel({ data, stateNames, onChange }: { data: StatusData; state
           <Toggle label="取消原版攻击 (CancelBukkitAttack)" checked={opts.CancelBukkitAttack ?? false} onChange={(v) => onChange({ ...opts, CancelBukkitAttack: v })} />
         </div>
         <Field label="时装皮肤 (Armourers)" hint="逗号分隔，支持变量">
-          <input className="input-base" value={(opts.Armourers ?? []).join(", ")}
-            onChange={(e) => onChange({ ...opts, Armourers: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} placeholder="皮肤1, 皮肤2" />
+          <BufferedListInput className="input-base" value={opts.Armourers ?? []} join={(value) => value.join(", ")}
+            parse={parseCommaListDraft} onCommit={(Armourers) => onChange({ ...opts, Armourers })} placeholder="皮肤1, 皮肤2" />
         </Field>
       </Section>
 
@@ -272,7 +283,8 @@ function StatePanel({ name, state, onChange }: { name: string; state: StateEntry
                 <input className="input-base" value={state.Check ?? ""} onChange={(e) => update({ Check: e.target.value })} placeholder="0-10" />
               </Field>
               <Field label="格挡成功无敌时长 (Invincible)" hint="tick，×50=ms">
-                <input className="input-base" type="number" value={state.Invincible ?? 0} onChange={(e) => update({ Invincible: e.target.value })} />
+                <BufferedNumberInput className="input-base" value={typeof state.Invincible === "number" ? state.Invincible : Number(state.Invincible) || 0}
+                  onCommit={(value) => update({ Invincible: value })} />
               </Field>
               <Field label="可格挡伤害类型 (DamageType)">
                 <Select value={state.DamageType ?? "PHYSICS"} onValueChange={(v) => update({ DamageType: v })}>
@@ -293,7 +305,7 @@ function StatePanel({ name, state, onChange }: { name: string; state: StateEntry
 
           {(isBlock || isDodge) && (
             <Field label="精力消耗 (Spirit)">
-              <input className="input-base" type="number" value={state.Spirit ?? 0} onChange={(e) => update({ Spirit: parseFloat(e.target.value) || 0 })} />
+              <BufferedNumberInput className="input-base" value={state.Spirit ?? 0} onCommit={(value) => update({ Spirit: value })} />
             </Field>
           )}
         </div>

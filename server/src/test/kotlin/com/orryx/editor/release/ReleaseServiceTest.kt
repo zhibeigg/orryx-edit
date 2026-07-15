@@ -31,10 +31,14 @@ class ReleaseServiceTest {
         val snapshots = InMemorySnapshotRepository()
         val snapshotService = SnapshotService(snapshots, clock = CLOCK)
         val baseContent = "value: base\n"
+        val unchangedContent = "keep: true\n"
         val base = snapshotService.createSnapshot(
             CreateSnapshotCommand(
                 SERVER_ID,
-                listOf(snapshotFile("config.yml", baseContent)),
+                listOf(
+                    snapshotFile("config.yml", baseContent),
+                    snapshotFile("unchanged.yml", unchangedContent),
+                ),
                 SnapshotSource.PLUGIN,
                 createdAt = NOW
             )
@@ -128,8 +132,13 @@ class ReleaseServiceTest {
         assertTrue(signer.verify(first.release.canonicalPayload, first.release.signature))
         assertEquals(first.release.id, replay.release.id)
         assertTrue(replay.replayed)
-        val releaseFile = repository.listFiles(first.release.id).single()
-        assertEquals(ReleaseFileChangeType.UPSERT, releaseFile.changeType)
+        val releaseFiles = repository.listFiles(first.release.id)
+        assertEquals(listOf("config.yml", "unchanged.yml"), releaseFiles.map(ReleaseFile::path))
+        assertEquals(targetContent, releaseFiles.single { it.path == "config.yml" }.content)
+        val unchanged = releaseFiles.single { it.path == "unchanged.yml" }
+        assertEquals(unchangedContent, unchanged.content)
+        assertEquals(SnapshotManifest.contentRevision(unchangedContent), unchanged.contentRevision)
+        assertTrue(releaseFiles.all { it.changeType == ReleaseFileChangeType.UPSERT })
         assertEquals(base.manifestRevision, first.release.expectedBaseManifestRevision)
     }
 

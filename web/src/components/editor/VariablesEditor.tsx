@@ -1,37 +1,69 @@
+import { useRef, useState } from "react"
 import { Plus, Trash2 } from "lucide-react"
+import { commitVariableValueDraft, renameRecordKey } from "./editor-input-utils"
+import { useEditorInputFlush } from "@/lib/editor-input-flush"
 
 interface VariablesEditorProps {
   variables: Record<string, string | number>
   onChange: (variables: Record<string, string | number>) => void
 }
 
-export function VariablesEditor({ variables, onChange }: VariablesEditorProps) {
-  const entries = Object.entries(variables)
+interface VariableRowMeta {
+  id: string
+  sourceKey: string
+}
 
-  const updateKey = (oldKey: string, newKey: string) => {
-    if (newKey === oldKey) return
-    // 检测键名冲突
-    if (newKey in variables && newKey !== oldKey) return
-    const newVars: Record<string, string | number> = {}
-    for (const [k, v] of entries) {
-      newVars[k === oldKey ? newKey : k] = v
-    }
-    onChange(newVars)
+let nextVariableRowId = 0
+function createRow(sourceKey: string): VariableRowMeta {
+  nextVariableRowId += 1
+  return { id: `variable-row-${nextVariableRowId}`, sourceKey }
+}
+
+export function VariablesEditor({ variables, onChange }: VariablesEditorProps) {
+  const variableKeys = Object.keys(variables)
+  const keySignature = variableKeys.join("\u0000")
+  const [rows, setRows] = useState<VariableRowMeta[]>(() => variableKeys.map(createRow))
+  const [previousKeySignature, setPreviousKeySignature] = useState(keySignature)
+
+  if (keySignature !== previousKeySignature) {
+    const retained = rows.filter((row) => row.sourceKey in variables)
+    const known = new Set(retained.map((row) => row.sourceKey))
+    const added = variableKeys.filter((key) => !known.has(key)).map(createRow)
+    setRows([...retained, ...added])
+    setPreviousKeySignature(keySignature)
   }
 
-  const updateValue = (key: string, value: string) => {
-    const numVal = Number(value)
-    onChange({ ...variables, [key]: isNaN(numVal) || value.includes(" ") ? value : numVal })
+  const commitKey = (oldKey: string, draft: string): boolean => {
+    const renamed = renameRecordKey(variables, oldKey, draft)
+    if (!renamed) return false
+    const newKey = draft.trim()
+    if (newKey !== oldKey) {
+      setRows((current) => current.map((row) => row.sourceKey === oldKey ? { ...row, sourceKey: newKey } : row))
+      onChange(renamed)
+    }
+    return true
+  }
+
+  const commitValue = (key: string, draft: string) => {
+    const value = commitVariableValueDraft(draft)
+    if (variables[key] !== value) onChange({ ...variables, [key]: value })
   }
 
   const addEntry = () => {
-    const key = `NewVar${entries.length}`
+    let index = Object.keys(variables).length
+    let key = `NewVar${index}`
+    while (key in variables) {
+      index += 1
+      key = `NewVar${index}`
+    }
+    setRows((current) => [...current, createRow(key)])
     onChange({ ...variables, [key]: 0 })
   }
 
   const removeEntry = (key: string) => {
     const newVars = { ...variables }
     delete newVars[key]
+    setRows((current) => current.filter((row) => row.sourceKey !== key))
     onChange(newVars)
   }
 
@@ -45,31 +77,106 @@ export function VariablesEditor({ variables, onChange }: VariablesEditorProps) {
       </div>
 
       <div className="space-y-2">
-        {entries.map(([key, value]) => (
-          <div key={key} className="flex items-center gap-2">
-            <input
-              value={key}
-              onChange={(e) => updateKey(key, e.target.value)}
-              className="w-32 px-2 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
-              placeholder="变量名"
+        {rows.map((row) => {
+          const value = variables[row.sourceKey]
+          if (value === undefined) return null
+          return (
+            <VariableRow
+              key={row.id}
+              sourceKey={row.sourceKey}
+              value={value}
+              onCommitKey={commitKey}
+              onCommitValue={commitValue}
+              onRemove={removeEntry}
             />
-            <span className="text-muted-foreground">=</span>
-            <textarea
-              value={String(value)}
-              onChange={(e) => updateValue(key, e.target.value)}
-              rows={typeof value === "string" && value.includes("\n") ? 3 : 1}
-              className="flex-1 px-2 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
-              placeholder="值或 calc 表达式"
-            />
-            <button onClick={() => removeEntry(key)} className="text-muted-foreground hover:text-red-400 p-1">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-        {entries.length === 0 && (
-          <p className="text-sm text-muted-foreground">暂无变量</p>
-        )}
+          )
+        })}
+        {rows.length === 0 && <p className="text-sm text-muted-foreground">暂无变量</p>}
       </div>
+    </div>
+  )
+}
+
+function VariableRow({ sourceKey, value, onCommitKey, onCommitValue, onRemove }: {
+  sourceKey: string
+  value: string | number
+  onCommitKey: (oldKey: string, draft: string) => boolean
+  onCommitValue: (key: string, draft: string) => void
+  onRemove: (key: string) => void
+}) {
+  const externalValue = String(value)
+  const keyInputRef = useRef<HTMLInputElement | null>(null)
+  const valueInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const [keyDraft, setKeyDraft] = useState(sourceKey)
+  const [previousSourceKey, setPreviousSourceKey] = useState(sourceKey)
+  const [valueDraft, setValueDraft] = useState(externalValue)
+  const [previousExternalValue, setPreviousExternalValue] = useState(externalValue)
+
+  if (sourceKey !== previousSourceKey) {
+    setPreviousSourceKey(sourceKey)
+    setKeyDraft(sourceKey)
+  }
+  if (externalValue !== previousExternalValue) {
+    setPreviousExternalValue(externalValue)
+    setValueDraft(externalValue)
+  }
+
+  const submitKey = (): boolean => {
+    const accepted = onCommitKey(sourceKey, keyDraft)
+    if (!accepted) setKeyDraft(sourceKey)
+    return accepted
+  }
+
+  const submitValue = () => {
+    onCommitValue(sourceKey, valueDraft)
+    return true
+  }
+
+  useEditorInputFlush(() => {
+    const keyChanged = keyDraft.trim() !== sourceKey
+    const valueChanged = valueDraft !== externalValue
+    if (keyChanged && valueChanged) {
+      keyInputRef.current?.focus()
+      return false
+    }
+    if (keyChanged) return submitKey()
+    if (valueChanged) return submitValue()
+    return true
+  })
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={keyInputRef}
+        value={keyDraft}
+        onChange={(event) => setKeyDraft(event.target.value)}
+        onBlur={submitKey}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            submitKey()
+            event.currentTarget.blur()
+          }
+          if (event.key === "Escape") setKeyDraft(sourceKey)
+        }}
+        className="w-32 px-2 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+        placeholder="变量名"
+      />
+      <span className="text-muted-foreground">=</span>
+      <textarea
+        ref={valueInputRef}
+        value={valueDraft}
+        onChange={(event) => setValueDraft(event.target.value)}
+        onBlur={submitValue}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.blur()
+        }}
+        rows={valueDraft.includes("\n") ? 3 : 1}
+        className="flex-1 px-2 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+        placeholder="值或 calc 表达式"
+      />
+      <button onClick={() => onRemove(sourceKey)} className="text-muted-foreground hover:text-red-400 p-1">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
     </div>
   )
 }

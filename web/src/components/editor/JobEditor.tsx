@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { JobData, JobOptions } from "@/types"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
 import { useEditorStore } from "@/store/editor-store"
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
@@ -20,22 +21,14 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
     rawYamlRef.current = content
   }, [content])
 
-  const job = useMemo<JobData>(() => {
-    try {
-      return parseYaml<JobData>(content)
-    } catch {
-      return { Options: { Name: "", Skills: [] } }
-    }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<JobData>(content), [content])
+  const job = useMemo<JobData>(() => parsed.ok
+    ? { ...parsed.data, Options: parsed.data.Options ?? { Name: "", Skills: [] } }
+    : { Options: { Name: "", Skills: [] } }, [parsed])
 
   const updateJob = useCallback((updater: (j: JobData) => JobData) => {
     const updated = updater(job)
-    try {
-      const newYaml = updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)
-      onChange(newYaml)
-    } catch {
-      onChange(stringifyYaml(updated))
-    }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [job, onChange])
 
   const updateOptions = useCallback((patch: Partial<JobOptions>) => {
@@ -54,22 +47,21 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
       </TabsList>
 
       <TabsContent value="general" className="flex-1 overflow-y-auto">
-        <GeneralPanel options={job.Options} onChange={updateOptions} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><GeneralPanel options={job.Options} onChange={updateOptions} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="skills" className="flex-1 overflow-y-auto">
-        <SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="attributes" className="flex-1 overflow-y-auto">
-        <AttributesPanel
-          attributes={job.Options.Attributes ?? []}
-          onChange={(attrs) => updateOptions({ Attributes: attrs })}
-        />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <AttributesPanel attributes={job.Options.Attributes ?? []} onChange={(attrs) => updateOptions({ Attributes: attrs })} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="scripts" className="flex-1 overflow-y-auto">
-        <ScriptsPanel options={job.Options} onChange={updateOptions} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><ScriptsPanel options={job.Options} onChange={updateOptions} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="refs" className="flex-1 overflow-y-auto">

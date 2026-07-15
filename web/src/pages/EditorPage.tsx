@@ -22,7 +22,7 @@ import { LogConsole } from "@/components/visualizer/LogConsole"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { saveEditorFile } from "@/lib/file-save"
+import { saveAllEditorFiles } from "@/lib/file-save"
 
 import type { OpenFile } from "@/store/editor-store"
 
@@ -63,8 +63,19 @@ function resolveEditor(file: OpenFile): React.ComponentType<EditorProps> {
 }
 
 export function EditorPage() {
-  const { openFiles, activeFilePath, setActiveFile, closeFile, closeAllFiles, closeSavedFiles } = useEditorStore()
+  const {
+    openFiles,
+    activeFilePath,
+    setActiveFile,
+    closeFile,
+    closeAllFiles,
+    closeSavedFiles,
+    lifecycleError,
+    clearLifecycleError,
+  } = useEditorStore()
   const connected = useConnectionStore((s) => s.connected)
+  const serverOnline = useConnectionStore((s) => s.serverOnline)
+  const serverAvailable = connected && serverOnline
   const [showPublish, setShowPublish] = useState(false)
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null)
   const dirtyCount = openFiles.filter((f) => f.dirty).length
@@ -127,7 +138,7 @@ export function EditorPage() {
                   boxShadow: isActive ? 'var(--md-elevation-1)' : 'none',
                   color: isActive ? 'var(--md-dark-text-primary)' : 'var(--md-dark-text-secondary)',
                 }}
-                title={file.externalRevision ? "服务器上的文件已被其他协作者修改；保存时会进行版本检查" : undefined}
+                title={file.externalRevision != null ? "服务器上的文件已被其他协作者修改；保存时会进行版本检查" : undefined}
                 onClick={() => setActiveFile(file.path)}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -154,11 +165,11 @@ export function EditorPage() {
                     style={{ background: 'var(--md-dark-accent-primary)' }}
                   />
                 )}
-                {file.externalRevision && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" aria-label="存在外部修改" />}
+                {file.externalRevision != null && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" aria-label="存在外部修改" />}
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    closeFile(file.path)
+                    void closeFile(file.path)
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity hover:bg-[var(--md-dark-bg-active)]"
                 >
@@ -181,25 +192,20 @@ export function EditorPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => closeSavedFiles()}>
+              <DropdownMenuItem onClick={() => void closeSavedFiles()}>
                 <span className="flex-1">关闭已保存</span>
                 <kbd className="text-[10px] px-1.5 py-0.5 rounded ml-4" style={{ background: 'var(--md-dark-bg-tertiary)', color: 'var(--md-dark-text-muted)' }}>Ctrl+K U</kbd>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => {
-                const store = useEditorStore.getState()
-                for (const f of store.openFiles.filter(f => f.dirty)) {
-                  try {
-                    const content = f.draft ?? f.content
-                    await saveEditorFile(f, content)
-                  } catch { /* skip */ }
+                if (await saveAllEditorFiles()) {
+                  await useEditorStore.getState().closeAllFiles()
                 }
-                store.closeAllFiles()
               }}>
                 <span className="flex-1">全部保存并关闭</span>
                 <kbd className="text-[10px] px-1.5 py-0.5 rounded ml-4" style={{ background: 'var(--md-dark-bg-tertiary)', color: 'var(--md-dark-text-muted)' }}>Ctrl+K S</kbd>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => closeAllFiles()} className="text-[var(--md-dark-accent-error)]">
+              <DropdownMenuItem onClick={() => void closeAllFiles()} className="text-[var(--md-dark-accent-error)]">
                 <span className="flex-1">全部关闭</span>
                 <kbd className="text-[10px] px-1.5 py-0.5 rounded ml-4" style={{ background: 'var(--md-dark-bg-tertiary)', color: 'var(--md-dark-text-muted)' }}>Ctrl+K W</kbd>
               </DropdownMenuItem>
@@ -210,7 +216,7 @@ export function EditorPage() {
             onClick={() => setShowPublish(!showPublish)}
             className={cn(
               "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition-all",
-              !connected && "opacity-50"
+              !serverAvailable && "opacity-50"
             )}
             style={{
               background: showPublish ? 'var(--md-dark-bg-active)' : 'var(--md-dark-bg-tertiary)',
@@ -218,7 +224,7 @@ export function EditorPage() {
             }}
           >
             <Upload className="w-4 h-4" />
-            <span className="font-medium">{connected ? "发布" : "离线"}</span>
+            <span className="font-medium">{serverAvailable ? "发布" : "离线"}</span>
             {dirtyCount > 0 && (
               <span 
                 className="px-2 py-0.5 text-[10px] rounded-full font-semibold"
@@ -230,6 +236,31 @@ export function EditorPage() {
           </button>
         </div>
       </div>
+
+      {!serverOnline && (
+        <div className="flex items-center gap-2 border-b border-red-500/40 bg-red-950/80 px-3 py-2 text-xs text-red-100" role="alert">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>服务器离线。已切断 revision 确认链并保留当前认证与 dirty 草稿；插件重连后将自动重新同步打开文件。</span>
+        </div>
+      )}
+
+      {lifecycleError && (
+        <div
+          className="flex items-center gap-2 border-b border-amber-500/40 bg-amber-950/80 px-3 py-2 text-xs text-amber-100"
+          role="alert"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1">{lifecycleError}</span>
+          <button
+            type="button"
+            onClick={clearLifecycleError}
+            className="rounded p-1 text-amber-200 hover:bg-amber-900 hover:text-white"
+            aria-label="关闭草稿持久化错误提示"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 主内容区域 */}
       <div className="flex-1 overflow-hidden flex flex-col">

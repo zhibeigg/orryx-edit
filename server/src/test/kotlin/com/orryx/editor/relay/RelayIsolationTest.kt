@@ -1,6 +1,7 @@
 package com.orryx.editor.relay
 
 import com.orryx.editor.protocol.MessageTypes
+import com.orryx.editor.protocol.ProtocolLimits
 import com.orryx.editor.protocol.ProtocolVersion
 import com.orryx.editor.protocol.WsMessage
 import kotlinx.coroutines.async
@@ -77,6 +78,91 @@ class RelayIsolationTest {
         relay.handleBrowserMessage(replayBrowser, message("auth", "auth-3", "\"resumeToken\":\"$resumeToken\""))
         val replay = replayBrowser.messages.map(::decode).single { it.type == MessageTypes.AUTH_RESULT }
         assertFalse(replay.data.jsonObject["success"]?.jsonPrimitive?.booleanOrNull ?: true)
+    }
+
+    @Test
+    fun `offline resume keeps token until server returns then rotates it once`() = runBlocking {
+        val registry = SessionRegistry()
+        val store = RecordingSessionStore()
+        val relay = RelayHandler(registry, store)
+        val plugin = FakeSocket()
+        val firstBrowser = FakeSocket()
+        registry.registerServer("license-key", "shared-key", "alpha", "alpha", plugin)
+        registry.registerToken("one-time-token", plugin, "Steve", 60_000)
+
+        relay.handleBrowserMessage(firstBrowser, message("auth", "auth-initial", "\"token\":\"one-time-token\""))
+        val resumeToken = firstBrowser.messages.map(::decode)
+            .single { it.type == MessageTypes.AUTH_RESULT }
+            .data.jsonObject["resumeToken"]?.jsonPrimitive?.contentOrNull
+        assertNotNull(resumeToken)
+        val tokenHash = RelaySecrets.sha256(resumeToken)
+        relay.onBrowserDisconnect(firstBrowser)
+        registry.unregisterServer(plugin)
+
+        repeat(2) { attempt ->
+            val offlineBrowser = FakeSocket()
+            relay.handleBrowserMessage(
+                offlineBrowser,
+                message("auth", "auth-offline-$attempt", "\"resumeToken\":\"$resumeToken\"")
+            )
+            val result = offlineBrowser.messages.map(::decode).single { it.type == MessageTypes.AUTH_RESULT }
+            assertFalse(result.data.jsonObject["success"]?.jsonPrimitive?.booleanOrNull ?: true)
+            assertEquals("SERVER_OFFLINE", result.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+            assertNotNull(store.lookup(tokenHash))
+        }
+
+        val replacementPlugin = FakeSocket()
+        registry.registerServer("license-key", "shared-key", "alpha", "alpha", replacementPlugin)
+        val resumedBrowser = FakeSocket()
+        relay.handleBrowserMessage(
+            resumedBrowser,
+            message("auth", "auth-online", "\"resumeToken\":\"$resumeToken\"")
+        )
+        val resumed = resumedBrowser.messages.map(::decode).single { it.type == MessageTypes.AUTH_RESULT }
+        assertTrue(resumed.data.jsonObject["success"]?.jsonPrimitive?.booleanOrNull == true)
+        val rotatedToken = resumed.data.jsonObject["resumeToken"]?.jsonPrimitive?.contentOrNull
+        assertNotNull(rotatedToken)
+        assertNotEquals(resumeToken, rotatedToken)
+        assertNull(store.lookup(tokenHash))
+        assertNotNull(store.lookup(RelaySecrets.sha256(rotatedToken)))
+
+        val replayBrowser = FakeSocket()
+        relay.handleBrowserMessage(
+            replayBrowser,
+            message("auth", "auth-replay", "\"resumeToken\":\"$resumeToken\"")
+        )
+        val replay = replayBrowser.messages.map(::decode).single { it.type == MessageTypes.AUTH_RESULT }
+        assertEquals("INVALID_RESUME_TOKEN", replay.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun `resume consume race returns invalid resume token`() = runBlocking {
+        val registry = SessionRegistry()
+        val store = RecordingSessionStore()
+        val relay = RelayHandler(registry, store)
+        val plugin = FakeSocket()
+        val firstBrowser = FakeSocket()
+        registry.registerServer("license-key", "shared-key", "alpha", "alpha", plugin)
+        registry.registerToken("one-time-token", plugin, "Steve", 60_000)
+
+        relay.handleBrowserMessage(firstBrowser, message("auth", "auth-initial", "\"token\":\"one-time-token\""))
+        val resumeToken = firstBrowser.messages.map(::decode)
+            .single { it.type == MessageTypes.AUTH_RESULT }
+            .data.jsonObject["resumeToken"]?.jsonPrimitive?.contentOrNull
+        assertNotNull(resumeToken)
+        relay.onBrowserDisconnect(firstBrowser)
+        store.loseNextConsume = true
+
+        val racingBrowser = FakeSocket()
+        relay.handleBrowserMessage(
+            racingBrowser,
+            message("auth", "auth-race", "\"resumeToken\":\"$resumeToken\"")
+        )
+
+        val result = racingBrowser.messages.map(::decode).single { it.type == MessageTypes.AUTH_RESULT }
+        assertFalse(result.data.jsonObject["success"]?.jsonPrimitive?.booleanOrNull ?: true)
+        assertEquals("INVALID_RESUME_TOKEN", result.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+        assertNull(store.lookup(RelaySecrets.sha256(resumeToken)))
     }
 
     @Test
@@ -177,6 +263,8 @@ class RelayIsolationTest {
             message("file.write", "write-1", "\"path\":\"config.yml\",\"content\":\"one\",\"baseRevision\":0")
         )
         val firstForward = decode(plugin.messages.single())
+        assertNull(firstForward.data.jsonObject["baseRevision"])
+        assertNull(firstForward.data.jsonObject["expectedRevision"])
         endpoint.handleServerMessage(
             plugin,
             message("file.written", firstForward.id, "\"success\":true,\"path\":\"config.yml\"")
@@ -204,6 +292,61 @@ class RelayIsolationTest {
         assertEquals(forwardedCount + 1, plugin.messages.size)
         assertNotNull(plugin.messages.lastOrNull()?.let(::decode))
         Unit
+    }
+
+    @Test
+    fun `v1 create replaces plugin sha with relay long revision while v2 preserves sha`() = runBlocking {
+        val registry = SessionRegistry()
+        val legacyRelay = RelayHandler(registry)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses())
+        val legacyPlugin = FakeSocket()
+        val legacyBrowser = FakeSocket()
+        val legacyServer = registry.registerServer("legacy-key", "legacy", "legacy", legacyPlugin)
+        registry.bindBrowser(legacyBrowser, "browser-v1", "Alice", legacyServer)
+        val shaRevision = "a".repeat(64)
+
+        legacyRelay.handleBrowserMessage(
+            legacyBrowser,
+            message(MessageTypes.FILE_CREATE, "create-v1", "\"path\":\"skills/new.yml\",\"isDirectory\":false")
+        )
+        val legacyRequest = decode(legacyPlugin.messages.single())
+        endpoint.handleServerMessage(
+            legacyPlugin,
+            message(
+                MessageTypes.FILE_WRITTEN,
+                legacyRequest.id,
+                "\"success\":true,\"path\":\"skills/new.yml\",\"revision\":\"$shaRevision\""
+            )
+        )
+        val legacyResponse = legacyBrowser.messages.map(::decode).single { it.id == "create-v1" }
+        assertEquals(0L, legacyResponse.data.jsonObject["revision"]?.jsonPrimitive?.longOrNull)
+
+        val features = RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true)
+        val modernRelay = RelayHandler(registry, features = features)
+        val modernEndpoint = ServerEndpoint(registry, AllowAllLicenses(), features)
+        val modernPlugin = FakeSocket()
+        val modernBrowser = FakeSocket()
+        val modernServer = registry.registerServer(
+            "modern-key", "modern-key", "modern", "modern", modernPlugin,
+            negotiatedProtocol = ProtocolVersion.V2
+        )
+        registry.bindBrowser(modernBrowser, "browser-v2", "Bob", modernServer)
+
+        modernRelay.handleBrowserMessage(
+            modernBrowser,
+            message(MessageTypes.FILE_CREATE, "create-v2", "\"path\":\"skills/new.yml\",\"isDirectory\":false")
+        )
+        val modernRequest = decode(modernPlugin.messages.single())
+        modernEndpoint.handleServerMessage(
+            modernPlugin,
+            message(
+                MessageTypes.FILE_WRITTEN,
+                modernRequest.id,
+                "\"success\":true,\"path\":\"skills/new.yml\",\"revision\":\"$shaRevision\""
+            )
+        )
+        val modernResponse = modernBrowser.messages.map(::decode).single { it.id == "create-v2" }
+        assertEquals(shaRevision, modernResponse.data.jsonObject["revision"]?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -286,12 +429,110 @@ class RelayIsolationTest {
     }
 
     @Test
-    fun `server registration negotiates enabled v2 and keeps legacy plugins on v1`() = runBlocking {
+    fun `release rollout keeps v1 plugin registration connected`() = runBlocking {
+        val registry = SessionRegistry()
+        val features = RelayFeatureFlags(
+            protocolV2Enabled = true,
+            v2WritesEnabled = true,
+            releaseTransactionsEnabled = true,
+        )
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses(), features)
+        val plugin = FakeSocket()
+
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.SERVER_REGISTER,
+                "legacy-release-reg",
+                "\"license\":\"license-key\",\"serverName\":\"legacy\",\"serverId\":\"legacy-release\"," +
+                    "\"protocolVersions\":[\"v1\"],\"preferredProtocol\":\"v1\""
+            )
+        )
+
+        val result = decode(plugin.messages.single()).data.jsonObject
+        assertTrue(result["success"]?.jsonPrimitive?.booleanOrNull == true)
+        assertEquals("v1", result["negotiatedProtocol"]?.jsonPrimitive?.contentOrNull)
+        assertNotNull(registry.getServerBySession(plugin))
+        Unit
+    }
+
+    @Test
+    fun `disabled v2 writes negotiate v1 and keep save path usable`() = runBlocking {
+        val registry = SessionRegistry()
+        val features = RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = false)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses(), features)
+        val relay = RelayHandler(registry, features = features)
+        val plugin = FakeSocket()
+        val browser = FakeSocket()
+
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.SERVER_REGISTER,
+                "readonly-reg",
+                "\"license\":\"license-key\",\"serverName\":\"fallback\",\"serverId\":\"fallback-1\"," +
+                    "\"protocolVersions\":[\"v1\",\"v2\"],\"preferredProtocol\":\"v2\"," +
+                    "\"capabilities\":[\"revision.sha256\",\"file.write.v2\",\"mutation.preconditions\"]"
+            )
+        )
+
+        val registration = decode(plugin.messages.single()).data.jsonObject
+        assertTrue(registration["success"]?.jsonPrimitive?.booleanOrNull == true)
+        assertEquals("v1", registration["negotiatedProtocol"]?.jsonPrimitive?.contentOrNull)
+        val server = assertNotNull(registry.getServerBySession(plugin))
+        registry.bindBrowser(browser, "browser-v1-fallback", "Alice", server)
+        plugin.messages.clear()
+
+        relay.handleBrowserMessage(
+            browser,
+            message(
+                MessageTypes.FILE_WRITE,
+                "save-v1-fallback",
+                "\"path\":\"config.yml\",\"content\":\"saved\",\"baseRevision\":0"
+            )
+        )
+        val forwarded = decode(plugin.messages.single())
+        assertNull(forwarded.data.jsonObject["baseRevision"])
+        assertNull(forwarded.data.jsonObject["expectedRevision"])
+        endpoint.handleServerMessage(
+            plugin,
+            message(MessageTypes.FILE_WRITTEN, forwarded.id, "\"success\":true,\"path\":\"config.yml\"")
+        )
+
+        val saved = browser.messages.map(::decode).single { it.id == "save-v1-fallback" }
+        assertEquals(1L, saved.data.jsonObject["revision"]?.jsonPrimitive?.longOrNull)
+    }
+
+    @Test
+    fun `plugin without v2 write capability negotiates v1`() = runBlocking {
+        val registry = SessionRegistry()
+        val features = RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses(), features)
+        val plugin = FakeSocket()
+
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.SERVER_REGISTER,
+                "missing-write-reg",
+                "\"license\":\"license-key\",\"serverName\":\"fallback\",\"serverId\":\"fallback-2\"," +
+                    "\"protocolVersions\":[\"v1\",\"v2\"],\"preferredProtocol\":\"v2\"," +
+                    "\"capabilities\":[\"revision.sha256\",\"mutation.preconditions\"]"
+            )
+        )
+
+        val result = decode(plugin.messages.single()).data.jsonObject
+        assertTrue(result["success"]?.jsonPrimitive?.booleanOrNull == true)
+        assertEquals("v1", result["negotiatedProtocol"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun `server registration negotiates writable v2 and keeps legacy plugins on v1`() = runBlocking {
         val registry = SessionRegistry()
         val endpoint = ServerEndpoint(
             registry,
             AllowAllLicenses(),
-            RelayFeatureFlags(protocolV2Enabled = true),
+            RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true),
         )
         val legacy = FakeSocket()
         val modern = FakeSocket()
@@ -312,8 +553,8 @@ class RelayIsolationTest {
                 "modern-reg",
                 "\"license\":\"license-key\",\"serverName\":\"modern\",\"serverId\":\"modern-1\"," +
                     "\"pluginVersion\":\"1.2.3\",\"protocolVersions\":[\"v1\",\"v2\"]," +
-                    "\"preferredProtocol\":\"v2\",\"capabilities\":[\"revision.sha256\"]," +
-                    "\"connectionNonce\":\"nonce-12345678\""
+                    "\"preferredProtocol\":\"v2\",\"capabilities\":[\"revision.sha256\",\"file.write.v2\"," +
+                    "\"mutation.preconditions\"],\"connectionNonce\":\"nonce-12345678\""
             )
         )
         val modernResult = decode(modern.messages.single()).data.jsonObject
@@ -321,7 +562,7 @@ class RelayIsolationTest {
         assertEquals("nonce-12345678", modernResult["connectionNonce"]?.jsonPrimitive?.contentOrNull)
         val relayCapabilities = modernResult["relayCapabilities"] as kotlinx.serialization.json.JsonArray
         assertTrue(relayCapabilities.any { it.jsonPrimitive.contentOrNull == "revision.sha256" })
-        assertFalse(relayCapabilities.any { it.jsonPrimitive.contentOrNull == "file.write.v2" })
+        assertTrue(relayCapabilities.any { it.jsonPrimitive.contentOrNull == "file.write.v2" })
     }
 
     @Test
@@ -519,6 +760,254 @@ class RelayIsolationTest {
         assertEquals(forcedRevision, forcedResponse.data.jsonObject["revision"]?.jsonPrimitive?.contentOrNull)
     }
 
+    @Test
+    fun `relay capabilities advertise v2 revision and writes together while release stays optional`() {
+        val legacy = relayCapabilities(
+            ProtocolVersion.V1,
+            RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true, releaseTransactionsEnabled = true)
+        ).mapNotNull { it.jsonPrimitive.contentOrNull }.toSet()
+        assertEquals(setOf("protocol.allowlist", "session.epoch"), legacy)
+
+        val writes = relayCapabilities(
+            ProtocolVersion.V2,
+            RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true)
+        ).mapNotNull { it.jsonPrimitive.contentOrNull }.toSet()
+        assertTrue(RelayCapabilities.REVISION_SHA256 in writes)
+        assertTrue(RelayCapabilities.FILE_WRITE_V2 in writes)
+        assertFalse(RelayCapabilities.RELEASE_CONTROL_V1 in writes)
+
+        val release = relayCapabilities(
+            ProtocolVersion.V2,
+            RelayFeatureFlags(
+                protocolV2Enabled = true,
+                v2WritesEnabled = true,
+                releaseTransactionsEnabled = true,
+            )
+        ).mapNotNull { it.jsonPrimitive.contentOrNull }.toSet()
+        assertTrue(RelayCapabilities.REVISION_SHA256 in release)
+        assertTrue(RelayCapabilities.FILE_WRITE_V2 in release)
+        assertTrue(RelayCapabilities.RELEASE_CONTROL_V1 in release)
+    }
+
+    @Test
+    fun `v2 browser cannot inject plugin expectedRevision field`() = runBlocking {
+        val registry = SessionRegistry()
+        val features = RelayFeatureFlags(protocolV2Enabled = true, v2WritesEnabled = true)
+        val relay = RelayHandler(registry, features = features)
+        val plugin = FakeSocket()
+        val browser = FakeSocket()
+        val server = registry.registerServer(
+            "license-key", "shared-key", "alpha", "alpha", plugin,
+            negotiatedProtocol = ProtocolVersion.V2
+        )
+        registry.bindBrowser(browser, "browser-a", "Alice", server)
+        val revision = "a".repeat(64)
+
+        relay.handleBrowserMessage(
+            browser,
+            message(
+                MessageTypes.FILE_WRITE,
+                "write-injected",
+                "\"path\":\"config.yml\",\"content\":\"x\",\"baseRevision\":\"$revision\"," +
+                    "\"expectedRevision\":\"$revision\""
+            )
+        )
+
+        assertTrue(plugin.messages.isEmpty())
+        val error = decode(browser.messages.single())
+        assertEquals("INVALID_REVISION_FIELD", error.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun `plugin errors expose only safe correlated fields`() = runBlocking {
+        val registry = SessionRegistry()
+        val relay = RelayHandler(registry)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses())
+        val plugin = FakeSocket()
+        val browser = FakeSocket()
+        val server = registry.registerServer(
+            "license-key", "shared-key", "alpha", "alpha", plugin,
+            negotiatedProtocol = ProtocolVersion.V2
+        )
+        registry.bindBrowser(browser, "browser-a", "Alice", server)
+        val revision = "b".repeat(64)
+
+        relay.handleBrowserMessage(browser, message(MessageTypes.FILE_READ, "read-conflict", "\"path\":\"config.yml\""))
+        val firstRequest = decode(plugin.messages.single())
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.ERROR,
+                firstRequest.id,
+                "\"code\":\"REVISION_CONFLICT\",\"message\":\"do not expose\"," +
+                    "\"path\":\"config.yml\",\"currentRevision\":\"$revision\"," +
+                    "\"requestType\":\"file.read\",\"secret\":\"hidden\""
+            )
+        )
+        val safe = browser.messages.map(::decode).single { it.id == "read-conflict" }.data.jsonObject
+        assertEquals("REVISION_CONFLICT", safe["code"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("config.yml", safe["path"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(revision, safe["currentRevision"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(MessageTypes.FILE_READ, safe["requestType"]?.jsonPrimitive?.contentOrNull)
+        assertNull(safe["message"])
+        assertNull(safe["secret"])
+
+        plugin.messages.clear()
+        browser.messages.clear()
+        relay.handleBrowserMessage(browser, message(MessageTypes.FILE_READ, "read-unknown", "\"path\":\"config.yml\""))
+        val secondRequest = decode(plugin.messages.single())
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.ERROR,
+                secondRequest.id,
+                "\"code\":\"PLUGIN_INTERNAL_STACKTRACE\",\"path\":\"config.yml\"," +
+                    "\"currentRevision\":\"$revision\",\"requestType\":\"file.read\""
+            )
+        )
+        val fallback = browser.messages.map(::decode).single { it.id == "read-unknown" }.data.jsonObject
+        assertEquals(setOf("code"), fallback.keys)
+        assertEquals("PLUGIN_ERROR", fallback["code"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun `manifest snapshot is v2 correlated normalized and not routable on v1`() = runBlocking {
+        val registry = SessionRegistry()
+        val relay = RelayHandler(registry)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses())
+        val v2Plugin = FakeSocket()
+        val v2Browser = FakeSocket()
+        val v2Server = registry.registerServer(
+            "license-key", "shared-key", "v2", "v2", v2Plugin,
+            negotiatedProtocol = ProtocolVersion.V2
+        )
+        registry.bindBrowser(v2Browser, "browser-v2", "Alice", v2Server)
+        val manifestRevision = "c".repeat(64)
+        val fileRevision = "d".repeat(64)
+
+        relay.handleBrowserMessage(v2Browser, message(MessageTypes.MANIFEST_GET, "manifest-data", "\"path\":\"x\""))
+        assertTrue(v2Plugin.messages.isEmpty())
+        val invalidRequest = v2Browser.messages.map(::decode).single { it.id == "manifest-data" }
+        assertEquals("INVALID_MANIFEST_REQUEST", invalidRequest.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+
+        relay.handleBrowserMessage(v2Browser, message(MessageTypes.MANIFEST_GET, "manifest-1", ""))
+        val request = decode(v2Plugin.messages.single())
+        assertEquals(MessageTypes.MANIFEST_GET, request.type)
+        endpoint.handleServerMessage(
+            v2Plugin,
+            message(
+                MessageTypes.MANIFEST_SNAPSHOT,
+                request.id,
+                "\"manifestId\":\"snapshot-1\",\"revision\":\"$manifestRevision\"," +
+                    "\"files\":[{\"path\":\"configs/main.yml\",\"revision\":\"$fileRevision\",\"size\":12," +
+                    "\"ignored\":true}],\"createdAt\":123,\"secret\":\"drop\""
+            )
+        )
+
+        val response = v2Browser.messages.map(::decode).single { it.id == "manifest-1" }
+        assertEquals(MessageTypes.MANIFEST_SNAPSHOT, response.type)
+        assertEquals(manifestRevision, response.data.jsonObject["revision"]?.jsonPrimitive?.contentOrNull)
+        assertNull(response.data.jsonObject["secret"])
+        val file = (response.data.jsonObject["files"] as kotlinx.serialization.json.JsonArray).single().jsonObject
+        assertEquals(setOf("path", "revision", "size"), file.keys)
+
+        val v1Plugin = FakeSocket()
+        val v1Browser = FakeSocket()
+        val v1Server = registry.registerServer("legacy-key", "legacy", "legacy", v1Plugin)
+        registry.bindBrowser(v1Browser, "browser-v1", "Bob", v1Server)
+        relay.handleBrowserMessage(v1Browser, message(MessageTypes.MANIFEST_GET, "manifest-v1", ""))
+        assertTrue(v1Plugin.messages.isEmpty())
+        val v1Error = decode(v1Browser.messages.single())
+        assertEquals("MESSAGE_NOT_SUPPORTED", v1Error.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun `invalid manifest paths revisions sizes counts and duplicates are rejected`() = runBlocking {
+        val registry = SessionRegistry()
+        val relay = RelayHandler(registry)
+        val endpoint = ServerEndpoint(registry, AllowAllLicenses())
+        val plugin = FakeSocket()
+        val browser = FakeSocket()
+        val server = registry.registerServer(
+            "license-key", "shared-key", "alpha", "alpha", plugin,
+            negotiatedProtocol = ProtocolVersion.V2
+        )
+        registry.bindBrowser(browser, "browser-a", "Alice", server)
+        val manifestRevision = "e".repeat(64)
+        val fileRevision = "f".repeat(64)
+        val invalidFiles = listOf(
+            "[{\"path\":\"../secret.yml\",\"revision\":\"$fileRevision\",\"size\":1}]",
+            "[{\"path\":\"a.yml\",\"revision\":\"bad\",\"size\":1}]",
+            "[{\"path\":\"a.yml\",\"revision\":\"$fileRevision\",\"size\":-1}]",
+            "[{\"path\":\"A.yml\",\"revision\":\"$fileRevision\"},{\"path\":\"a.yml\",\"revision\":\"$fileRevision\"}]",
+        )
+
+        invalidFiles.forEachIndexed { index, files ->
+            relay.handleBrowserMessage(browser, message(MessageTypes.MANIFEST_GET, "manifest-invalid-$index", ""))
+            val request = decode(plugin.messages.last())
+            endpoint.handleServerMessage(
+                plugin,
+                message(
+                    MessageTypes.MANIFEST_SNAPSHOT,
+                    request.id,
+                    "\"manifestId\":\"snapshot-$index\",\"revision\":\"$manifestRevision\",\"files\":$files"
+                )
+            )
+            val error = browser.messages.map(::decode).single { it.id == "manifest-invalid-$index" }
+            assertEquals("INVALID_MANIFEST", error.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+        }
+
+        relay.handleBrowserMessage(browser, message(MessageTypes.MANIFEST_GET, "manifest-bad-revision", ""))
+        val revisionRequest = decode(plugin.messages.last())
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.MANIFEST_SNAPSHOT,
+                revisionRequest.id,
+                "\"manifestId\":\"snapshot-revision\",\"revision\":\"BAD\",\"files\":[]"
+            )
+        )
+        val revisionError = browser.messages.map(::decode).single { it.id == "manifest-bad-revision" }
+        assertEquals("INVALID_MANIFEST", revisionError.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+
+        val maximum = (0 until ProtocolLimits.MAX_MANIFEST_FILES).joinToString(prefix = "[", postfix = "]") { index ->
+            "{\"path\":\"f$index\",\"revision\":\"$fileRevision\"}"
+        }
+        relay.handleBrowserMessage(browser, message(MessageTypes.MANIFEST_GET, "manifest-maximum", ""))
+        val maximumRequest = decode(plugin.messages.last())
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.MANIFEST_SNAPSHOT,
+                maximumRequest.id,
+                "\"manifestId\":\"snapshot-maximum\",\"revision\":\"$manifestRevision\",\"files\":$maximum"
+            )
+        )
+        val maximumResponse = browser.messages.map(::decode).single { it.id == "manifest-maximum" }
+        assertEquals(MessageTypes.MANIFEST_SNAPSHOT, maximumResponse.type)
+        assertEquals(
+            ProtocolLimits.MAX_MANIFEST_FILES,
+            (maximumResponse.data.jsonObject["files"] as kotlinx.serialization.json.JsonArray).size
+        )
+
+        val tooMany = (0..ProtocolLimits.MAX_MANIFEST_FILES).joinToString(prefix = "[", postfix = "]") { index ->
+            "{\"path\":\"f$index\",\"revision\":\"$fileRevision\"}"
+        }
+        relay.handleBrowserMessage(browser, message(MessageTypes.MANIFEST_GET, "manifest-too-many", ""))
+        val request = decode(plugin.messages.last())
+        endpoint.handleServerMessage(
+            plugin,
+            message(
+                MessageTypes.MANIFEST_SNAPSHOT,
+                request.id,
+                "\"manifestId\":\"snapshot-many\",\"revision\":\"$manifestRevision\",\"files\":$tooMany"
+            )
+        )
+        val countError = browser.messages.map(::decode).single { it.id == "manifest-too-many" }
+        assertEquals("INVALID_MANIFEST", countError.data.jsonObject["code"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(0, registry.pendingRequestCount())
+    }
+
     private fun decode(text: String): WsMessage = json.decodeFromString(text)
 
     private fun message(type: String, id: String, dataFields: String): String =
@@ -534,13 +1023,21 @@ class RelayIsolationTest {
     private class RecordingSessionStore : EditorSessionStore {
         private val delegate = InMemoryEditorSessionStore()
         val savedHashes = mutableListOf<String>()
+        var loseNextConsume = false
 
         override suspend fun save(tokenHash: String, session: EditorSessionRecord) {
             savedHashes += tokenHash
             delegate.save(tokenHash, session)
         }
 
-        override suspend fun consume(tokenHash: String): EditorSessionRecord? = delegate.consume(tokenHash)
+        override suspend fun lookup(tokenHash: String): EditorSessionRecord? = delegate.lookup(tokenHash)
+
+        override suspend fun consume(tokenHash: String): EditorSessionRecord? {
+            if (!loseNextConsume) return delegate.consume(tokenHash)
+            loseNextConsume = false
+            delegate.consume(tokenHash)
+            return null
+        }
 
         override suspend fun revoke(tokenHash: String) {
             delegate.revoke(tokenHash)

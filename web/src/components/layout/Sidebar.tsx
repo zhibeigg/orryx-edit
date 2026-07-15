@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react"
 import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react"
 import type { FileTreeNode } from "@/types"
-import { getConfigType } from "@/types"
 import { getFileIconInfo, getFolderColor } from "@/lib/file-icons"
 import { useFileStore } from "@/store/file-store"
 import { useEditorStore } from "@/store/editor-store"
+import { deleteServerPathSafely, renameServerPathSafely } from "@/lib/file-lifecycle"
+import { openServerFile } from "@/lib/server-file"
 import { wsClient } from "@/lib/ws-client"
-import { tryRestoreDraft } from "@/lib/use-draft-sync"
 import { cn } from "@/lib/utils"
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -19,7 +19,6 @@ function TreeNode({ node, depth = 0, onAction }: {
   onAction: (action: "newFile" | "newFolder" | "rename" | "delete", node: FileTreeNode) => void
 }) {
   const [expanded, setExpanded] = useState(depth < 1)
-  const openFile = useEditorStore((s) => s.openFile)
   const activeFilePath = useEditorStore((s) => s.activeFilePath)
 
   const handleClick = useCallback(async () => {
@@ -28,20 +27,11 @@ function TreeNode({ node, depth = 0, onAction }: {
       return
     }
     try {
-      const res = await wsClient.fileRead(node.path)
-      const { content, hasDraft } = await tryRestoreDraft(node.path, res.content)
-      openFile({
-        path: node.path,
-        name: node.name,
-        content: res.content,
-        revision: res.revision,
-        configType: getConfigType(node.path),
-        ...(hasDraft ? { draft: content } : {}),
-      })
+      await openServerFile(node.path, node.name)
     } catch (err) {
       console.error("读取文件失败:", err)
     }
-  }, [node, openFile])
+  }, [node])
 
   const isActive = activeFilePath === node.path
 
@@ -109,6 +99,8 @@ export function Sidebar() {
     node: FileTreeNode
   } | null>(null)
   const [inputValue, setInputValue] = useState("")
+  const [operationBusy, setOperationBusy] = useState(false)
+  const [operationStatus, setOperationStatus] = useState<{ success: boolean; message: string } | null>(null)
 
   const refreshTree = useCallback(async () => {
     setLoading(true)
@@ -122,48 +114,69 @@ export function Sidebar() {
   }, [setLoading, setFileTree])
 
   const handleAction = useCallback((action: "newFile" | "newFolder" | "rename" | "delete", node: FileTreeNode) => {
+    if (operationBusy) return
     if (action === "delete") {
-      if (!confirm(`确定删除 ${node.name}？`)) return
-      wsClient.fileDelete(node.path).then(() => {
-        useEditorStore.getState().closeFile(node.path)
-        refreshTree()
-      }).catch((err) => console.error("删除失败:", err))
+      const consequence = node.isDirectory
+        ? `确定删除目录 ${node.name} 及其全部子文件、已打开标签和本地草稿？`
+        : `确定删除 ${node.name}、对应标签和本地草稿？`
+      if (!confirm(consequence)) return
+      setOperationBusy(true)
+      setOperationStatus(null)
+      void deleteServerPathSafely(node.path, node.isDirectory)
+        .then(async (result) => {
+          setOperationStatus({ success: result.success, message: result.message })
+          if (result.changed) await refreshTree()
+        })
+        .catch((error) => {
+          setOperationStatus({
+            success: false,
+            message: error instanceof Error ? error.message : "删除失败，远端文件未变更。",
+          })
+        })
+        .finally(() => setOperationBusy(false))
       return
     }
+    setOperationStatus(null)
     setInputValue(action === "rename" ? node.name : "")
     setDialogState({ type: action, node })
-  }, [refreshTree])
+  }, [operationBusy, refreshTree])
 
   const handleDialogSubmit = async () => {
-    if (!dialogState || !inputValue.trim()) return
+    if (!dialogState || !inputValue.trim() || operationBusy) return
     const { type, node } = dialogState
+    setOperationBusy(true)
+    setOperationStatus(null)
 
-    if (type === "rename") {
-      const parentPath = node.path.includes("/")
-        ? node.path.substring(0, node.path.lastIndexOf("/"))
-        : ""
-      const newPath = parentPath ? `${parentPath}/${inputValue}` : inputValue
-      try {
-        await wsClient.fileRename(node.path, newPath)
-        await refreshTree()
-      } catch (err) {
-        console.error("重命名失败:", err)
-      }
-    } else {
-      const basePath = node.isDirectory ? node.path : (
-        node.path.includes("/")
+    try {
+      if (type === "rename") {
+        const parentPath = node.path.includes("/")
           ? node.path.substring(0, node.path.lastIndexOf("/"))
           : ""
-      )
-      const newPath = basePath ? `${basePath}/${inputValue}` : inputValue
-      try {
+        const newPath = parentPath ? `${parentPath}/${inputValue.trim()}` : inputValue.trim()
+        const result = await renameServerPathSafely(node.path, newPath, node.isDirectory)
+        setOperationStatus({ success: result.success, message: result.message })
+        if (result.changed) await refreshTree()
+        if (result.success) setDialogState(null)
+      } else {
+        const basePath = node.isDirectory ? node.path : (
+          node.path.includes("/")
+            ? node.path.substring(0, node.path.lastIndexOf("/"))
+            : ""
+        )
+        const newPath = basePath ? `${basePath}/${inputValue.trim()}` : inputValue.trim()
         await wsClient.fileCreate(newPath, type === "newFolder")
         await refreshTree()
-      } catch (err) {
-        console.error("创建失败:", err)
+        setOperationStatus({ success: true, message: type === "newFolder" ? "文件夹已创建。" : "文件已创建。" })
+        setDialogState(null)
       }
+    } catch (error) {
+      setOperationStatus({
+        success: false,
+        message: error instanceof Error ? error.message : "文件操作失败。",
+      })
+    } finally {
+      setOperationBusy(false)
     }
-    setDialogState(null)
   }
 
   const dialogTitle = dialogState?.type === "rename" ? "重命名" : dialogState?.type === "newFile" ? "新建文件" : "新建文件夹"
@@ -173,10 +186,23 @@ export function Sidebar() {
     <aside className="w-64 border-r border-border bg-sidebar-background flex flex-col shrink-0">
       <div className="px-2 py-1 border-b border-border flex items-center justify-between">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground">文件浏览器</h2>
-        <button onClick={refreshTree} className="text-muted-foreground hover:text-foreground p-0.5 hover:bg-[#2a2d2e]" title="刷新">
-          <RefreshCw className="w-3.5 h-3.5" />
+        <button onClick={refreshTree} disabled={operationBusy} className="text-muted-foreground hover:text-foreground p-0.5 hover:bg-[#2a2d2e] disabled:opacity-40" title="刷新">
+          <RefreshCw className={cn("w-3.5 h-3.5", operationBusy && "animate-spin")} />
         </button>
       </div>
+      {operationStatus && (
+        <div
+          role={operationStatus.success ? "status" : "alert"}
+          className={cn(
+            "border-b px-2 py-2 text-[11px] leading-4",
+            operationStatus.success
+              ? "border-emerald-700/50 bg-emerald-950/60 text-emerald-100"
+              : "border-red-700/50 bg-red-950/60 text-red-100",
+          )}
+        >
+          {operationStatus.message}
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto py-1">
         {loading ? (
           <div className="px-3 py-4 text-sm text-muted-foreground">加载中...</div>
@@ -196,14 +222,15 @@ export function Sidebar() {
             <input
               autoFocus
               value={inputValue}
+              disabled={operationBusy}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleDialogSubmit(); if (e.key === "Escape") setDialogState(null) }}
               placeholder={dialogPlaceholder}
               className="w-full px-2 py-1.5 text-[13px] bg-[#3c3c3c] border border-[#3c3c3c] text-[#cccccc] focus:outline-none focus:border-[#007acc]"
             />
             <div className="flex justify-end gap-2 mt-3">
-              <button onClick={() => setDialogState(null)} className="px-3 py-1 text-[13px] text-[#858585] hover:text-[#cccccc]">取消</button>
-              <button onClick={handleDialogSubmit} disabled={!inputValue.trim()} className="px-3 py-1 text-[13px] bg-[#007acc] text-white hover:bg-[#0098ff] disabled:opacity-40">确认</button>
+              <button onClick={() => setDialogState(null)} disabled={operationBusy} className="px-3 py-1 text-[13px] text-[#858585] hover:text-[#cccccc] disabled:opacity-40">取消</button>
+              <button onClick={handleDialogSubmit} disabled={!inputValue.trim() || operationBusy} className="px-3 py-1 text-[13px] bg-[#007acc] text-white hover:bg-[#0098ff] disabled:opacity-40">{operationBusy ? "处理中..." : "确认"}</button>
             </div>
           </div>
         </DialogContent>

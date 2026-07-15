@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { ExperienceData, ExperienceOptions } from "@/types"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { evaluateKether, formatKetherScript } from "@/lib/kether-eval"
 import { ActionsEditor } from "./ActionsEditor"
@@ -19,31 +21,34 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
     rawYamlRef.current = content
   }, [content])
 
+  const parsed = useMemo(() => safeParseYaml<ExperienceData>(content), [content])
   const data = useMemo<ExperienceData>(() => {
-    try {
-      return parseYaml<ExperienceData>(content)
-    } catch {
-      return { Options: { Min: 0, Max: 20, ExperienceOfLevel: 'calc "200*level"' } }
-    }
-  }, [content])
+    const defaults: ExperienceOptions = { Min: 0, Max: 20, ExperienceOfLevel: 'calc "200*level"' }
+    return parsed.ok
+      ? { ...parsed.data, Options: { ...defaults, ...parsed.data.Options } }
+      : { Options: defaults }
+  }, [parsed])
 
   const updateOptions = useCallback((patch: Partial<ExperienceOptions>) => {
     const updated = { ...data, Options: { ...data.Options, ...patch } }
-    try {
-      onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
-    } catch {
-      onChange(stringifyYaml(updated))
-    }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [data, onChange])
 
-  // 格式化经验公式（仅首次挂载时，避免反复格式化导致 dirty）
-  const [formulaValue, setFormulaValue] = useState(() =>
-    formatKetherScript(data.Options?.ExperienceOfLevel ?? "")
-  )
+  const externalFormula = data.Options?.ExperienceOfLevel ?? ""
+  const [formulaValue, setFormulaValue] = useState(() => formatKetherScript(externalFormula))
+  const [previousExternalFormula, setPreviousExternalFormula] = useState(externalFormula)
+  const lastLocalFormulaRef = useRef<string | null>(null)
 
-  const updateFormula = useCallback((v: string) => {
-    setFormulaValue(v)
-    updateOptions({ ExperienceOfLevel: v })
+  if (externalFormula !== previousExternalFormula) {
+    setPreviousExternalFormula(externalFormula)
+    if (lastLocalFormulaRef.current === externalFormula) lastLocalFormulaRef.current = null
+    else setFormulaValue(formatKetherScript(externalFormula))
+  }
+
+  const updateFormula = useCallback((value: string) => {
+    lastLocalFormulaRef.current = value
+    setFormulaValue(value)
+    updateOptions({ ExperienceOfLevel: value })
   }, [updateOptions])
 
   return (
@@ -55,11 +60,15 @@ export function ExperienceEditor({ content, onChange }: ExperienceEditorProps) {
       </TabsList>
 
       <TabsContent value="editor" className="flex-1 overflow-y-auto">
-        <ConfigPanel options={data.Options} onChange={updateOptions} formulaValue={formulaValue} onFormulaChange={updateFormula} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <ConfigPanel options={data.Options} onChange={updateOptions} formulaValue={formulaValue} onFormulaChange={updateFormula} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="curve" className="flex-1 overflow-y-auto">
-        <CurvePreview options={{ ...data.Options, ExperienceOfLevel: formulaValue }} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <CurvePreview options={{ ...data.Options, ExperienceOfLevel: formulaValue }} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">
@@ -102,21 +111,13 @@ function ConfigPanel({ options, onChange, formulaValue, onFormulaChange }: {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">最小等级 (Min)</label>
-            <input
-              type="number"
-              value={options.Min ?? 0}
-              onChange={(e) => onChange({ Min: parseInt(e.target.value) || 0 })}
-              className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md"
-            />
+            <BufferedNumberInput mode="integer" value={options.Min ?? 0} onCommit={(value) => onChange({ Min: value })}
+              className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">最大等级 (Max)</label>
-            <input
-              type="number"
-              value={options.Max ?? 20}
-              onChange={(e) => onChange({ Max: parseInt(e.target.value) || 20 })}
-              className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md"
-            />
+            <BufferedNumberInput mode="integer" value={options.Max ?? 20} onCommit={(value) => onChange({ Max: value })}
+              className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md" />
           </div>
         </div>
         <div className="text-xs text-muted-foreground">

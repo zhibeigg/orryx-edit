@@ -1,5 +1,6 @@
 package com.orryx.editor.release
 
+import com.orryx.editor.protocol.ProtocolLimits
 import com.orryx.editor.protocol.ReleasePluginState
 import com.orryx.editor.protocol.ReleaseRequestData
 import com.orryx.editor.protocol.ReleaseResultData
@@ -149,6 +150,9 @@ class ReleaseTransactionCoordinator(
         val release = repository.findRelease(transaction.releaseId)
             ?: return failClaimed(transaction, workerId, "RELEASE_NOT_FOUND")
         val files = repository.listFiles(release.id)
+        if (files.size > ProtocolLimits.MAX_MANIFEST_FILES) {
+            return failClaimed(transaction, workerId, "RELEASE_FILE_COUNT_EXCEEDED")
+        }
         val totalBytes = files.sumOf(ReleaseFile::size)
         if (totalBytes > maxReleaseBytes) return failClaimed(transaction, workerId, "RELEASE_TOO_LARGE")
         val rawToken = newTransferToken()

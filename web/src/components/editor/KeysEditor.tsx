@@ -1,5 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlPaths, type YamlPathMutation } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
+import { BufferedTextInput } from "./BufferedTextInput"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
@@ -21,39 +24,35 @@ export function KeysEditor({ content, onChange }: KeysEditorProps) {
     rawRef.current = content
   }, [content])
 
-  const data = useMemo(() => {
-    try {
-      const parsed = parseYaml<{ Keys?: Record<string, KeyConfig> }>(content)
-      return parsed.Keys ?? {}
-    } catch { return {} }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<{ Keys?: Record<string, KeyConfig> }>(content), [content])
+  const data = parsed.ok ? (parsed.data.Keys ?? {}) : {}
 
-  const save = useCallback((keys: Record<string, KeyConfig>) => {
-    try { onChange(updateYamlFromObject(rawRef.current, { Keys: keys } as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml({ Keys: keys })) }
+  const mutate = useCallback((mutations: YamlPathMutation[]) => {
+    onChange(updateYamlPaths(rawRef.current, mutations))
   }, [onChange])
 
   const addKey = () => {
     const id = `新按键_${Date.now() % 1000}`
-    save({ ...data, [id]: { sort: Object.keys(data).length + 1 } })
+    mutate([{ type: "set", path: ["Keys", id], value: { sort: Object.keys(data).length + 1 } }])
     setEditingKey(id)
   }
 
-  const removeKey = (id: string) => {
-    const { [id]: _removed, ...rest } = data
-    void _removed
-    save(rest)
-  }
+  const removeKey = (id: string) => mutate([{ type: "delete", path: ["Keys", id] }])
 
-  const renameKey = (oldId: string, newId: string) => {
-    if (!newId.trim() || (newId !== oldId && newId in data)) return
-    const entries = Object.entries(data).map(([k, v]) => [k === oldId ? newId : k, v])
-    save(Object.fromEntries(entries))
+  const renameKey = (oldId: string, newId: string): boolean => {
+    const trimmed = newId.trim()
+    if (!trimmed || (trimmed !== oldId && trimmed in data)) return false
+    mutate([{ type: "rename", path: ["Keys", oldId], newKey: trimmed }])
     setEditingKey(null)
+    return true
   }
 
   const updateKey = (id: string, patch: Partial<KeyConfig>) => {
-    save({ ...data, [id]: { ...data[id], ...patch } })
+    mutate(Object.entries(patch).map(([key, value]) => ({
+      type: "set" as const,
+      path: ["Keys", id, key],
+      value,
+    })))
   }
 
   const sorted = Object.entries(data).sort(([, a], [, b]) => (a.sort ?? 0) - (b.sort ?? 0))
@@ -66,6 +65,7 @@ export function KeysEditor({ content, onChange }: KeysEditorProps) {
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-3 max-w-2xl">
             <div className="flex justify-end">
               <button onClick={addKey} className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded">添加按键</button>
@@ -75,15 +75,13 @@ export function KeysEditor({ content, onChange }: KeysEditorProps) {
               <div key={id} className="flex items-center gap-3 px-3 py-2 bg-muted/50 rounded border border-border group">
                 <span className="text-xs text-muted-foreground w-6 text-center">{cfg.sort}</span>
                 {editingKey === id ? (
-                  <input autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
-                    defaultValue={id}
-                    onBlur={(e) => renameKey(id, e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") renameKey(id, e.currentTarget.value); if (e.key === "Escape") setEditingKey(null) }} />
+                  <BufferedTextInput autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
+                    value={id} onCommit={(value) => renameKey(id, value)} onCancel={() => setEditingKey(null)} />
                 ) : (
                   <span className="flex-1 text-sm font-mono font-semibold cursor-pointer hover:text-primary" onClick={() => setEditingKey(id)}>{id}</span>
                 )}
-                <input type="number" className="w-16 px-2 py-0.5 text-xs bg-secondary border border-border rounded text-center"
-                  value={cfg.sort ?? 0} onChange={(e) => updateKey(id, { sort: parseInt(e.target.value) || 0 })} title="排序" />
+                <BufferedNumberInput mode="integer" className="w-16 px-2 py-0.5 text-xs bg-secondary border border-border rounded text-center"
+                  value={cfg.sort ?? 0} onCommit={(value) => updateKey(id, { sort: value })} title="排序" />
                 {cfg.category !== undefined && (
                   <input className="w-24 px-2 py-0.5 text-xs bg-secondary border border-border rounded"
                     value={cfg.category ?? ""} onChange={(e) => updateKey(id, { category: e.target.value })} placeholder="分类" />
@@ -97,6 +95,7 @@ export function KeysEditor({ content, onChange }: KeysEditorProps) {
             ))}
             {sorted.length === 0 && <div className="text-sm text-muted-foreground py-8 text-center">暂无按键配置</div>}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

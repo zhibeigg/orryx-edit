@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react"
 import type { SkillOptions, SkillType } from "@/types"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { BufferedNumberInput } from "./BufferedNumberInput"
+import { commitVariableValueDraft } from "./editor-input-utils"
+import { useEditorInputFlush } from "@/lib/editor-input-flush"
 
 interface OptionsPanelProps {
   options: SkillOptions
@@ -105,6 +108,33 @@ function Input({ value, onChange, type = "text", placeholder }: {
       className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
     />
   )
+}
+
+function BufferedScalarInput({ value, onCommit, placeholder }: {
+  value: string | number | undefined
+  onCommit: (value: string | number) => void
+  placeholder?: string
+}) {
+  const externalValue = String(value ?? "")
+  const [draft, setDraft] = useState(externalValue)
+  const [previousExternalValue, setPreviousExternalValue] = useState(externalValue)
+
+  if (externalValue !== previousExternalValue) {
+    setPreviousExternalValue(externalValue)
+    setDraft(externalValue)
+  }
+
+  const commit = () => {
+    const next = commitVariableValueDraft(draft)
+    if (next !== value) onCommit(next)
+    return true
+  }
+  useEditorInputFlush(commit)
+
+  return <input value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit}
+    onKeyDown={(event) => { if (event.key === "Enter") { commit(); event.currentTarget.blur() } }}
+    placeholder={placeholder}
+    className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -251,7 +281,7 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
             <Input value={options.Name} onChange={(v) => update({ Name: v })} placeholder="技能名称" />
           </Field>
           <Field label="排序 (Sort)" hint="支持 Kether 表达式">
-            <Input value={options.Sort} onChange={(v) => update({ Sort: isNaN(Number(v)) ? v : Number(v) })} />
+            <BufferedScalarInput value={options.Sort} onCommit={(value) => update({ Sort: value })} />
           </Field>
           <Field label="图标 (Icon)" hint="支持 {{ }} 模板">
             <Input value={options.Icon} onChange={(v) => update({ Icon: v })} />
@@ -270,13 +300,13 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
       <Section title="等级">
         <div className="grid grid-cols-3 gap-3">
           <Field label="最小等级">
-            <Input value={options.MinLevel} onChange={(v) => update({ MinLevel: parseInt(v) || 0 })} type="number" />
+            <BufferedNumberInput mode="integer" value={options.MinLevel ?? 0} onCommit={(value) => update({ MinLevel: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
           </Field>
           <Field label="最大等级">
-            <Input value={options.MaxLevel} onChange={(v) => update({ MaxLevel: parseInt(v) || 1 })} type="number" />
+            <BufferedNumberInput mode="integer" value={options.MaxLevel ?? 1} onCommit={(value) => update({ MaxLevel: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
           </Field>
           <Field label="升级消耗点数" hint="数值或 Kether">
-            <Input value={options.UpgradePointAction} onChange={(v) => update({ UpgradePointAction: isNaN(Number(v)) ? v : Number(v) })} placeholder="1" />
+            <BufferedScalarInput value={options.UpgradePointAction} onCommit={(value) => update({ UpgradePointAction: value })} placeholder="1" />
           </Field>
         </div>
 
@@ -331,18 +361,18 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
         <Section title="指向参数 (AIM)">
           <div className="grid grid-cols-2 gap-3">
             <Field label="指向半径 (AimRadiusAction)">
-              <Input value={options.AimRadiusAction} onChange={(v) => update({ AimRadiusAction: parseFloat(v) || 0 })} type="number" />
+              <BufferedNumberInput value={options.AimRadiusAction ?? 0} onCommit={(value) => update({ AimRadiusAction: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
             </Field>
             <Field label="指向大小 (AimSizeAction)">
-              <Input value={options.AimSizeAction} onChange={(v) => update({ AimSizeAction: parseFloat(v) || 0 })} type="number" />
+              <BufferedNumberInput value={options.AimSizeAction ?? 0} onCommit={(value) => update({ AimSizeAction: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
             </Field>
             {options.Type === "PRESSING AIM" && (
               <>
                 <Field label="初始大小 (AimMinAction)">
-                  <Input value={options.AimMinAction} onChange={(v) => update({ AimMinAction: parseFloat(v) || 0 })} type="number" />
+                  <BufferedNumberInput value={options.AimMinAction ?? 0} onCommit={(value) => update({ AimMinAction: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
                 </Field>
                 <Field label="最大大小 (AimMaxAction)">
-                  <Input value={options.AimMaxAction} onChange={(v) => update({ AimMaxAction: parseFloat(v) || 0 })} type="number" />
+                  <BufferedNumberInput value={options.AimMaxAction ?? 0} onCommit={(value) => update({ AimMaxAction: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
                 </Field>
               </>
             )}
@@ -354,10 +384,10 @@ export function OptionsPanel({ options, onChange }: OptionsPanelProps) {
         <Section title="蓄力参数 (PRESSING)">
           <div className="grid grid-cols-2 gap-3">
             <Field label="蓄力周期 (Period)" hint="tick">
-              <Input value={options.Period} onChange={(v) => update({ Period: parseInt(v) || 0 })} type="number" />
+              <BufferedNumberInput mode="integer" value={options.Period ?? 0} onCommit={(value) => update({ Period: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
             </Field>
             <Field label="最大蓄力 (MaxPressTickAction)" hint="tick">
-              <Input value={options.MaxPressTickAction} onChange={(v) => update({ MaxPressTickAction: parseInt(v) || 0 })} type="number" />
+              <BufferedNumberInput mode="integer" value={options.MaxPressTickAction ?? 0} onCommit={(value) => update({ MaxPressTickAction: value })} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring" />
             </Field>
           </div>
 

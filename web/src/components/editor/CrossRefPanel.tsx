@@ -9,7 +9,7 @@ import {
   type RefGroup,
   type CrossRef,
 } from "@/lib/cross-ref-analyzer"
-import { getConfigType } from "@/types"
+import { openServerFile } from "@/lib/server-file"
 import { cn } from "@/lib/utils"
 
 interface CrossRefPanelProps {
@@ -18,7 +18,6 @@ interface CrossRefPanelProps {
 
 export function CrossRefPanel({ currentFile }: CrossRefPanelProps) {
   const fileContents = useEditorStore((s) => s.fileContents)
-  const openFile = useEditorStore((s) => s.openFile)
 
   const groups = useMemo<RefGroup[]>(() => {
     if (fileContents.size === 0) return []
@@ -42,11 +41,12 @@ export function CrossRefPanel({ currentFile }: CrossRefPanelProps) {
     )
   }
 
-  const handleClickFile = (ref: CrossRef) => {
-    const content = fileContents.get(ref.file)
-    if (!content) return
-    const name = ref.file.split("/").pop() ?? ref.file
-    openFile({ path: ref.file, name, content, configType: getConfigType(ref.file) })
+  const handleClickFile = async (ref: CrossRef) => {
+    try {
+      await openServerFile(ref.file)
+    } catch (error) {
+      console.error("读取交叉引用文件失败:", error)
+    }
   }
 
   // 按类型分组显示

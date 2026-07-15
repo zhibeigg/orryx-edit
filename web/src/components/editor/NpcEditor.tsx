@@ -1,5 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlPaths, type YamlPathMutation } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
+import { BufferedTextInput } from "./BufferedTextInput"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Editor from "@monaco-editor/react"
 
@@ -24,38 +27,36 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
     rawRef.current = content
   }, [content])
 
-  const npcs = useMemo(() => {
-    try { return parseYaml<Record<string, NpcConfig>>(content) }
-    catch { return {} }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<Record<string, NpcConfig>>(content), [content])
+  const npcs = parsed.ok ? parsed.data : {}
 
-  const save = useCallback((data: Record<string, NpcConfig>) => {
-    try { onChange(updateYamlFromObject(rawRef.current, data as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(data)) }
+  const mutate = useCallback((mutations: YamlPathMutation[]) => {
+    onChange(updateYamlPaths(rawRef.current, mutations))
   }, [onChange])
 
   const addNpc = () => {
     const id = `npc_${Date.now() % 10000}`
-    save({ ...npcs, [id]: { name: "新 NPC", system: "你是一个NPC", temperature: 1.0, maxTokens: 64, model: "gpt-4o-mini" } })
+    mutate([{ type: "set", path: [id], value: { name: "新 NPC", system: "你是一个NPC", temperature: 1.0, maxTokens: 64, model: "gpt-4o-mini" } }])
     setEditingId(id)
     setExpandedId(id)
   }
 
-  const removeNpc = (id: string) => {
-    const { [id]: _removed, ...rest } = npcs
-    void _removed
-    save(rest)
-  }
+  const removeNpc = (id: string) => mutate([{ type: "delete", path: [id] }])
 
-  const renameNpc = (oldId: string, newId: string) => {
-    if (!newId.trim() || (newId !== oldId && newId in npcs)) return
-    const entries = Object.entries(npcs).map(([k, v]) => [k === oldId ? newId : k, v])
-    save(Object.fromEntries(entries) as Record<string, NpcConfig>)
+  const renameNpc = (oldId: string, newId: string): boolean => {
+    const trimmed = newId.trim()
+    if (!trimmed || (trimmed !== oldId && trimmed in npcs)) return false
+    mutate([{ type: "rename", path: [oldId], newKey: trimmed }])
     setEditingId(null)
+    return true
   }
 
   const updateNpc = (id: string, patch: Partial<NpcConfig>) => {
-    save({ ...npcs, [id]: { ...npcs[id], ...patch } })
+    mutate(Object.entries(patch).map(([key, value]) => ({
+      type: "set" as const,
+      path: [id, key],
+      value,
+    })))
   }
 
   return (
@@ -66,6 +67,7 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
       </TabsList>
 
       <TabsContent value="visual" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-3 max-w-3xl">
             <div className="flex justify-end">
               <button onClick={addNpc} className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded">添加 NPC</button>
@@ -77,10 +79,9 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
                   onClick={() => setExpandedId(expandedId === id ? null : id)}>
                   <span className="text-xs text-muted-foreground">{expandedId === id ? "▼" : "▶"}</span>
                   {editingId === id ? (
-                    <input autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
-                      defaultValue={id} onClick={(e) => e.stopPropagation()}
-                      onBlur={(e) => renameNpc(id, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") renameNpc(id, e.currentTarget.value); if (e.key === "Escape") setEditingId(null) }} />
+                    <BufferedTextInput autoFocus className="flex-1 bg-secondary border border-border rounded px-2 py-0.5 text-sm font-mono"
+                      value={id} onClick={(event) => event.stopPropagation()}
+                      onCommit={(value) => renameNpc(id, value)} onCancel={() => setEditingId(null)} />
                   ) : (
                     <span className="flex-1 text-sm font-semibold" onDoubleClick={(e) => { e.stopPropagation(); setEditingId(id) }}>{id}</span>
                   )}
@@ -100,12 +101,12 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
                           value={npc.model ?? ""} onChange={(e) => updateNpc(id, { model: e.target.value })} placeholder="gpt-4o-mini" />
                       </Field>
                       <Field label="温度 (temperature)">
-                        <input type="number" step={0.1} min={0} max={2} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
-                          value={npc.temperature ?? 1.0} onChange={(e) => updateNpc(id, { temperature: parseFloat(e.target.value) || 1.0 })} />
+                        <BufferedNumberInput step={0.1} min={0} max={2} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
+                          value={npc.temperature ?? 1.0} onCommit={(value) => updateNpc(id, { temperature: value })} />
                       </Field>
                       <Field label="最大 Tokens">
-                        <input type="number" min={1} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
-                          value={npc.maxTokens ?? 64} onChange={(e) => updateNpc(id, { maxTokens: parseInt(e.target.value) || 64 })} />
+                        <BufferedNumberInput mode="integer" min={1} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded"
+                          value={npc.maxTokens ?? 64} onCommit={(value) => updateNpc(id, { maxTokens: value })} />
                       </Field>
                     </div>
                     <Field label="System Prompt">
@@ -118,6 +119,7 @@ export function NpcEditor({ content, onChange }: NpcEditorProps) {
             ))}
             {Object.keys(npcs).length === 0 && <div className="text-sm text-muted-foreground py-8 text-center">暂无 NPC 配置</div>}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">

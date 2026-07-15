@@ -133,6 +133,8 @@ object ProtocolLimits {
     const val MAX_CAPABILITY_LENGTH = 64
     const val MAX_CAPABILITIES = 64
     const val MAX_CONNECTION_NONCE_LENGTH = 128
+    const val MAX_MANIFEST_ID_LENGTH = 128
+    const val MAX_MANIFEST_FILES = 4_096
 }
 
 data class ProtocolError(val code: String, val message: String)
@@ -188,8 +190,11 @@ object ProtocolContracts {
     private val both = setOf(ProtocolVersion.V1, ProtocolVersion.V2)
     private val v2Only = setOf(ProtocolVersion.V2)
 
-    private fun browserRequest(type: String, response: String? = null) =
-        MessageContract(type, MessageDirection.BROWSER_TO_RELAY, both, response)
+    private fun browserRequest(
+        type: String,
+        response: String? = null,
+        versions: Set<ProtocolVersion> = both
+    ) = MessageContract(type, MessageDirection.BROWSER_TO_RELAY, versions, response)
 
     private fun pluginMessage(type: String, versions: Set<ProtocolVersion> = both) =
         MessageContract(type, MessageDirection.PLUGIN_TO_RELAY, versions)
@@ -213,6 +218,7 @@ object ProtocolContracts {
         browserRequest(MessageTypes.LOG_SUBSCRIBE, MessageTypes.LOG_SUBSCRIBE_RESULT),
         browserRequest(MessageTypes.LOG_UNSUBSCRIBE, MessageTypes.LOG_UNSUBSCRIBE_RESULT),
         browserRequest(MessageTypes.PRESENCE_UPDATE, MessageTypes.PRESENCE_UPDATE_RESULT),
+        browserRequest(MessageTypes.MANIFEST_GET, MessageTypes.MANIFEST_SNAPSHOT, v2Only),
 
         pluginMessage(MessageTypes.SERVER_REGISTER),
         pluginMessage(MessageTypes.TOKEN_REGISTER),
@@ -226,6 +232,7 @@ object ProtocolContracts {
         pluginMessage(MessageTypes.LOG_UNSUBSCRIBE_RESULT),
         pluginMessage(MessageTypes.LOG_ENTRY),
         pluginMessage(MessageTypes.SERVER_INFO),
+        pluginMessage(MessageTypes.MANIFEST_SNAPSHOT, v2Only),
         pluginMessage(MessageTypes.RELEASE_RESULT, v2Only),
         pluginMessage(MessageTypes.ERROR),
         relayToPlugin(MessageTypes.SERVER_REGISTER_RESULT),
@@ -241,6 +248,7 @@ object ProtocolContracts {
         MessageContract(MessageTypes.RELOAD, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.LOG_SUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both),
         MessageContract(MessageTypes.LOG_UNSUBSCRIBE, MessageDirection.RELAY_TO_PLUGIN, both),
+        relayToPlugin(MessageTypes.MANIFEST_GET, v2Only),
         relayToPlugin(MessageTypes.RELEASE_REQUEST, v2Only),
 
         relayToBrowser(MessageTypes.AUTH_RESULT),
@@ -256,6 +264,7 @@ object ProtocolContracts {
         relayToBrowser(MessageTypes.LOG_UNSUBSCRIBE_RESULT),
         relayToBrowser(MessageTypes.LOG_ENTRY),
         relayToBrowser(MessageTypes.SERVER_INFO),
+        relayToBrowser(MessageTypes.MANIFEST_SNAPSHOT, v2Only),
         relayToBrowser(MessageTypes.ERROR)
     )
 
@@ -368,6 +377,7 @@ object MessageTypes {
     const val LOG_SUBSCRIBE = "log.subscribe"
     const val LOG_UNSUBSCRIBE = "log.unsubscribe"
     const val PRESENCE_UPDATE = "presence.update"
+    const val MANIFEST_GET = "manifest.get"
 
     // 插件 → relay 控制消息
     const val SERVER_REGISTER = "server.register"
@@ -393,7 +403,7 @@ object MessageTypes {
     const val SERVER_INFO = "server.info"
     const val ERROR = "error"
 
-    // manifest.snapshot remains reserved; release control is V2 relay↔plugin only.
+    // Manifest and release control routes are V2-only.
     const val MANIFEST_SNAPSHOT = "manifest.snapshot"
     const val RELEASE_REQUEST = "release.request"
     const val RELEASE_RESULT = "release.result"

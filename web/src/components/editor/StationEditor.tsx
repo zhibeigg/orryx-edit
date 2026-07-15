@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import type { StationData, StationOptions } from "@/types"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { getActionsSchema } from "@/lib/kether-language"
@@ -42,15 +44,14 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
     rawYamlRef.current = content
   }, [content])
 
-  const station = useMemo<StationData>(() => {
-    try { return parseYaml<StationData>(content) }
-    catch { return { Options: { Event: "" } } }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<StationData>(content), [content])
+  const station = useMemo<StationData>(() => parsed.ok
+    ? { ...parsed.data, Options: parsed.data.Options ?? { Event: "" } }
+    : { Options: { Event: "" } }, [parsed])
 
   const updateStation = useCallback((updater: (s: StationData) => StationData) => {
     const updated = updater(station)
-    try { onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)) }
-    catch { onChange(stringifyYaml(updated)) }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [station, onChange])
 
   const updateOptions = useCallback((patch: Partial<StationOptions>) => {
@@ -68,17 +69,17 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
       </TabsList>
 
       <TabsContent value="options" className="flex-1 overflow-y-auto">
-        <StationOptionsPanel options={station.Options} onChange={updateOptions} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><StationOptionsPanel options={station.Options} onChange={updateOptions} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="variables" className="flex-1 overflow-y-auto">
-        <VariablesEditor variables={station.Options.Variables ?? {}} onChange={(v) => updateOptions({ Variables: v })} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><VariablesEditor variables={station.Options.Variables ?? {}} onChange={(v) => updateOptions({ Variables: v })} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="actions" className="flex-1 overflow-y-auto">
-        <div className="h-full">
-          <ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" />
-        </div>
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <div className="h-full"><ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" /></div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="refs" className="flex-1 overflow-y-auto">
@@ -181,8 +182,8 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">执行权重</label>
-        <input type="number" className="w-32 bg-muted border border-border rounded px-3 py-1.5 text-sm"
-          value={options.Weight ?? 0} onChange={(e) => onChange({ Weight: parseInt(e.target.value) || 0 })} />
+        <BufferedNumberInput mode="integer" className="w-32 bg-muted border border-border rounded px-3 py-1.5 text-sm"
+          value={options.Weight ?? 0} onCommit={(value) => onChange({ Weight: value })} />
         <p className="text-xs text-muted-foreground mt-1">数字越大越先执行，默认 0</p>
       </div>
       <div>

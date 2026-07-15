@@ -9,8 +9,8 @@ import { SaveConflictDialog } from "@/components/editor/SaveConflictDialog"
 
 const EditorPage = lazy(() => import("@/pages/EditorPage").then((module) => ({ default: module.EditorPage })))
 
-export function AuthenticatedEditor() {
-  useDraftSync()
+export function AuthenticatedEditor({ workspaceId }: { workspaceId: string }) {
+  useDraftSync(workspaceId)
   useKeyboardShortcuts()
   useCrossRefLoader()
   useCollaboration()

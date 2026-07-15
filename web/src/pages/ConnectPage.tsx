@@ -15,7 +15,13 @@ import {
 } from "lucide-react"
 import { BrandMark } from "@/components/BrandMark"
 import { extractAndScrubUrlToken } from "@/lib/connection-credential"
-import { wsClient, WsRequestError, type AuthSession } from "@/lib/ws-client"
+import { resynchronizeOpenFiles } from "@/lib/server-file"
+import {
+  isPermanentAuthenticationError,
+  wsClient,
+  WsRequestError,
+  type AuthSession,
+} from "@/lib/ws-client"
 import { useConnectionStore } from "@/store/connection-store"
 import { useFileStore } from "@/store/file-store"
 import { apiFetch } from "@/lib/api-client"
@@ -28,7 +34,7 @@ function connectionFailureMessage(cause: unknown): string {
       return "这条连接链接已过期或已经使用。请回到游戏重新执行 /orryx edit。"
     }
     if (cause.code === "SERVER_OFFLINE") {
-      return "游戏服务器已经离线，无法打开对应工作区。请确认插件在线后重新执行 /orryx edit。"
+      return "游戏服务器已经离线，无法打开对应工作区。请确认插件在线后刷新页面，或重新执行 /orryx edit。"
     }
     if (cause.code === "LICENSE_INACTIVE") {
       return "服务器授权当前不可用。请在 Portal 检查 License 状态后重新生成链接。"
@@ -54,33 +60,52 @@ export function ConnectPage() {
   const [unbindStatus, setUnbindStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null)
   const [unbinding, setUnbinding] = useState(false)
 
-  const loadWorkspace = useCallback(async () => {
+  const loadWorkspace = useCallback(async (workspaceId: string) => {
     setLoading(true)
     try {
       const fileResult = await wsClient.fileList()
-      setFileTree(fileResult.files)
+      if (useConnectionStore.getState().workspaceId === workspaceId) {
+        setFileTree(fileResult.files)
+      }
     } finally {
-      setLoading(false)
+      if (useConnectionStore.getState().workspaceId === workspaceId) {
+        setLoading(false)
+      }
     }
   }, [setFileTree, setLoading])
 
-  const applySession = useCallback((session: AuthSession) => {
-    setAuthenticated(true, session)
+  const applySession = useCallback(async (session: AuthSession): Promise<string> => {
+    if (!await setAuthenticated(true, session)) {
+      throw new Error(useConnectionStore.getState().error ?? "无法安全切换编辑工作区")
+    }
+    const workspaceId = useConnectionStore.getState().workspaceId
+    if (!workspaceId) throw new Error("认证响应缺少 workspaceId")
+    return workspaceId
   }, [setAuthenticated])
 
   const configureClient = useCallback(() => {
     wsClient.setStatusChangeHandler(setConnected)
     wsClient.setReconnectedHandler((session) => {
-      applySession(session)
-      void loadWorkspace()
+      void applySession(session)
+        .then(async (workspaceId) => {
+          await resynchronizeOpenFiles(workspaceId)
+          await loadWorkspace(workspaceId)
+        })
+        .catch((reconnectError) => setError(connectionFailureMessage(reconnectError)))
     })
-    wsClient.setReconnectFailedHandler(() => {
-      useConnectionStore.getState().setReconnecting(false)
-      setError("恢复连接失败。请刷新页面，或回到游戏重新执行 /orryx edit。")
+    wsClient.setReconnectFailedHandler((reconnectError) => {
+      void setAuthenticated(false).then((cleared) => {
+        setError(cleared
+          ? `恢复连接失败：${reconnectError.message}。请刷新页面，或回到游戏重新执行 /orryx edit。`
+          : `恢复连接失败，且草稿持久化失败；当前工作区已保留：${reconnectError.message}`)
+      })
     })
     wsClient.setAuthenticationLostHandler((authError) => {
-      setAuthenticated(false)
-      setError(`编辑会话已失效：${authError.message}`)
+      void setAuthenticated(false).then((cleared) => {
+        setError(cleared
+          ? `编辑会话已失效：${authError.message}`
+          : `编辑会话已失效，且草稿持久化失败；当前工作区已保留：${authError.message}`)
+      })
     })
   }, [applySession, loadWorkspace, setAuthenticated, setConnected, setError])
 
@@ -97,9 +122,10 @@ export function ConnectPage() {
     try {
       await connectSocket()
       const session = await wsClient.auth(token)
+      const workspaceId = await applySession(session)
       setPhase("loading")
-      await loadWorkspace()
-      applySession(session)
+      await resynchronizeOpenFiles(workspaceId)
+      await loadWorkspace(workspaceId)
     } catch (connectError) {
       wsClient.disconnect(false)
       setError(connectionFailureMessage(connectError))
@@ -113,17 +139,21 @@ export function ConnectPage() {
     try {
       await connectSocket()
       const session = await wsClient.resume()
+      const workspaceId = await applySession(session)
       setPhase("loading")
-      await loadWorkspace()
-      applySession(session)
-    } catch {
-      wsClient.clearResumeSession()
+      await resynchronizeOpenFiles(workspaceId)
+      await loadWorkspace(workspaceId)
+    } catch (resumeError) {
       wsClient.disconnect(false)
-      setAuthenticated(false)
-      setResumeExpired(true)
-      setPhase("idle")
+      if (isPermanentAuthenticationError(resumeError)) {
+        setResumeExpired(true)
+        setPhase("idle")
+        return
+      }
+      setError(connectionFailureMessage(resumeError))
+      setPhase("error")
     }
-  }, [applySession, connectSocket, loadWorkspace, setAuthenticated, setError])
+  }, [applySession, connectSocket, loadWorkspace, setError])
 
   useEffect(() => {
     if (autoConnectTriggered.current) return
@@ -185,6 +215,7 @@ export function ConnectPage() {
         {phase === "idle" && (
           <div className="connect-state connect-state--idle">
             {resumeExpired && <p className="status-message" role="status">上次编辑会话已经失效，请生成新的连接链接。</p>}
+            {!resumeExpired && error && <p className="status-message status-message--error" role="alert">{error}</p>}
             <div className="connect-command">
               <span>IN-GAME COMMAND</span>
               <code>/orryx edit</code>

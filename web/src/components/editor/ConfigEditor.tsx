@@ -1,5 +1,9 @@
 import { useMemo, useCallback, useRef, useEffect } from "react"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
+import { BufferedNumberInput } from "./BufferedNumberInput"
+import { BufferedListInput } from "./BufferedListInput"
+import { parseLineListDraft } from "./editor-input-utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
@@ -16,15 +20,12 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
     rawRef.current = content
   }, [content])
 
-  const config = useMemo(() => {
-    try { return parseYaml<Record<string, unknown>>(content) }
-    catch { return {} }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<Record<string, unknown>>(content), [content])
+  const config = useMemo<Record<string, unknown>>(() => parsed.ok ? parsed.data : {}, [parsed])
 
   const save = useCallback((patch: Record<string, unknown>) => {
     const merged = { ...config, ...patch }
-    try { onChange(updateYamlFromObject(rawRef.current, merged)) }
-    catch { onChange(stringifyYaml(merged)) }
+    onChange(updateYamlFromObject(rawRef.current, merged))
   }, [config, onChange])
 
   const db = (config.Database ?? {}) as Record<string, unknown>
@@ -44,6 +45,7 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
       </TabsList>
 
       <TabsContent value="general" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-5 max-w-2xl">
             <Section title="基础设置">
               <div className="grid grid-cols-2 gap-3">
@@ -69,10 +71,9 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
             </Section>
 
             <Section title="技能组">
-              <textarea className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md font-mono h-20 resize-y"
-                value={((config.Group as string[]) ?? []).join("\n")}
-                onChange={(e) => save({ Group: e.target.value.split("\n").filter(Boolean) })}
-                placeholder="每行一个技能组类型" />
+              <BufferedListInput multiline className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded-md font-mono h-20 resize-y"
+                value={(config.Group as string[]) ?? []} join={(value) => value.join("\n")} parse={parseLineListDraft}
+                onCommit={(Group) => save({ Group })} placeholder="每行一个技能组类型" />
             </Section>
 
             <Section title="描述分隔符">
@@ -99,9 +100,11 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               </Select>
             </Section>
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="database" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-4 max-w-2xl">
             <Section title="数据库类型">
               <Select value={(db.use as string) ?? "SQLLITE"} onValueChange={(v) => save({ Database: { ...db, use: v } })}>
@@ -130,9 +133,11 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               </Section>
             )}
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="integration" className="flex-1 overflow-y-auto">
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
           <div className="p-4 space-y-5 max-w-2xl">
             <Section title="飞书文档 (LarkSuite)">
               <div className="grid grid-cols-2 gap-3">
@@ -154,6 +159,7 @@ export function ConfigEditor({ content, onChange }: ConfigEditorProps) {
               <Field label="License"><StrInput value={editor.License as string} onChange={(v) => save({ Editor: { ...editor, License: v } })} /></Field>
             </Section>
           </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="yaml" className="flex-1 overflow-y-auto">
@@ -176,7 +182,7 @@ function StrInput({ value, onChange, placeholder, type = "text" }: { value?: str
   return <input type={type} className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded" value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
 }
 function NumInput({ value, onChange }: { value?: number; onChange: (v: number) => void }) {
-  return <input type="number" className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded" value={value ?? 0} onChange={(e) => onChange(parseInt(e.target.value) || 0)} />
+  return <BufferedNumberInput mode="integer" className="w-full px-3 py-1.5 text-sm bg-secondary border border-border rounded" value={value ?? 0} onCommit={onChange} />
 }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return <label className="flex items-center gap-2 text-[13px] cursor-pointer"><Switch checked={checked} onCheckedChange={onChange} />{label}</label>

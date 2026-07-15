@@ -1,4 +1,4 @@
-# Orryx Editor 插件端协议（0.10.13）
+# Orryx Editor 插件端协议（0.10.14）
 
 插件通过 `wss://<editor-host>/ws/server` 连接中心服务。插件端文件 I/O 必须异步执行；Bukkit 状态修改和模块重载必须切回 Bukkit 主线程。
 
@@ -16,7 +16,7 @@
 - `id` 最长 128 字符。
 - 单帧最大 1 MiB。
 - 文件路径必须为相对路径，不允许空段、`.`、`..` 或控制字符。
-- 错误统一返回 `type=error`，`data={code,message}`。
+- Relay 自身错误返回 `type=error`。插件关联错误只会向浏览器暴露安全白名单字段 `code/path/currentRevision/requestType`；未知插件 code 统一降级为 `PLUGIN_ERROR`，插件的 `message` 与其他字段不会透传。
 - Relay 对浏览器/插件角色、消息方向及 V1/V2 消息类型使用硬 allowlist。未知类型返回 `UNKNOWN_MESSAGE_TYPE`，方向错误返回 `MESSAGE_DIRECTION_NOT_ALLOWED`，消息不会继续转发。
 - 机器可读的方向、revision 字段与能力合同位于 `schemas/editor-relay-contract-v2.json`；插件包内携带同名资源，双方测试会拒绝 allowlist 漂移。
 - 浏览器请求具有固定 expected response type；插件返回错误响应类型时，插件与对应浏览器请求都会收到 `UNEXPECTED_RESPONSE_TYPE`，不会静默等待超时。
@@ -27,9 +27,9 @@
 - 新插件可声明 `protocolVersions: ["v1", "v2"]` 与 `preferredProtocol`。服务端返回唯一的 `negotiatedProtocol`。
 - `v2` revision 必须是 64 位小写 SHA-256 字符串；它与 V1 Long revision 状态完全隔离，relay 不递增、不替换插件返回的 SHA。
 - 同一 workspace 同时只有一个 authoritative plugin session。每次成功注册产生新的 `sessionEpoch`；旧连接继续发消息会稳定收到 `STALE_PLUGIN_SESSION`。
-- 协议 V2 默认不参与协商，确保现有 V1 前端与插件写入流程不受灰度代码影响。设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 后才可协商 V2。
-- V2 的文件写入、创建、删除、重命名与 Reload 默认全部关闭；只有同时设置 `EDITOR_PROTOCOL_V2_ENABLED=true` 和 `EDITOR_V2_WRITES_ENABLED=true` 后才会转发。
-- `manifest.snapshot` 仍为保留消息；`release.request` 与 `release.result` 已正式启用，但只允许 V2 relay↔plugin 方向，浏览器 WebSocket 永远不能直接发起发布。
+- 协议 V2 默认不参与协商，确保现有 V1 前端与插件写入流程不受灰度代码影响。V2 编辑会话只有在 relay 同时启用 `EDITOR_PROTOCOL_V2_ENABLED=true`、`EDITOR_V2_WRITES_ENABLED=true`，且插件声明 `revision.sha256`、`file.write.v2`、`mutation.preconditions` 时才会协商成功。
+- 若 V2 写路径未启用或插件缺少上述任一写入能力，双方同时支持 V1 时 relay 必须明确协商 V1，继续提供可保存的实时编辑；不得建立只读 V2 编辑会话。
+- `manifest.get`（browser→relay→plugin）与 `manifest.snapshot`（plugin→relay→browser）已正式启用，但只允许 V2 且必须使用关联 relay ID；V1 不路由。`release.request` 与 `release.result` 同样只允许 V2 relay↔plugin 方向，浏览器 WebSocket 永远不能直接发起发布。
 - 发布事务由已登录账户通过 `/api/v2/releases` 显式创建；插件只执行签名验证、staging、备份、激活、Readiness 与回滚。
 
 ## 1. 注册服务器
@@ -48,6 +48,7 @@
     "capabilities": [
       "protocol.allowlist",
       "revision.sha256",
+      "file.write.v2",
       "mutation.preconditions",
       "release.transaction.v1",
       "release.signature.ed25519",
@@ -81,6 +82,7 @@
       "protocol.allowlist",
       "session.epoch",
       "revision.sha256",
+      "file.write.v2",
       "release.control.v1"
     ],
     "connectionNonce": "random-connection-nonce"
@@ -89,6 +91,8 @@
 ```
 
 中心服务使用 `SHA-256(serverKey + NUL + serverId)` 生成 workspace。同 License 的不同 `serverId` 不共享请求、文件事件、日志或浏览器会话。
+
+V2 编辑会话的 `relayCapabilities` 必须同时包含 `revision.sha256` 与 `file.write.v2`，两者缺一时插件必须拒绝该 V2 结果并进行一次受控 V1 fallback。`release.control.v1` 与编辑写入能力独立，仅在发布事务启用时可选出现；插件缺少发布能力不会阻止注册或实时编辑，只会在具体发布分发时被拒绝。
 
 ## 2. 注册一次性编辑 Token
 
@@ -137,7 +141,7 @@ https://editor.example.com/connect#token=<token>
 |---|---|---|
 | revision 类型 | JSON Long | 64 位小写 SHA-256 字符串 |
 | revision 来源 | relay workspace/path 计数器 | 插件文件内容/状态 |
-| 写入转发字段 | `baseRevision` | 浏览器 `baseRevision` 映射为插件 `expectedRevision` |
+| 写入转发字段 | Relay 完成 Long CAS 后移除 revision 字段 | 浏览器 `baseRevision` 映射为插件 `expectedRevision` |
 | 成功写入 | relay 自增并覆盖响应 revision | relay 原样保留插件 revision，不自增、不覆盖 |
 | `file.changed` | relay 填入 Long | 必须携带并保留插件 SHA revision |
 
@@ -203,7 +207,7 @@ V1 插件可省略 `revision`，中心服务会向浏览器响应补充 Long rev
 
 启用 Phase 0 V2 写路径后，relay 转发给插件时删除 `baseRevision` 并写入同值的 `expectedRevision`。relay 不在 V2 执行 SHA 冲突比较；插件负责原子校验 `expectedRevision` 并返回新 SHA revision。
 
-V1 中心服务仅在 Long revision 匹配后转发给插件。冲突时插件不会收到请求，浏览器收到：
+V1 中心服务仅在 Long revision 匹配后转发给插件，并在转发前移除 `baseRevision`/`expectedRevision`；插件不参与 V1 revision 校验。冲突时插件不会收到请求，浏览器收到：
 
 ```json
 {
@@ -248,7 +252,45 @@ file.delete {path}             -> file.written
 file.rename {oldPath,newPath}  -> file.written
 ```
 
-## 5. Presence 与广播
+## 5. V2 Manifest 快照
+
+浏览器读取当前完整 Manifest：
+
+```json
+{"type":"manifest.get","id":"browser-id","data":{}}
+```
+
+Relay 生成新的关联 ID 并原样转发给 V2 插件。插件返回：
+
+```json
+{
+  "type": "manifest.snapshot",
+  "id": "relay-id",
+  "data": {
+    "manifestId": "current",
+    "revision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "files": [
+      {
+        "path": "skills/example.yml",
+        "revision": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        "size": 1234
+      }
+    ],
+    "createdAt": 1710000000000
+  }
+}
+```
+
+约束：
+
+- `manifest.get` / `manifest.snapshot` 仅 V2 可路由，V1 收到 `MESSAGE_NOT_SUPPORTED`。
+- `manifestId` 非空、最长 128 字符；Manifest 与文件 revision 均为 64 位小写 SHA-256。
+- 文件路径按 Relay 相对路径规则校验和归一化；归一化后按不区分大小写比较不得重复。
+- `size` 可省略；存在时必须为非负 Long。`createdAt` 存在时也必须为非负 Long。
+- 单个快照最多 4096 个文件，并继续受 1 MiB WebSocket 帧限制。
+- Relay 只向浏览器发送上述合同字段，插件附带的未知字段会被丢弃；无效快照会以 `INVALID_MANIFEST` 同时终止浏览器关联请求并通知插件。
+
+## 6. Presence 与广播
 
 `presence.update` 在中心服务内部处理，不会转发给插件。浏览器收到：
 
@@ -278,7 +320,7 @@ file.rename {oldPath,newPath}  -> file.written
 
 其他带 ID 的插件响应必须匹配有效 relay 请求，否则会被丢弃。
 
-## 6. 重载与线程要求
+## 7. 重载与线程要求
 
 ```json
 {"type":"reload","id":"relay-id","data":{"module":"all"}}
@@ -298,7 +340,7 @@ file.rename {oldPath,newPath}  -> file.written
 
 禁止从异步回调直接调用 Bukkit 主线程敏感 API。应使用 Bukkit Scheduler 切回主线程。
 
-## 7. V2 签名发布事务
+## 8. V2 签名发布事务
 
 发布控制消息只允许协商为 V2、声明完整发布能力且绑定当前 `serverInstanceId` 的权威插件会话。
 
@@ -315,8 +357,8 @@ Relay 发送 `release.request`，`data.action=prepare`。请求包含：
 插件必须：
 
 1. 读取当前 allowlist Manifest 并核对 expected revision。
-2. 通过精确 HTTPS URL 下载完整目标 operations 与文件；显式允许时仅接受 localhost HTTP。
-3. 校验路径、大小写、符号链接、文件大小、SHA-256、总字节和目标 Manifest。
+2. 通过精确 HTTPS URL 下载完整目标 operations 与文件；显式允许时仅接受 localhost HTTP。operations 是完整目标快照而不是增量差异，未修改但仍属于目标 Manifest 的文件也必须出现。
+3. 校验路径、大小写、符号链接、文件大小、SHA-256、总字节、文件数量和目标 Manifest；不得把 operations 中未出现的旧文件隐式保留进目标快照。
 4. 按冻结 canonical 二进制格式重建 payload，并使用本机 `Editor.Release.TrustedKeys` 中的公钥验签。
 5. 将完整目标写入 `.editor/releases/transactions/<transactionId>/stage`，持久化 journal 后返回 `PREPARED`。
 
@@ -365,7 +407,7 @@ Readiness、文件下载和 journal I/O 不得阻塞 Bukkit 主线程。
 
 机器可读方向、能力和状态列表以 `schemas/editor-relay-contract-v2.json` 为准。
 
-## 8. 稳定错误码
+## 9. 稳定错误码
 
 常见错误：
 
@@ -393,8 +435,11 @@ INVALID_RESUME_TOKEN
 SERVER_OFFLINE
 INVALID_PATH
 MISSING_BASE_REVISION
+INVALID_REVISION_FIELD
 INVALID_REVISION
 REVISION_CONFLICT
+INVALID_MANIFEST_REQUEST
+INVALID_MANIFEST
 FEATURE_DISABLED
 RELEASE_DISABLED
 RELEASE_REQUIRES_V2

@@ -138,17 +138,23 @@ class RelayHandler(
             sendResumeFailure(browserSession, msg.id, resultType, "INVALID_RESUME_TOKEN", "Resume token 无效或已过期")
             return
         }
-        val record = sessionStore.consume(RelaySecrets.sha256(resumeToken))
-        if (record == null || record.expiresAt < System.currentTimeMillis()) {
+        val tokenHash = RelaySecrets.sha256(resumeToken)
+        val record = sessionStore.lookup(tokenHash)
+        if (record == null || record.expiresAt <= System.currentTimeMillis()) {
             sendResumeFailure(browserSession, msg.id, resultType, "INVALID_RESUME_TOKEN", "Resume token 无效或已过期")
             return
         }
         val server = registry.getServerForResume(record.workspaceId, record.serverId)
-        if (server == null || server.licenseKey != record.licenseKey) {
+        if (server == null || server.licenseKey != record.licenseKey || server.serverKey != record.serverKey) {
             sendResumeFailure(browserSession, msg.id, resultType, "SERVER_OFFLINE", "游戏服务器已断开连接")
             return
         }
-        val binding = registry.bindBrowser(browserSession, record.browserId, record.playerName, server)
+        val consumed = sessionStore.consume(tokenHash)
+        if (consumed == null || consumed != record) {
+            sendResumeFailure(browserSession, msg.id, resultType, "INVALID_RESUME_TOKEN", "Resume token 无效或已过期")
+            return
+        }
+        val binding = registry.bindBrowser(browserSession, consumed.browserId, consumed.playerName, server)
         val rotatedToken = issueResumeToken(binding, server)
         browserSession.sendText(WsResponse.build(
             resultType,
@@ -226,12 +232,20 @@ class RelayHandler(
             browserSession.sendText(WsResponse.error(msg.id, "MISSING_RESPONSE_CONTRACT", "消息缺少响应契约"))
             return
         }
+        if (binding.suspended) {
+            browserSession.sendText(WsResponse.error(msg.id, "SERVER_OFFLINE", "游戏服务器已断开连接"))
+            return
+        }
         if (binding.protocolVersion == ProtocolVersion.V2 && isMutation(msg.type) && !features.v2WritesEnabled) {
             browserSession.sendText(WsResponse.error(msg.id, "FEATURE_DISABLED", "V2 变更路径尚未启用"))
             return
         }
 
         val data = msg.data.jsonObject
+        if (msg.type == MessageTypes.MANIFEST_GET && data.isNotEmpty()) {
+            browserSession.sendText(WsResponse.error(msg.id, "INVALID_MANIFEST_REQUEST", "manifest.get data 必须为空对象"))
+            return
+        }
         val rawPath = data["path"]?.jsonPrimitive?.contentOrNull
         val path = when {
             requiresPath(msg.type) -> RelayValidation.path(rawPath.orEmpty()) ?: run {
@@ -271,9 +285,15 @@ class RelayHandler(
                         browserSession.sendText(WsResponse.error(msg.id, "MISSING_BASE_REVISION", "file.write 需要 Long baseRevision"))
                         return
                     }
-                    normalizedData = JsonObject(normalizedData - "expectedRevision")
+                    normalizedData = JsonObject(normalizedData - "baseRevision" - "expectedRevision")
                 }
                 ProtocolVersion.V2 -> {
+                    if (data["expectedRevision"] != null) {
+                        browserSession.sendText(
+                            WsResponse.error(msg.id, "INVALID_REVISION_FIELD", "浏览器 V2 file.write 只能发送 baseRevision")
+                        )
+                        return
+                    }
                     val rawBaseRevision = data["baseRevision"]?.jsonPrimitive?.contentOrNull
                     val baseRevision = rawBaseRevision?.let(RelayValidation::sha256Revision)
                     if (rawBaseRevision != null && baseRevision == null) {
@@ -304,6 +324,9 @@ class RelayHandler(
             force = force
         )) {
             RequestReservation.BrowserNotBound -> {
+                browserSession.sendText(WsResponse.error(msg.id, "SERVER_OFFLINE", "游戏服务器已断开连接"))
+            }
+            RequestReservation.ServerOffline -> {
                 browserSession.sendText(WsResponse.error(msg.id, "SERVER_OFFLINE", "游戏服务器已断开连接"))
             }
             is RequestReservation.Conflict -> {

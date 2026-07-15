@@ -1,8 +1,9 @@
 import { useEditorStore, type OpenFile } from "@/store/editor-store"
 import { useConnectionStore } from "@/store/connection-store"
-import { wsClient } from "@/lib/ws-client"
-import { deleteDraft } from "@/lib/draft-storage"
+import { deleteDraftSnapshotIfUnchanged } from "@/lib/draft-consistency"
 import { saveEditorFile } from "@/lib/file-save"
+import { flushEditorInputs } from "@/lib/editor-input-flush"
+import { wsClient } from "@/lib/ws-client"
 import { useState } from "react"
 import { Upload, RotateCcw, Check, AlertCircle, Eye, Undo2 } from "lucide-react"
 import { DiffView } from "@/components/editor/DiffView"
@@ -10,19 +11,23 @@ import { DiffView } from "@/components/editor/DiffView"
 export function PublishPanel() {
   const { openFiles, updateDraft } = useEditorStore()
   const connected = useConnectionStore((s) => s.connected)
+  const serverOnline = useConnectionStore((s) => s.serverOnline)
+  const serverAvailable = connected && serverOnline
   const dirtyFiles = openFiles.filter((f) => f.dirty)
   const [publishing, setPublishing] = useState(false)
   const [results, setResults] = useState<{ path: string; success: boolean; message?: string }[]>([])
   const [diffFile, setDiffFile] = useState<OpenFile | null>(null)
 
   const handlePublish = async (paths: string[], reload = false) => {
+    if (!flushEditorInputs()) return
     setPublishing(true)
     setResults([])
     const newResults: typeof results = []
+    const snapshots = useEditorStore.getState().openFiles
 
     for (const path of paths) {
-      const file = openFiles.find((f) => f.path === path)
-      if (!file?.draft) continue
+      const file = snapshots.find((candidate) => candidate.path === path)
+      if (file?.draft == null) continue
 
       try {
         const success = await saveEditorFile(file, file.draft)
@@ -47,9 +52,10 @@ export function PublishPanel() {
   const handleRevert = (path: string) => {
     if (!confirm("确定撤销此文件的所有修改？")) return
     const file = openFiles.find((f) => f.path === path)
-    if (file) {
+    if (file?.draft != null) {
+      const discardedDraft = file.draft
       updateDraft(path, file.content)
-      deleteDraft(path)
+      void deleteDraftSnapshotIfUnchanged(file.workspaceId, path, discardedDraft)
     }
   }
 
@@ -107,14 +113,14 @@ export function PublishPanel() {
         ))}
       </div>
 
-      {!connected && (
-        <p className="text-xs text-yellow-500">当前处于离线状态，草稿已自动保存到本地。重新连接后可发布。</p>
+      {!serverAvailable && (
+        <p className="text-xs text-yellow-500">当前服务器离线，草稿与认证均已保留。插件重新连接并完成文件同步后可发布。</p>
       )}
 
       <div className="flex gap-2">
         <button
           onClick={() => handlePublish(dirtyFiles.map((f) => f.path), false)}
-          disabled={publishing || !connected}
+          disabled={publishing || !serverAvailable}
           className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
         >
           <Upload className="w-4 h-4" />
@@ -122,7 +128,7 @@ export function PublishPanel() {
         </button>
         <button
           onClick={() => handlePublish(dirtyFiles.map((f) => f.path), true)}
-          disabled={publishing || !connected}
+          disabled={publishing || !serverAvailable}
           className="flex items-center gap-1.5 px-4 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
         >
           <RotateCcw className="w-4 h-4" />

@@ -54,6 +54,12 @@ internal object RelayValidation {
 
     fun sha256Revision(value: String): String? = value.takeIf(sha256Pattern::matches)
 
+    fun manifestId(value: String): String? = value.takeIf {
+        it.isNotEmpty() &&
+            it.length <= ProtocolLimits.MAX_MANIFEST_ID_LENGTH &&
+            it.none(Char::isISOControl)
+    }
+
     fun path(value: String): String? {
         if (value.isEmpty() || value.length > ProtocolLimits.MAX_PATH_LENGTH || value.any(Char::isISOControl)) return null
         val normalized = value.replace('\\', '/').removePrefix("/")

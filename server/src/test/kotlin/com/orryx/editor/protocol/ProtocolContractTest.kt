@@ -1,5 +1,8 @@
 package com.orryx.editor.protocol
 
+import com.orryx.editor.relay.PluginRelayErrorContract
+import com.orryx.editor.relay.RelayCapabilities
+import com.orryx.editor.relay.V2EditorPluginCapabilities
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -47,6 +50,27 @@ class ProtocolContractTest {
         assertEquals(ProtocolVersion.V1, ProtocolVersion.parse("V1"))
         assertEquals(ProtocolVersion.V2, ProtocolVersion.parse("v2"))
         assertEquals(null, ProtocolVersion.parse("v3"))
+    }
+
+    @Test
+    fun `manifest snapshot round trip is v2 only`() {
+        listOf(
+            Triple(MessageTypes.MANIFEST_GET, ProtocolRole.BROWSER, MessageDirection.BROWSER_TO_RELAY),
+            Triple(MessageTypes.MANIFEST_GET, ProtocolRole.RELAY, MessageDirection.RELAY_TO_PLUGIN),
+            Triple(MessageTypes.MANIFEST_SNAPSHOT, ProtocolRole.PLUGIN, MessageDirection.PLUGIN_TO_RELAY),
+            Triple(MessageTypes.MANIFEST_SNAPSHOT, ProtocolRole.RELAY, MessageDirection.RELAY_TO_BROWSER),
+        ).forEach { (type, role, direction) ->
+            assertIs<ContractValidationResult.Allowed>(
+                ProtocolContracts.validate(type, role, direction, ProtocolVersion.V2)
+            )
+            val v1 = ProtocolContracts.validate(type, role, direction, ProtocolVersion.V1)
+            assertEquals("MESSAGE_NOT_SUPPORTED", assertIs<ContractValidationResult.Rejected>(v1).error.code)
+        }
+        assertEquals(
+            MessageTypes.MANIFEST_SNAPSHOT,
+            ProtocolContracts.expectedResponseType(MessageTypes.MANIFEST_GET, ProtocolVersion.V2)
+        )
+        assertEquals(null, ProtocolContracts.expectedResponseType(MessageTypes.MANIFEST_GET, ProtocolVersion.V1))
     }
 
     @Test
@@ -98,7 +122,12 @@ class ProtocolContractTest {
         ProtocolVersion.entries.forEach { version ->
             expected.forEach { (direction, types) ->
                 val versionTypes = if (version == ProtocolVersion.V1) {
-                    types - setOf(MessageTypes.RELEASE_REQUEST, MessageTypes.RELEASE_RESULT)
+                    types - setOf(
+                        MessageTypes.MANIFEST_GET,
+                        MessageTypes.MANIFEST_SNAPSHOT,
+                        MessageTypes.RELEASE_REQUEST,
+                        MessageTypes.RELEASE_RESULT,
+                    )
                 } else {
                     types
                 }
@@ -109,9 +138,83 @@ class ProtocolContractTest {
         val reserved = (manifest.getValue("reservedUnroutedTypes") as JsonArray)
             .mapNotNull { it.jsonPrimitive.contentOrNull }
             .toSet()
+        assertTrue(reserved.isEmpty())
         assertTrue(reserved.intersect(routedTypes).isEmpty())
         assertEquals(setOf("v1", "v2"), manifest.stringSet("protocolVersions"))
-        Json.parseToJsonElement(Files.readString(Path.of("..", "schemas", "editor-protocol-v2.schema.json")))
+        val v2 = manifest.getValue("v2").jsonObject
+        val manifestContract = v2.getValue("manifest").jsonObject
+        assertEquals(
+            ProtocolLimits.MAX_MANIFEST_FILES.toString(),
+            manifestContract.getValue("maxFiles").jsonPrimitive.contentOrNull
+        )
+        val pluginError = v2.getValue("pluginError").jsonObject
+        assertEquals(PluginRelayErrorContract.forwardedFields, pluginError.stringSet("forwardedFields"))
+        assertEquals(PluginRelayErrorContract.safeCodes, pluginError.stringSet("safeCodes"))
+        assertTrue(
+            PluginRelayErrorContract.safeCodes.containsAll(
+                setOf(
+                    "FILE_POLICY_VIOLATION",
+                    "PRECONDITION_FAILED",
+                    "CASE_CONFLICT",
+                    "MUTATION_GATE_ACTIVE",
+                    "REQUEST_QUEUE_FULL",
+                    "REVISION_FIELDS_MISMATCH",
+                    "REVISION_REQUIRED",
+                    "READINESS_FAILED",
+                    "ROLLBACK_FAILED",
+                    "ROLLBACK_RELOAD_FAILED",
+                    "ROLLBACK_MANIFEST_MISMATCH",
+                    "RECOVERY_AMBIGUOUS",
+                )
+            )
+        )
+        assertEquals(
+            PluginRelayErrorContract.FALLBACK_CODE,
+            pluginError.getValue("fallbackCode").jsonPrimitive.contentOrNull
+        )
+        val requiredV2PluginCapabilities = v2.stringSet("requiredPluginCapabilities")
+        val requiredMutationCapabilities = v2.stringSet("requiredMutationCapabilities")
+        assertEquals(
+            setOf(RelayCapabilities.REVISION_SHA256, RelayCapabilities.FILE_WRITE_V2),
+            requiredV2PluginCapabilities
+        )
+        assertEquals(setOf("mutation.preconditions"), requiredMutationCapabilities)
+        assertEquals(
+            requiredV2PluginCapabilities + requiredMutationCapabilities,
+            V2EditorPluginCapabilities.required
+        )
+        assertEquals(
+            RelayCapabilities.REVISION_SHA256,
+            v2.getValue("relayRevisionCapability").jsonPrimitive.contentOrNull
+        )
+        assertEquals(
+            RelayCapabilities.FILE_WRITE_V2,
+            v2.getValue("relayWriteCapability").jsonPrimitive.contentOrNull
+        )
+        assertEquals(
+            RelayCapabilities.RELEASE_CONTROL_V1,
+            v2.getValue("relayReleaseCapability").jsonPrimitive.contentOrNull
+        )
+        assertEquals(
+            "complete-target-snapshot",
+            v2.getValue("releaseOperationsSemantics").jsonPrimitive.contentOrNull
+        )
+        val protocolSchema = Json.parseToJsonElement(
+            Files.readString(Path.of("..", "schemas", "editor-protocol-v2.schema.json"))
+        ).jsonObject
+        val schemaDefinitions = protocolSchema.getValue("\$defs").jsonObject
+        val releaseFileMaximum = schemaDefinitions
+            .getValue("releaseRequestData").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("fileCount").jsonObject
+            .getValue("maximum").jsonPrimitive.contentOrNull
+        assertEquals(ProtocolLimits.MAX_MANIFEST_FILES.toString(), releaseFileMaximum)
+        val schemaPluginErrorCodes = schemaDefinitions
+            .getValue("pluginErrorData").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("code").jsonObject
+            .stringSet("enum")
+        assertEquals(PluginRelayErrorContract.safeCodes, schemaPluginErrorCodes)
     }
 
     private fun JsonObject.stringSet(key: String): Set<String> =

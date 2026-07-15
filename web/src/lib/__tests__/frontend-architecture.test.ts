@@ -40,13 +40,13 @@ describe("前端路由隔离", () => {
   it("未认证与窄屏路由不会静态导入编辑器 hooks 或重型页面", () => {
     expect(editorRoute).toContain('lazy(() => import("@/routes/AuthenticatedEditor")')
     expect(editorRoute).not.toMatch(/useDraftSync|useKeyboardShortcuts|useCrossRefLoader|@\/pages\/EditorPage/)
-    expect(editorRoute).toContain("if (!authenticated) return <ConnectPage />")
+    expect(editorRoute).toContain("if (!authenticated || !workspaceId) return <ConnectPage />")
     expect(editorRoute).toContain("if (narrow) return <NarrowEditorNotice />")
     expect(editorRoute).toContain("当前页面不会加载这些重型画布")
   })
 
   it("编辑器 hooks 与 EditorPage 只存在于认证后懒加载模块", () => {
-    expect(authenticatedEditor).toMatch(/useDraftSync\(\)[\s\S]*useKeyboardShortcuts\(\)[\s\S]*useCrossRefLoader\(\)/)
+    expect(authenticatedEditor).toMatch(/useDraftSync\(workspaceId\)[\s\S]*useKeyboardShortcuts\(\)[\s\S]*useCrossRefLoader\(\)/)
     expect(authenticatedEditor).toContain('lazy(() => import("@/pages/EditorPage")')
   })
 })

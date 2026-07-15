@@ -11,7 +11,6 @@ const BUILTIN_NODES = [
   { builtin: "set", label: "set 变量", description: "设置变量值" },
   { builtin: "if", label: "if 条件", description: "条件分支" },
   { builtin: "for", label: "for 循环", description: "遍历循环" },
-  { builtin: "case", label: "case 匹配", description: "模式匹配" },
   { builtin: "calc", label: "calc 公式", description: "表达式计算" },
 ]
 

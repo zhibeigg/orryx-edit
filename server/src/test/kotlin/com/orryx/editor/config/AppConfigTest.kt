@@ -107,7 +107,7 @@ class AppConfigTest {
             ))
         }
 
-        val required = base + mapOf(
+        val releaseWithoutV2Writes = base + mapOf(
             "ACCOUNTS_ENABLED" to "true",
             "CLOUD_DRAFTS_ENABLED" to "true",
             "EDITOR_PROTOCOL_V2_ENABLED" to "true",
@@ -115,6 +115,11 @@ class AppConfigTest {
             "RELEASE_SIGNING_PRIVATE_KEY_PKCS8_BASE64" to "private-key",
             "RELEASE_SIGNING_PUBLIC_KEY_X509_BASE64" to "public-key"
         )
+        assertFailsWith<IllegalArgumentException> {
+            AppConfig.load(releaseWithoutV2Writes)
+        }
+
+        val required = releaseWithoutV2Writes + ("EDITOR_V2_WRITES_ENABLED" to "true")
         val enabled = AppConfig.load(required)
         assertEquals(true, enabled.editorProtocol.releaseTransactionsEnabled)
         assertEquals(true, enabled.release.enabled)

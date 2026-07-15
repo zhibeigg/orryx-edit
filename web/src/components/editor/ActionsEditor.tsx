@@ -6,6 +6,7 @@ import type { ActionsSchemaV2, SchemaAction } from "@/types/schema"
 import { normalizeSchema } from "@/types/schema"
 import { ParameterWizard } from "./ParameterWizard"
 import { findBestOverload, parseLineValues } from "@/lib/parameter-wizard"
+import { flushEditorInputs } from "@/lib/editor-input-flush"
 
 const FlowEditor = lazy(() => import("./flow/FlowEditor").then(m => ({ default: m.FlowEditor })))
 
@@ -34,7 +35,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
   } | null>(null)
 
   const [schema, setSchema] = useState<ActionsSchemaV2 | null>(() => {
-    const raw = getActionsSchema() as unknown as ActionsSchemaV2
+    const raw = getActionsSchema()
     return raw ? normalizeSchema(raw) : null
   })
 
@@ -44,7 +45,7 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
     let cancelled = false
     loadActionsSchema().then(() => {
       if (!cancelled) {
-        const raw = getActionsSchema() as unknown as ActionsSchemaV2
+        const raw = getActionsSchema()
         setSchema(raw ? normalizeSchema(raw) : null)
       }
     })
@@ -117,14 +118,19 @@ export function ActionsEditor({ value, onChange, height = "300px" }: ActionsEdit
 
   useEffect(() => { return () => { editorRef.current = null } }, [])
 
+  const switchMode = useCallback((nextMode: "text" | "flow") => {
+    if (nextMode === mode || !flushEditorInputs()) return
+    setMode(nextMode)
+  }, [mode])
+
   return (
     <div style={{ height }} className="flex flex-col relative">
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[#2f3136] bg-[linear-gradient(180deg,#252a33_0%,#1f232b_100%)] shrink-0">
-        <button onClick={() => setMode("text")}
+        <button onClick={() => switchMode("text")}
           className={`flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-md transition-all ${mode === "text" ? "bg-[#3b82f6] text-white shadow-[0_4px_10px_rgba(59,130,246,0.35)]" : "text-[#94a0b4] hover:text-[#d4dbe8] hover:bg-[#2a303a]"}`}>
           <Code className="w-3 h-3" />文本
         </button>
-        <button onClick={() => setMode("flow")}
+        <button onClick={() => switchMode("flow")}
           className={`flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-md transition-all ${mode === "flow" ? "bg-[#3b82f6] text-white shadow-[0_4px_10px_rgba(59,130,246,0.35)]" : "text-[#94a0b4] hover:text-[#d4dbe8] hover:bg-[#2a303a]"}`}>
           <Workflow className="w-3 h-3" />节点
         </button>

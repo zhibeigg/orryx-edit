@@ -246,7 +246,9 @@ class PostgresIntegrationTest {
                     expiresAt = System.currentTimeMillis() + 60_000
                 )
             )
+            assertNotNull(relaySessions.lookup(tokenHash))
             assertNotNull(relaySessions.consume(tokenHash))
+            assertNull(relaySessions.lookup(tokenHash))
             assertNull(relaySessions.consume(tokenHash))
 
             val instanceId = "integration-${UUID.randomUUID()}"

@@ -1,3 +1,5 @@
+import type { ActionsSchema, SchemaParam as ParserSchemaParam } from "@/lib/kether-ast"
+
 // actions-schema.json v2 类型定义
 
 export interface SchemaType {
@@ -91,6 +93,40 @@ export interface ActionsSchemaV2 {
   properties?: unknown[]
 }
 
+function toParserParam(input: SchemaInput): ParserSchemaParam {
+  return {
+    name: input.key,
+    type: input.type,
+    keyword: input.keyword,
+    optional: !input.required,
+    default: input.default,
+    options: input.options,
+  }
+}
+
+/** 将编辑器 V2 schema 正式适配为 Kether parser 消费的 params schema。 */
+export function toParserActionsSchema(schema: ActionsSchemaV2): ActionsSchema {
+  return {
+    actions: schema.actions.map((action) => ({
+      name: action.name,
+      aliases: action.aliases,
+      category: action.category,
+      params: action.inputs.map(toParserParam),
+    })),
+    selectors: schema.selectors.map((selector) => ({
+      name: selector.name,
+      aliases: selector.aliases,
+      params: selector.params.map((param) => ({
+        name: param.key,
+        type: param.type,
+        default: param.default,
+      })),
+    })),
+    triggers: schema.triggers,
+    properties: schema.properties,
+  }
+}
+
 // ============ v1 → v2 兼容层 ============
 
 const DEFAULT_TYPES: Record<string, SchemaType> = {
@@ -150,9 +186,10 @@ interface V1Schema {
 }
 
 /** 将 v1 或 v2 schema 统一转为编辑器使用的 v2 兼容格式 */
-export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV2 {
-  if (raw?.version === 2) {
-    const schema = raw as ActionsSchemaV2
+export function normalizeSchema(raw: unknown): ActionsSchemaV2 {
+  const source = raw && typeof raw === "object" ? raw as V1Schema | ActionsSchemaV2 : {}
+  if (source.version === 2) {
+    const schema = source as ActionsSchemaV2
     if (schema.schemaVersion !== 3) return schema
     return {
       ...schema,
@@ -168,7 +205,7 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
   }
 
   // v1 → v2
-  const actions: SchemaAction[] = (raw?.actions ?? []).map((a: V1Action) => {
+  const actions: SchemaAction[] = (source.actions ?? []).map((a: V1Action) => {
     const params: Record<string, unknown>[] = a.params ?? a.inputs ?? []
     return {
       name: a.name,
@@ -197,7 +234,7 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
     }
   })
 
-  const selectors: SchemaSelector[] = (raw?.selectors ?? []).map((s: V1Selector) => ({
+  const selectors: SchemaSelector[] = (source.selectors ?? []).map((s: V1Selector) => ({
     name: s.name,
     aliases: s.aliases ?? [],
     description: s.description ?? "",
@@ -210,7 +247,7 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
   }))
 
   // 从 actions 收集 categories
-  const categories: Record<string, SchemaCategory> = (raw?.categories ?? {}) as Record<string, SchemaCategory>
+  const categories: Record<string, SchemaCategory> = (source.categories ?? {}) as Record<string, SchemaCategory>
   for (const a of actions) {
     if (!categories[a.category]) {
       categories[a.category] = { ...DEFAULT_CATEGORY }
@@ -219,10 +256,10 @@ export function normalizeSchema(raw: V1Schema | ActionsSchemaV2): ActionsSchemaV
 
   return {
     version: 2,
-    types: (raw?.types ?? DEFAULT_TYPES) as Record<string, SchemaType>,
+    types: (source.types ?? DEFAULT_TYPES) as Record<string, SchemaType>,
     categories,
     actions,
     selectors,
-    triggers: raw?.triggers,
+    triggers: source.triggers,
   }
 }

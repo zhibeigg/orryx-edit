@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { AlertTriangle, GitCompare, RefreshCw, Upload } from "lucide-react"
 import { DiffView } from "@/components/editor/DiffView"
-import { deleteDraft } from "@/lib/draft-storage"
-import { wsClient } from "@/lib/ws-client"
+import { displayedContentOf, draftVersionOf } from "@/lib/editor-file-state"
+import { saveEditorFile } from "@/lib/file-save"
+import { readServerFile, reloadEditorFileFromServer } from "@/lib/server-file"
 import { useEditorStore } from "@/store/editor-store"
 
 export function SaveConflictDialog() {
@@ -17,22 +18,17 @@ export function SaveConflictDialog() {
     setWorking(true)
     setError(null)
     try {
-      const latest = await wsClient.fileRead(conflict.path)
       if (replace) {
         const current = useEditorStore.getState().openFiles.find((file) => file.path === conflict.path)
-        if (current) {
-          useEditorStore.getState().openFile({
-            path: current.path,
-            name: current.name,
-            configType: current.configType,
-            content: latest.content,
-            revision: latest.revision,
-          })
-        }
-        await deleteDraft(conflict.path)
-        useEditorStore.getState().setSaveConflict(null)
+        if (!current) throw new Error("文件已关闭，无法重新加载")
+        await reloadEditorFileFromServer(
+          conflict.path,
+          draftVersionOf(current),
+          displayedContentOf(current),
+        )
         setLatestContent(null)
       } else {
+        const latest = await readServerFile(conflict.path)
         setLatestContent(latest.content)
       }
     } catch (loadError) {
@@ -46,14 +42,14 @@ export function SaveConflictDialog() {
     setWorking(true)
     setError(null)
     try {
-      const result = await wsClient.fileWrite(
-        conflict.path,
-        conflict.attemptedContent,
-        conflict.currentRevision,
-        true,
-      )
-      useEditorStore.getState().markSaved(conflict.path, conflict.attemptedContent, result.revision)
-      await deleteDraft(conflict.path)
+      const current = useEditorStore.getState().openFiles.find((file) => file.path === conflict.path)
+      if (!current) throw new Error("文件已关闭，无法强制覆盖")
+      const success = await saveEditorFile(current, conflict.attemptedContent, {
+        force: true,
+        baseRevision: conflict.currentRevision,
+        draftVersion: conflict.attemptedDraftVersion,
+      })
+      if (!success) throw new Error("强制覆盖未成功")
       setLatestContent(null)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "强制覆盖失败")

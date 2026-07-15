@@ -30,10 +30,11 @@ class ReleaseMaterializerTest {
         val snapshotService = SnapshotService(snapshots, clock = CLOCK)
         val a0 = "a: 0\n"
         val b0 = "b: 0\n"
+        val unchanged0 = "unchanged: true\n"
         val base = snapshotService.createSnapshot(
             CreateSnapshotCommand(
                 serverInstanceId = "server-1",
-                files = listOf(file("a.yml", a0), file("b.yml", b0)),
+                files = listOf(file("a.yml", a0), file("b.yml", b0), file("unchanged.yml", unchanged0)),
                 source = SnapshotSource.PLUGIN,
                 createdAt = NOW
             )
@@ -62,11 +63,14 @@ class ReleaseMaterializerTest {
 
         val target = DraftMaterializer(repository, snapshots).materialize(draft.id, 1)
 
-        assertEquals(listOf("a.yml", "c.yml"), target.files.map { it.path })
+        assertEquals(listOf("a.yml", "c.yml", "unchanged.yml"), target.files.map { it.path })
         assertEquals(SnapshotManifest.contentRevision(a0), target.files[0].baseRevision)
         assertEquals(SnapshotManifest.contentRevision(a1), target.files[0].revision)
         assertNull(target.files[1].baseRevision)
         assertEquals(SnapshotManifest.contentRevision(c1), target.files[1].revision)
+        assertEquals(SnapshotManifest.contentRevision(unchanged0), target.files[2].baseRevision)
+        assertEquals(SnapshotManifest.contentRevision(unchanged0), target.files[2].revision)
+        assertEquals(unchanged0, target.files[2].content)
         assertEquals(base.manifestRevision, target.baseManifestRevision)
         assertEquals(target.targetManifestRevision, drafts.getVersion(versionId)?.version?.manifestRevision)
     }

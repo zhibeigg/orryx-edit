@@ -1,29 +1,50 @@
 import { useEffect, useRef } from "react"
+import {
+  deleteDraftSnapshotIfUnchanged,
+  persistDraftSnapshot,
+  persistDraftSnapshotsBestEffort,
+} from "@/lib/draft-consistency"
+import { flushEditorInputs } from "@/lib/editor-input-flush"
+import { loadDraft, type StoredDraft } from "@/lib/draft-storage"
 import { useEditorStore } from "@/store/editor-store"
-import { saveDraft, loadDraft, deleteDraft } from "@/lib/draft-storage"
+import type { RevisionToken } from "@/types/protocol"
 
 /**
  * 草稿自动保存 Hook
  * - 编辑器内容变更后 1 秒自动保存到 IndexedDB
- * - 组件卸载时立即保存所有 dirty 文件
+ * - 文件关闭由 editor store 立即补存，避免 debounce 窗口丢失
+ * - 组件卸载始终使用挂载时的 workspaceId，不回退到 unbound
  */
-export function useDraftSync() {
-  const openFiles = useEditorStore((s) => s.openFiles)
+export function useDraftSync(workspaceId: string) {
+  const openFiles = useEditorStore((state) => state.openFiles)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const filesRef = useRef(openFiles)
-  useEffect(() => {
-    filesRef.current = openFiles
-  }, [openFiles])
+  const lastDraftsRef = useRef(new Map<string, string>())
 
   useEffect(() => {
+    const workspaceFiles = openFiles.filter((file) => file.workspaceId === workspaceId)
+    for (const file of workspaceFiles) {
+      if (file.dirty && file.draft != null) {
+        lastDraftsRef.current.set(file.path, file.draft)
+      }
+    }
+
     if (timerRef.current) clearTimeout(timerRef.current)
-
     timerRef.current = setTimeout(() => {
-      for (const file of openFiles) {
+      for (const capturedFile of workspaceFiles) {
+        // 生命周期操作可能已关闭或迁移标签；过期 debounce 绝不能在远端 rename/delete 后重建旧草稿键。
+        const file = useEditorStore.getState().openFiles.find(
+          (candidate) => candidate.workspaceId === workspaceId && candidate.path === capturedFile.path,
+        )
+        if (!file) continue
         if (file.dirty && file.draft != null) {
-          saveDraft(file.path, file.draft)
-        } else if (!file.dirty) {
-          deleteDraft(file.path)
+          lastDraftsRef.current.set(file.path, file.draft)
+          void persistDraftSnapshot(workspaceId, file)
+        } else {
+          const lastDraft = lastDraftsRef.current.get(file.path)
+          if (lastDraft != null) {
+            lastDraftsRef.current.delete(file.path)
+            void deleteDraftSnapshotIfUnchanged(workspaceId, file.path, lastDraft)
+          }
         }
       }
     }, 1000)
@@ -31,34 +52,73 @@ export function useDraftSync() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [openFiles])
+  }, [openFiles, workspaceId])
 
-  // 页面卸载时立即保存所有 dirty 文件
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      for (const file of filesRef.current) {
-        if (file.dirty && file.draft != null) {
-          saveDraft(file.path, file.draft)
-        }
-      }
+    const persistCurrentDraftsBestEffort = () => {
+      // beforeunload 无法等待 IndexedDB；先同步 flush 输入，再明确执行 best-effort，绝不视为已确认。
+      flushEditorInputs()
+      const currentFiles = useEditorStore.getState().openFiles.filter((file) => file.workspaceId === workspaceId)
+      persistDraftSnapshotsBestEffort(workspaceId, currentFiles)
     }
-    window.addEventListener("beforeunload", handleBeforeUnload)
+    window.addEventListener("beforeunload", persistCurrentDraftsBestEffort)
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-      // 组件卸载时也执行一次保存
-      handleBeforeUnload()
+      window.removeEventListener("beforeunload", persistCurrentDraftsBestEffort)
+      persistCurrentDraftsBestEffort()
     }
-  }, [])
+  }, [workspaceId])
 }
 
-/**
- * 尝试恢复草稿内容
- * 在打开文件时调用，如果有草稿则返回草稿内容
- */
-export async function tryRestoreDraft(path: string, serverContent: string): Promise<{ content: string; hasDraft: boolean }> {
-  const draft = await loadDraft(path)
+export interface RestoredDraft {
+  content: string
+  serverContent: string
+  baseRevision: RevisionToken
+  draftVersion: number
+  externalRevision?: RevisionToken
+  hasDraft: boolean
+}
+
+export function restoreDraftAgainstServer(
+  draft: StoredDraft | null,
+  serverContent: string,
+  serverRevision: RevisionToken,
+): RestoredDraft {
   if (draft && draft.content !== serverContent) {
-    return { content: draft.content, hasDraft: true }
+    const baseRevision = draft.baseRevision ?? serverRevision
+    return {
+      content: draft.content,
+      serverContent: draft.baseContent ?? serverContent,
+      baseRevision,
+      draftVersion: draft.draftVersion ?? 1,
+      ...(draft.requiresConflictResolution || baseRevision !== serverRevision
+        ? { externalRevision: serverRevision }
+        : {}),
+      hasDraft: true,
+    }
   }
-  return { content: serverContent, hasDraft: false }
+  return {
+    content: serverContent,
+    serverContent,
+    baseRevision: serverRevision,
+    draftVersion: 0,
+    hasDraft: false,
+  }
+}
+
+/** 尝试恢复同一 workspace 的草稿，并保留草稿实际基于的 base revision。 */
+export async function tryRestoreDraft(
+  workspaceId: string,
+  path: string,
+  serverContent: string,
+  serverRevision: RevisionToken,
+): Promise<RestoredDraft> {
+  const loadedDraft = await loadDraft(workspaceId, path)
+  // 再次回读以关闭“首次读取后、恢复前刚好写入 tombstone”的窗口。
+  const verifiedDraft = loadedDraft ? await loadDraft(workspaceId, path) : null
+  const draft = loadedDraft && verifiedDraft?.savedAt === loadedDraft.savedAt ? loadedDraft : null
+  const restored = restoreDraftAgainstServer(draft, serverContent, serverRevision)
+  if (draft && !restored.hasDraft) {
+    await deleteDraftSnapshotIfUnchanged(workspaceId, path, draft.content)
+  }
+  return restored
 }

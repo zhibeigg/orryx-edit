@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useRef, useEffect } from "react"
 import type { SkillData, SkillOptions } from "@/types"
-import { parseYaml, updateYamlFromObject, stringifyYaml } from "@/lib/yaml-parser"
+import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import { YamlVisualGuard } from "./YamlVisualGuard"
 import { OptionsPanel } from "./OptionsPanel"
 import { VariablesEditor } from "./VariablesEditor"
 import { DescriptionEditor } from "./DescriptionEditor"
@@ -23,23 +24,15 @@ export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
     rawYamlRef.current = content
   }, [content])
 
-  const skill = useMemo<SkillData>(() => {
-    try {
-      return parseYaml<SkillData>(content)
-    } catch {
-      return { Options: { Type: "DIRECT" } }
-    }
-  }, [content])
+  const parsed = useMemo(() => safeParseYaml<SkillData>(content), [content])
+  const skill = useMemo<SkillData>(() => parsed.ok
+    ? { ...parsed.data, Options: parsed.data.Options ?? { Type: "DIRECT" } }
+    : { Options: { Type: "DIRECT" } }, [parsed])
 
-  // 使用保留注释的增量更新
+  // 使用保留注释的增量更新；无效 YAML 由可视化守卫阻止更新。
   const updateSkill = useCallback((updater: (s: SkillData) => SkillData) => {
     const updated = updater(skill)
-    try {
-      const newYaml = updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>)
-      onChange(newYaml)
-    } catch {
-      onChange(stringifyYaml(updated))
-    }
+    onChange(updateYamlFromObject(rawYamlRef.current, updated as unknown as Record<string, unknown>))
   }, [skill, onChange])
 
   return (
@@ -55,45 +48,38 @@ export function SkillEditor({ content, onChange, filePath }: SkillEditorProps) {
       </TabsList>
 
       <TabsContent value="options" className="flex-1 overflow-y-auto">
-        <OptionsPanel
-          options={skill.Options}
-          onChange={(options: SkillOptions) => updateSkill((s) => ({ ...s, Options: options }))}
-        />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <OptionsPanel options={skill.Options} onChange={(options: SkillOptions) => updateSkill((s) => ({ ...s, Options: options }))} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="variables" className="flex-1 overflow-y-auto">
-        <VariablesEditor
-          variables={skill.Options.Variables ?? {}}
-          onChange={(variables) =>
-            updateSkill((s) => ({ ...s, Options: { ...s.Options, Variables: variables } }))
-          }
-        />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <VariablesEditor variables={skill.Options.Variables ?? {}} onChange={(variables) =>
+            updateSkill((s) => ({ ...s, Options: { ...s.Options, Variables: variables } }))} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="description" className="flex-1 overflow-y-auto">
-        <DescriptionEditor
-          descriptions={skill.Options.Description ?? []}
-          variables={skill.Options.Variables ?? {}}
-          minLevel={skill.Options.MinLevel ?? 1}
-          maxLevel={skill.Options.MaxLevel ?? 5}
-          onChange={(descriptions) =>
-            updateSkill((s) => ({ ...s, Options: { ...s.Options, Description: descriptions } }))
-          }
-        />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <DescriptionEditor descriptions={skill.Options.Description ?? []} variables={skill.Options.Variables ?? {}}
+            minLevel={skill.Options.MinLevel ?? 1} maxLevel={skill.Options.MaxLevel ?? 5} onChange={(descriptions) =>
+              updateSkill((s) => ({ ...s, Options: { ...s.Options, Description: descriptions } }))} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="actions" className="flex-1 overflow-y-auto">
-        <div className="h-full">
-          <ActionsEditor
-            value={skill.Actions ?? ""}
-            onChange={(actions) => updateSkill((s) => ({ ...s, Actions: actions }))}
-            height="100%"
-          />
-        </div>
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <div className="h-full">
+            <ActionsEditor value={skill.Actions ?? ""} onChange={(actions) => updateSkill((s) => ({ ...s, Actions: actions }))} height="100%" />
+          </div>
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="timeline" className="flex-1 overflow-y-auto">
-        <SkillTimeline script={skill.Actions ?? ""} />
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
+          <SkillTimeline script={skill.Actions ?? ""} />
+        </YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="refs" className="flex-1 overflow-y-auto">
