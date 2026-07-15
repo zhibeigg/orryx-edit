@@ -1018,17 +1018,17 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     <div ref={flowRootRef} className="flex h-full max-md:flex-col bg-[#17191d]">
       <NodePalette schema={schema} onDragStart={() => {}} />
       <div className="flex-1 min-w-0 relative">
-        <div className="h-8 px-3 border-b border-[#2f3136] bg-[#1b1d22]/95 flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-2 text-[#a6adbb]">
+        <div className="h-8 px-3 border-b border-[#2f3136] bg-[#1b1d22]/95 flex items-center justify-between gap-2 text-[11px]">
+          <div className="flex shrink-0 items-center gap-2 text-[#a6adbb] max-lg:hidden">
             <Sparkles className="w-3.5 h-3.5 text-[#56b6c2]" />
             {isReadOnly ? "当前脚本仅提供只读节点预览" : "拖拽左侧节点到画布，显式编辑后同步到脚本文本"}
           </div>
-          <div className="flex items-center gap-1 text-[#7f8795]">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto whitespace-nowrap text-[#7f8795]">
             <button
               type="button"
               onClick={handleAutoLayout}
               disabled={nodes.length === 0}
-              className="inline-flex items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title="清除手工位置并自动排列"
             >
               <Sparkles className="w-3 h-3" />
@@ -1037,7 +1037,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             <button
               type="button"
               onClick={() => setShowHistory((value) => !value)}
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] transition-colors ${showHistory ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#aab2c0] hover:bg-[#242933] hover:text-[#dde4f0]"}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] transition-colors ${showHistory ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#aab2c0] hover:bg-[#242933] hover:text-[#dde4f0]"}`}
               title="历史时间线"
             >
               <History className="w-3 h-3" />
@@ -1047,7 +1047,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               type="button"
               onClick={undo}
               disabled={!canUndo}
-              className="inline-flex items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title={undoLabel ? `撤销 ${undoLabel} (Ctrl+Z)` : "撤销 (Ctrl+Z)"}
             >
               <Undo2 className="w-3 h-3" />
@@ -1057,19 +1057,27 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               type="button"
               onClick={redo}
               disabled={!canRedo}
-              className="inline-flex items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title={redoLabel ? `重做 ${redoLabel} (Ctrl+Y / Ctrl+Shift+Z)` : "重做 (Ctrl+Y / Ctrl+Shift+Z)"}
             >
               <Redo2 className="w-3 h-3" />
               重做
             </button>
-            <Link2 className="w-3 h-3" />
-            {isReadOnly ? "已禁用回写" : "已启用显式连接与回写"}
+            <Link2 className="w-3 h-3 shrink-0" />
+            <span className="shrink-0">{isReadOnly ? "已禁用回写" : "已启用显式连接与回写"}</span>
           </div>
         </div>
         {isReadOnly && (
-          <div className="absolute z-20 top-10 left-1/2 -translate-x-1/2 max-w-[70%] rounded-md border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-[11px] text-amber-100 shadow-lg">
-            节点回写已禁用：{readOnlyReasons.join("；")}
+          <div
+            className="absolute z-20 top-10 left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-2 rounded-md border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-[11px] text-amber-100 shadow-lg md:max-w-[680px]"
+            title={`节点回写已禁用：${readOnlyReasons.join("；")}`}
+          >
+            <span className="truncate">节点回写已禁用：{readOnlyReasons[0]}</span>
+            {readOnlyReasons.length > 1 && (
+              <span className="shrink-0 rounded bg-amber-800/60 px-1.5 py-0.5 text-[10px]">
+                另有 {readOnlyReasons.length - 1} 项
+              </span>
+            )}
           </div>
         )}
         {!isReadOnly && connectionError && (
