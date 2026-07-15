@@ -40,4 +40,12 @@ if (monacoVendorSource.includes(monacoLoader)) {
   throw new Error(`${monacoVendor} 不应反向引用 ${monacoLoader}，否则动态加载会形成循环 chunk`)
 }
 
+const radixVendor = files.find((name) => /^vendor-radix-.*\.js$/.test(name))
+const tooltipBundle = files.find((name) => /^tooltip-.*\.js$/.test(name))
+if (!radixVendor || !tooltipBundle) throw new Error("缺少 Radix Tooltip 生产资产")
+const radixVendorSource = await readFile(resolve(assetsDir, radixVendor), "utf8")
+if (radixVendorSource.includes(tooltipBundle)) {
+  throw new Error(`${radixVendor} 不应反向引用 ${tooltipBundle}，否则 Tooltip 会形成循环 chunk`)
+}
+
 console.log("Bundle budgets passed")

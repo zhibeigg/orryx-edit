@@ -23,7 +23,7 @@ export default defineConfig({
             { name: "vendor-monaco", test: /node_modules[\\/]monaco-editor[\\/]/, priority: 70, includeDependenciesRecursively: false },
             { name: "vendor-three", test: /node_modules[\\/]three[\\/]/, priority: 60, includeDependenciesRecursively: false },
             { name: "vendor-flow", test: /node_modules[\\/](?:@xyflow|@dagrejs)[\\/]/, priority: 50, includeDependenciesRecursively: false },
-            { name: "vendor-radix", test: /node_modules[\\/](?:@radix-ui|cmdk)[\\/]/, priority: 40, includeDependenciesRecursively: false },
+            { name: "vendor-radix", test: /node_modules[\\/](?:@radix-ui|@floating-ui|cmdk)[\\/]/, priority: 40, includeDependenciesRecursively: false },
             { name: "vendor-yaml", test: /node_modules[\\/]yaml[\\/]/, priority: 30, includeDependenciesRecursively: false },
             { name: "vendor-state", test: /node_modules[\\/](?:zustand|use-sync-external-store)[\\/]/, priority: 20, includeDependenciesRecursively: false },
             { name: "vendor-react", test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/, priority: 10, includeDependenciesRecursively: false },
