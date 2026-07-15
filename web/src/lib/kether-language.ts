@@ -1,95 +1,78 @@
 import { apiFetch } from "@/lib/api-client"
 import type { languages, editor } from "monaco-editor"
+import {
+  buildSchemaCatalog,
+  mergeSchemas,
+  normalizeSchema,
+  validateSchemaRuntime,
+  type SchemaAction as ActionDef,
+  type SchemaInput as ActionParam,
+  type SchemaCatalog,
+  type UnifiedActionsSchema,
+} from "@/types/schema"
 
 export const KETHER_LANGUAGE_ID = "kether"
 
-// ---- Schema 类型 ----
-interface ActionParam {
-  name: string
-  key?: string
-  type: string
-  required: boolean
-  default?: unknown
-  description?: string
-  options?: string[]
-  keyword?: string
-}
-
-interface ActionDef {
-  name: string
-  aliases?: string[]
-  category: string
-  description: string
-  returnType?: string
-  params?: ActionParam[]
-  inputs?: ActionParam[]
-  output?: { type: string; description?: string } | null
-  syntax: string
-  examples?: string[]
-  deprecated?: boolean
-}
-
-interface ActionsSchema {
-  version: string | number
-  pluginVersion?: string
-  actions: ActionDef[]
-  triggers?: TriggerDef[]
-  selectors?: SelectorDef[]
-  properties?: PropertyDef[]
-}
-
-interface TriggerDef {
-  name: string
-  category: string
-  description?: string
-  variables?: { name: string; type: string; description?: string }[]
-}
-
-interface SelectorDef {
-  name: string
-  aliases?: string[]
-  category: string
-  description: string
-  params?: { type: string; description: string; default?: string }[]
-  syntax: string
-  examples?: string[]
-}
-
-interface PropertyDef {
-  name: string
-  id: string
-  category: string
-  description?: string
-  usage?: string
-  keys: { name: string; type: string; writable: boolean; description?: string }[]
-}
-
-// ---- 全局 schema 缓存 ----
-let cachedSchema: ActionsSchema | null = null
+let cachedSchema: UnifiedActionsSchema | null = null
+let cachedCatalog: SchemaCatalog | null = null
+let schemaLoadPromise: Promise<UnifiedActionsSchema> | null = null
 let allActionKeywords: string[] = []
 let deprecatedKeywords: Set<string> = new Set()
 
-export async function loadActionsSchema(baseUrl?: string): Promise<ActionsSchema> {
-  const url = baseUrl || `${window.location.origin}/api/actions-schema`
-  try {
-    const res = await apiFetch(url, { cache: "no-cache" })
-    if (res.ok) {
-      cachedSchema = await res.json()
-      rebuildFromSchema()
-    }
-  } catch (e) {
-    console.warn("加载 actions-schema 失败:", e)
-  }
-  return cachedSchema || { version: "1.0", pluginVersion: "unknown", actions: [] }
+async function fetchValidatedSchema(url: string): Promise<UnifiedActionsSchema | null> {
+  const response = await apiFetch(url, { cache: "no-cache" })
+  if (!response.ok) return null
+  const result = validateSchemaRuntime(await response.json())
+  if (!result.ok || !result.schema) throw new Error(`Schema 运行时校验失败: ${result.errors.join("；")}`)
+  return result.schema
 }
 
-/** 获取已加载的 schema（供其他组件使用） */
-export function getActionsSchema(): ActionsSchema | null {
+export function loadActionsSchema(baseUrl?: string): Promise<UnifiedActionsSchema> {
+  if (schemaLoadPromise) return schemaLoadPromise
+  const origin = typeof window === "undefined" ? "" : window.location.origin
+  const registryUrl = baseUrl || `${origin}/api/kether-registry`
+  const legacyUrl = `${origin}/api/actions-schema`
+  const baseCatalogUrl = `${origin}/taboolib-6.3.0/actions-schema.json`
+  schemaLoadPromise = (async () => {
+    const extensionPromise = fetchValidatedSchema(registryUrl).then((registry) => (
+      registry ?? (baseUrl ? null : fetchValidatedSchema(legacyUrl))
+    ))
+    const [baseResult, extensionResult] = await Promise.allSettled([
+      fetchValidatedSchema(baseCatalogUrl),
+      extensionPromise,
+    ])
+    const base = baseResult.status === "fulfilled" ? baseResult.value : null
+    const extension = extensionResult.status === "fulfilled" ? extensionResult.value : null
+    if (!base && !extension) {
+      const reasons = [baseResult, extensionResult]
+        .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+        .map((result) => String(result.reason))
+      throw new Error(reasons.join("；") || "没有可用的 Kether Schema")
+    }
+    cachedSchema = base && extension ? mergeSchemas(base, extension) : normalizeSchema(base ?? extension)
+    cachedCatalog = buildSchemaCatalog(cachedSchema)
+    rebuildFromSchema()
+    return cachedSchema
+  })().catch((error) => {
+    schemaLoadPromise = null
+    console.warn("加载 Kether Registry 失败:", error)
+    cachedSchema = normalizeSchema({ version: 2, schemaVersion: 4, types: {}, categories: {}, actions: [], selectors: [], triggers: [], properties: [] })
+    cachedCatalog = buildSchemaCatalog(cachedSchema)
+    return cachedSchema
+  })
+  return schemaLoadPromise
+}
+
+export function getActionsSchema(): UnifiedActionsSchema | null {
   return cachedSchema
 }
 
+export function getActionsCatalog(): SchemaCatalog | null {
+  return cachedCatalog
+}
+
 function getActionParams(action: ActionDef): ActionParam[] {
-  return action.params ?? action.inputs ?? []
+  return action.inputs
 }
 
 function formatParamDefault(value: unknown): string {
@@ -130,20 +113,20 @@ const SELECTORS = [
 ]
 
 export const ketherThemeRules: { token: string; foreground: string; fontStyle?: string }[] = [
-  { token: "keyword", foreground: "C586C0" },
-  { token: "action", foreground: "4EC9B0", fontStyle: "bold" },
-  { token: "action.deprecated", foreground: "6A6A6A", fontStyle: "italic strikethrough" },
-  { token: "selector", foreground: "DCDCAA" },
-  { token: "variable.ref", foreground: "9CDCFE" },
-  { token: "variable.lazy", foreground: "9CDCFE", fontStyle: "italic" },
-  { token: "template.bracket", foreground: "FFD700" },
-  { token: "template.content", foreground: "CE9178" },
-  { token: "string", foreground: "CE9178" },
-  { token: "number", foreground: "B5CEA8" },
-  { token: "comment", foreground: "6A9955", fontStyle: "italic" },
-  { token: "operator", foreground: "D4D4D4" },
-  { token: "bracket", foreground: "FFD700" },
-  { token: "identifier", foreground: "D4D4D4" },
+  { token: "keyword", foreground: "E58A48", fontStyle: "bold" },
+  { token: "action", foreground: "F0B35F", fontStyle: "bold" },
+  { token: "action.deprecated", foreground: "806B62", fontStyle: "italic strikethrough" },
+  { token: "selector", foreground: "D69A67" },
+  { token: "variable.ref", foreground: "E9C89B" },
+  { token: "variable.lazy", foreground: "DFAE78", fontStyle: "italic" },
+  { token: "template.bracket", foreground: "F07A3B" },
+  { token: "template.content", foreground: "D9A078" },
+  { token: "string", foreground: "D9A078" },
+  { token: "number", foreground: "E7C879" },
+  { token: "comment", foreground: "9B8174", fontStyle: "italic" },
+  { token: "operator", foreground: "E0CFC0" },
+  { token: "bracket", foreground: "E58A48" },
+  { token: "identifier", foreground: "E8DED3" },
 ]
 
 export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
@@ -228,7 +211,15 @@ export function registerKetherLanguage(monaco: typeof import("monaco-editor")) {
     base: "vs-dark",
     inherit: true,
     rules: ketherThemeRules,
-    colors: { "editor.background": "#0a0e14" },
+    colors: {
+      "editor.background": "#17110f",
+      "editor.foreground": "#e8ded3",
+      "editorLineNumber.foreground": "#806b62",
+      "editorLineNumber.activeForeground": "#e58a48",
+      "editor.selectionBackground": "#693323",
+      "editorCursor.foreground": "#f0a14a",
+      "editor.focusBorder": "#d26a35",
+    },
   })
 
   // ---- 补全 ----
@@ -694,7 +685,7 @@ function isNumericCompatible(token: string): boolean {
       return first === token.toLowerCase() || (a.aliases ?? []).some(al => al.toLowerCase() === token.toLowerCase())
     })
     if (action) {
-      const rt = (action.returnType ?? action.output?.type ?? "").toLowerCase()
+      const rt = (action.output?.type ?? "").toLowerCase()
       return rt.includes("number") || rt.includes("int") || rt.includes("double") || rt.includes("any") || rt === ""
     }
   }

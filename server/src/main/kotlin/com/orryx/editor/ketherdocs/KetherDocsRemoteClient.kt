@@ -51,7 +51,17 @@ internal open class KetherDocsRemoteClient(
             invalidCode = KetherDocsErrorCode.SCHEMA_INVALID,
             tooLargeCode = KetherDocsErrorCode.SCHEMA_TOO_LARGE
         )
-        return validator.validateRemoteSchema(schemaBytes, pointer, manifest)
+        val registryUri = validator.resolveRegistryUri(manifestUri, manifest)
+        if (registryUri == null) return validator.validateRemoteSchema(schemaBytes, pointer, manifest)
+        val registryAsset = manifest.registry ?: throw KetherDocsFailure(KetherDocsErrorCode.MANIFEST_INVALID)
+        val registryBytes = downloadJson(
+            uri = registryUri,
+            maxBytes = minOf(config.maxSchemaBytes, registryAsset.bytes),
+            unavailableCode = KetherDocsErrorCode.SCHEMA_UNAVAILABLE,
+            invalidCode = KetherDocsErrorCode.SCHEMA_INVALID,
+            tooLargeCode = KetherDocsErrorCode.SCHEMA_TOO_LARGE
+        )
+        return validator.validateRemoteRegistry(registryBytes, schemaBytes, pointer, manifest)
     }
 
     private suspend fun downloadJson(

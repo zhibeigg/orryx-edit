@@ -1,0 +1,2006 @@
+{
+  "version": 1,
+  "target": {
+    "pluginId": "TabooLib",
+    "pluginVersion": "6.3.0",
+    "commit": "ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+  },
+  "source": {
+    "id": "TabooLib",
+    "version": "6.3.0",
+    "commit": "ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b",
+    "repository": "D:/code/taboolib",
+    "module": "module/minecraft/minecraft-kether"
+  },
+  "rules": {
+    "if": {
+      "sequence": [
+        "if",
+        {
+          "input": "condition",
+          "accepts": [
+            "predicate",
+            "boolean"
+          ]
+        },
+        "then",
+        {
+          "branch": "then"
+        },
+        {
+          "optional": [
+            "else",
+            {
+              "branch": "else"
+            }
+          ]
+        }
+      ]
+    },
+    "for": {
+      "sequence": [
+        "for",
+        {
+          "literal": "variable"
+        },
+        "in",
+        {
+          "input": "iterable",
+          "accepts": [
+            "action"
+          ]
+        },
+        "then",
+        {
+          "branch": "body"
+        }
+      ]
+    },
+    "while": {
+      "sequence": [
+        "while",
+        {
+          "input": "condition",
+          "accepts": [
+            "predicate",
+            "boolean"
+          ]
+        },
+        "then",
+        {
+          "branch": "body"
+        }
+      ]
+    },
+    "check": {
+      "sequence": [
+        "check",
+        {
+          "input": "left",
+          "accepts": [
+            "any"
+          ]
+        },
+        {
+          "localRaw": "operator"
+        },
+        {
+          "input": "right",
+          "accepts": [
+            "any"
+          ]
+        }
+      ]
+    },
+    "range": {
+      "sequence": [
+        "range",
+        {
+          "input": "from",
+          "accepts": [
+            "double"
+          ]
+        },
+        "to",
+        {
+          "input": "to",
+          "accepts": [
+            "double"
+          ]
+        },
+        {
+          "optional": [
+            "step",
+            {
+              "input": "step",
+              "accepts": [
+                "double"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "player": {
+      "sequence": [
+        "player",
+        {
+          "operatorCatalog": "taboolib.player.operators"
+        },
+        {
+          "localRawRemainder": true
+        }
+      ]
+    }
+  },
+  "fallback": {
+    "scope": "local",
+    "representation": "raw-block",
+    "preserveSource": true,
+    "fabricateUnknownGrammar": false
+  },
+  "player": {
+    "operatorCount": 65,
+    "operators": [
+      {
+        "id": "taboolib.player.operator.locale",
+        "name": "LOCALE",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LOCALE（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "locale",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.world",
+        "name": "WORLD",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.WORLD（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "world",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.x",
+        "name": "X",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.X（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "x",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.y",
+        "name": "Y",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.Y（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "y",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.z",
+        "name": "Z",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.Z（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "z",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.yaw",
+        "name": "YAW",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.YAW（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "yaw",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.pitch",
+        "name": "PITCH",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.PITCH（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "pitch",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.block-x",
+        "name": "BLOCK_X",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BLOCK_X（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "block",
+            "x",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.block-y",
+        "name": "BLOCK_Y",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BLOCK_Y（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "block",
+            "y",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.block-z",
+        "name": "BLOCK_Z",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BLOCK_Z（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "block",
+            "z",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.compass-x",
+        "name": "COMPASS_X",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.COMPASS_X（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "compass",
+            "x",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.compass-y",
+        "name": "COMPASS_Y",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.COMPASS_Y（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "compass",
+            "y",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.compass-z",
+        "name": "COMPASS_Z",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.COMPASS_Z（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "compass",
+            "z",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.location",
+        "name": "LOCATION",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LOCATION（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "location",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.compass-target",
+        "name": "COMPASS_TARGET",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.COMPASS_TARGET（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "compass",
+            "target",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.bed-spawn",
+        "name": "BED_SPAWN",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BED_SPAWN（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "bed",
+            "spawn",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.bed-spawn-x",
+        "name": "BED_SPAWN_X",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BED_SPAWN_X（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "bed",
+            "spawn",
+            "x",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.bed-spawn-y",
+        "name": "BED_SPAWN_Y",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BED_SPAWN_Y（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "bed",
+            "spawn",
+            "y",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.bed-spawn-z",
+        "name": "BED_SPAWN_Z",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BED_SPAWN_Z（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "bed",
+            "spawn",
+            "z",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.name",
+        "name": "NAME",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.NAME（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "name",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.list-name",
+        "name": "LIST_NAME",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LIST_NAME（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "list",
+            "name",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.display-name",
+        "name": "DISPLAY_NAME",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.DISPLAY_NAME（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "display",
+            "name",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.uuid",
+        "name": "UUID",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.UUID（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "uuid",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.gamemode",
+        "name": "GAMEMODE",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.GAMEMODE（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "gamemode",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.address",
+        "name": "ADDRESS",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.ADDRESS（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "address",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.sneaking",
+        "name": "SNEAKING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SNEAKING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "sneaking",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.sprinting",
+        "name": "SPRINTING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SPRINTING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "sprinting",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.blocking",
+        "name": "BLOCKING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.BLOCKING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "blocking",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.gliding",
+        "name": "GLIDING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.GLIDING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "gliding",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.glowing",
+        "name": "GLOWING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.GLOWING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "glowing",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.swimming",
+        "name": "SWIMMING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SWIMMING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "swimming",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.riptiding",
+        "name": "RIPTIDING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.RIPTIDING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "riptiding",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.sleeping",
+        "name": "SLEEPING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SLEEPING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "sleeping",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.sleep-ticks",
+        "name": "SLEEP_TICKS",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SLEEP_TICKS（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "sleep",
+            "ticks",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.sleep-ignored",
+        "name": "SLEEP_IGNORED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SLEEP_IGNORED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "sleep",
+            "ignored",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.dead",
+        "name": "DEAD",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.DEAD（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "dead",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.conversing",
+        "name": "CONVERSING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.CONVERSING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "conversing",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.leashed",
+        "name": "LEASHED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LEASHED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "leashed",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.on-ground",
+        "name": "ON_GROUND",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.ON_GROUND（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "on",
+            "ground",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.is-online",
+        "name": "IS_ONLINE",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.IS_ONLINE（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "is",
+            "online",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.inside-vehicle",
+        "name": "INSIDE_VEHICLE",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.INSIDE_VEHICLE（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "inside",
+            "vehicle",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.op",
+        "name": "OP",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.OP（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "op",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.gravity",
+        "name": "GRAVITY",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.GRAVITY（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "gravity",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.attack-cooldown",
+        "name": "ATTACK_COOLDOWN",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.ATTACK_COOLDOWN（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "attack",
+            "cooldown",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.player-time",
+        "name": "PLAYER_TIME",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.PLAYER_TIME（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "player",
+            "time",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.first-played",
+        "name": "FIRST_PLAYED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.FIRST_PLAYED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "first",
+            "played",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.last-played",
+        "name": "LAST_PLAYED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LAST_PLAYED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "last",
+            "played",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.absorption-amount",
+        "name": "ABSORPTION_AMOUNT",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.ABSORPTION_AMOUNT（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "absorption",
+            "amount",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.no-damage-ticks",
+        "name": "NO_DAMAGE_TICKS",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.NO_DAMAGE_TICKS（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "no",
+            "damage",
+            "ticks",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.remaining-air",
+        "name": "REMAINING_AIR",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.REMAINING_AIR（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "remaining",
+            "air",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.maximum-air",
+        "name": "MAXIMUM_AIR",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.MAXIMUM_AIR（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "maximum",
+            "air",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.exp",
+        "name": "EXP",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.EXP（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "exp",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.level",
+        "name": "LEVEL",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.LEVEL（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "level",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.exhaustion",
+        "name": "EXHAUSTION",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.EXHAUSTION（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "exhaustion",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.saturation",
+        "name": "SATURATION",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.SATURATION（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "saturation",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.food-level",
+        "name": "FOOD_LEVEL",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.FOOD_LEVEL（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "food",
+            "level",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.health",
+        "name": "HEALTH",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.HEALTH（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "health",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.max-health",
+        "name": "MAX_HEALTH",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.MAX_HEALTH（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "max",
+            "health",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.allow-flight",
+        "name": "ALLOW_FLIGHT",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.ALLOW_FLIGHT（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "allow",
+            "flight",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.flying",
+        "name": "FLYING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.FLYING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "flying",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.fly-speed",
+        "name": "FLY_SPEED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.FLY_SPEED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "fly",
+            "speed",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.walk-speed",
+        "name": "WALK_SPEED",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.WALK_SPEED（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": true,
+        "methods": [
+          "INCREASE",
+          "DECREASE",
+          "MODIFY"
+        ],
+        "grammar": {
+          "sequence": [
+            "player",
+            "walk",
+            "speed",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.ping",
+        "name": "PING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.PING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "ping",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.pose",
+        "name": "POSE",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.POSE（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "pose",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      },
+      {
+        "id": "taboolib.player.operator.facing",
+        "name": "FACING",
+        "category": "player",
+        "inputTypes": [
+          "player"
+        ],
+        "outputType": "any",
+        "description": "PlayerOperators.FACING（TabooLib 6.3.0）",
+        "readable": true,
+        "writable": false,
+        "methods": [],
+        "grammar": {
+          "sequence": [
+            "player",
+            "facing",
+            {
+              "localRawRemainder": true
+            }
+          ],
+          "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+        }
+      }
+    ],
+    "propertyCount": 7,
+    "properties": [
+      {
+        "id": "taboolib.property.item-operator",
+        "name": "item.operator",
+        "category": "platform",
+        "description": "ItemStack 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "ItemStack",
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+        "keys": [
+          {
+            "name": "type",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "material",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "meta",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "itemmeta",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "data",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "damage",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "durability",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "name",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "lore",
+            "type": "any",
+            "writable": true
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.itemmeta-operator",
+        "name": "itemMeta.operator",
+        "category": "platform",
+        "description": "ItemMeta 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "ItemMeta",
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+        "keys": [
+          {
+            "name": "name",
+            "type": "any",
+            "writable": true
+          },
+          {
+            "name": "lore",
+            "type": "any",
+            "writable": true
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.string-operator",
+        "name": "string.operator",
+        "category": "data",
+        "description": "String 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "String",
+        "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "keys": [
+          {
+            "name": "upper",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "uppercase",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "lower",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "lowercase",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "length",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "size",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "trim",
+            "type": "any",
+            "writable": false
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.map-operator",
+        "name": "map.operator",
+        "category": "data",
+        "description": "Map 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "Map",
+        "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "keys": [
+          {
+            "name": "length",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "size",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "keys",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "values",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "@<key>",
+            "type": "any",
+            "writable": true
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.list-operator",
+        "name": "list.operator",
+        "category": "data",
+        "description": "List 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "List",
+        "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "keys": [
+          {
+            "name": "length",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "size",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "<index>",
+            "type": "any",
+            "writable": true
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.array-operator",
+        "name": "array.operator",
+        "category": "data",
+        "description": "Array 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "Array",
+        "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "keys": [
+          {
+            "name": "length",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "size",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "<index>",
+            "type": "any",
+            "writable": true
+          }
+        ]
+      },
+      {
+        "id": "taboolib.property.matcher-operator",
+        "name": "matcher.operator",
+        "category": "data",
+        "description": "Matcher 绑定的 ScriptProperty（TabooLib 6.3.0）",
+        "usage": "&value[<key>]",
+        "bind": "Matcher",
+        "source": "src/main/kotlin/taboolib/module/kether/action/transform/ActionMatcher.kt",
+        "keys": [
+          {
+            "name": "<index>",
+            "type": "any",
+            "writable": false
+          },
+          {
+            "name": "<name>",
+            "type": "any",
+            "writable": false
+          }
+        ]
+      }
+    ]
+  },
+  "preservation": {
+    "comments": true,
+    "rawFragments": "local",
+    "unknownVariant": "raw-block",
+    "wholeDocumentReadOnly": false
+  }
+}

@@ -1,0 +1,5831 @@
+{
+  "$schema": "https://zhibeigg.github.io/Orryx/kether/contracts/actions-schema-v4.schema.json",
+  "version": 2,
+  "schemaVersion": 4,
+  "pluginId": "TabooLib",
+  "pluginVersion": "6.3.0",
+  "commit": "ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b",
+  "source": {
+    "id": "TabooLib",
+    "version": "6.3.0",
+    "commit": "ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b",
+    "repository": "D:/code/taboolib",
+    "module": "module/minecraft/minecraft-kether"
+  },
+  "types": {
+    "any": {
+      "widget": "text",
+      "color": "oklch(0.58 0.10 35)",
+      "extends": [],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "raw"
+    },
+    "unit": {
+      "widget": "port",
+      "color": "oklch(0.58 0.10 35)",
+      "extends": [],
+      "ketherFillable": false,
+      "inputStrategy": "literal",
+      "serialization": "token"
+    },
+    "number": {
+      "widget": "number",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "int": {
+      "widget": "number",
+      "color": "oklch(0.68 0.12 58)",
+      "step": 1,
+      "extends": [
+        "number"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "long": {
+      "widget": "number",
+      "color": "oklch(0.68 0.12 58)",
+      "step": 1,
+      "extends": [
+        "number"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "float": {
+      "widget": "number",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "number"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "double": {
+      "widget": "number",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "number"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "text": {
+      "widget": "text",
+      "color": "oklch(0.60 0.11 32)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "quoted"
+    },
+    "string": {
+      "widget": "text",
+      "color": "oklch(0.60 0.11 32)",
+      "extends": [
+        "text"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "quoted"
+    },
+    "boolean": {
+      "widget": "toggle",
+      "color": "oklch(0.62 0.14 42)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "token"
+    },
+    "keyword": {
+      "widget": "select",
+      "color": "oklch(0.58 0.10 35)",
+      "extends": [
+        "text"
+      ],
+      "ketherFillable": false,
+      "inputStrategy": "literal",
+      "serialization": "token"
+    },
+    "list": {
+      "widget": "list",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "any"
+      ],
+      "elementTypes": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "json"
+    },
+    "duration": {
+      "widget": "duration",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "long"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "duration"
+    },
+    "location": {
+      "widget": "location",
+      "color": "oklch(0.66 0.15 48)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": false,
+      "inputStrategy": "raw",
+      "serialization": "raw"
+    },
+    "player": {
+      "widget": "port",
+      "color": "oklch(0.66 0.15 48)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "raw"
+    },
+    "action": {
+      "widget": "port",
+      "color": "oklch(0.62 0.14 42)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "raw"
+    },
+    "predicate": {
+      "widget": "port",
+      "color": "oklch(0.62 0.14 42)",
+      "extends": [
+        "boolean"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "raw"
+    },
+    "reporter": {
+      "widget": "port",
+      "color": "oklch(0.68 0.12 58)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": true,
+      "inputStrategy": "expression",
+      "serialization": "raw"
+    },
+    "raw": {
+      "widget": "raw",
+      "color": "oklch(0.54 0.08 28)",
+      "extends": [
+        "any"
+      ],
+      "ketherFillable": false,
+      "inputStrategy": "raw",
+      "serialization": "raw"
+    }
+  },
+  "categories": {
+    "core": {
+      "color": "oklch(0.58 0.10 35)",
+      "icon": "core"
+    },
+    "flow": {
+      "color": "oklch(0.62 0.14 42)",
+      "icon": "flow"
+    },
+    "data": {
+      "color": "oklch(0.68 0.12 58)",
+      "icon": "data"
+    },
+    "text": {
+      "color": "oklch(0.60 0.11 32)",
+      "icon": "text"
+    },
+    "platform": {
+      "color": "oklch(0.54 0.08 28)",
+      "icon": "platform"
+    },
+    "player": {
+      "color": "oklch(0.66 0.15 48)",
+      "icon": "player"
+    }
+  },
+  "actions": [
+    {
+      "id": "taboolib.action.kether.get",
+      "variantId": "taboolib.action.kether.get.default",
+      "name": "get",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：get",
+      "syntax": "get <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 1,
+        "registration": "annotation",
+        "registeredNames": [
+          "get"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/ActionGet.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.set",
+      "variantId": "taboolib.action.kether.set.default",
+      "name": "set",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：set",
+      "syntax": "set <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 2,
+        "registration": "annotation",
+        "registeredNames": [
+          "set"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/ActionSet.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.import",
+      "variantId": "taboolib.action.kether.import.default",
+      "name": "import",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：import",
+      "syntax": "import <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 3,
+        "registration": "annotation",
+        "registeredNames": [
+          "import"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.release",
+      "variantId": "taboolib.action.kether.release.default",
+      "name": "release",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：release",
+      "syntax": "release <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 4,
+        "registration": "annotation",
+        "registeredNames": [
+          "release"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.pause",
+      "variantId": "taboolib.action.kether.pause.default",
+      "name": "pause",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：pause",
+      "syntax": "pause <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 5,
+        "registration": "annotation",
+        "registeredNames": [
+          "pause"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.exit",
+      "variantId": "taboolib.action.kether.exit.default",
+      "name": "exit",
+      "aliases": [
+        "stop",
+        "terminate"
+      ],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：exit, stop, terminate",
+      "syntax": "exit <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 6,
+        "registration": "annotation",
+        "registeredNames": [
+          "exit",
+          "stop",
+          "terminate"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.log",
+      "variantId": "taboolib.action.kether.log.default",
+      "name": "log",
+      "aliases": [
+        "print",
+        "info"
+      ],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：log, print, info",
+      "syntax": "log <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 7,
+        "registration": "annotation",
+        "registeredNames": [
+          "log",
+          "print",
+          "info"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.warn",
+      "variantId": "taboolib.action.kether.warn.default",
+      "name": "warn",
+      "aliases": [
+        "warning"
+      ],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：warn, warning",
+      "syntax": "warn <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 8,
+        "registration": "annotation",
+        "registeredNames": [
+          "warn",
+          "warning"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.error",
+      "variantId": "taboolib.action.kether.error.default",
+      "name": "error",
+      "aliases": [
+        "severe"
+      ],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：error, severe",
+      "syntax": "error <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 9,
+        "registration": "annotation",
+        "registeredNames": [
+          "error",
+          "severe"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.wait",
+      "variantId": "taboolib.action.kether.wait.default",
+      "name": "wait",
+      "aliases": [
+        "delay",
+        "sleep"
+      ],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：wait, delay, sleep",
+      "syntax": "wait <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 10,
+        "registration": "annotation",
+        "registeredNames": [
+          "wait",
+          "delay",
+          "sleep"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.async",
+      "variantId": "taboolib.action.kether.async.default",
+      "name": "async",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：async",
+      "syntax": "async <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 11,
+        "registration": "annotation",
+        "registeredNames": [
+          "async"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.call",
+      "variantId": "taboolib.action.kether.call.default",
+      "name": "call",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：call",
+      "syntax": "call <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 12,
+        "registration": "annotation",
+        "registeredNames": [
+          "call"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.goto",
+      "variantId": "taboolib.action.kether.goto.default",
+      "name": "goto",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：goto",
+      "syntax": "goto <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 13,
+        "registration": "annotation",
+        "registeredNames": [
+          "goto"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.if",
+      "variantId": "taboolib.action.kether.if.default",
+      "name": "if",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：if",
+      "syntax": "if <condition> then <action> [else <action>]",
+      "inputs": [],
+      "output": null,
+      "flow": "branch",
+      "shape": "container",
+      "slots": [
+        {
+          "name": "then",
+          "label": "条件成立",
+          "multiple": false,
+          "optional": false,
+          "accepts": [
+            "action"
+          ]
+        },
+        {
+          "name": "else",
+          "label": "条件不成立",
+          "multiple": false,
+          "optional": true,
+          "accepts": [
+            "action"
+          ]
+        }
+      ],
+      "grammar": {
+        "sequence": [
+          "if",
+          {
+            "input": "condition",
+            "accepts": [
+              "predicate",
+              "boolean"
+            ]
+          },
+          "then",
+          {
+            "branch": "then"
+          },
+          {
+            "optional": [
+              "else",
+              {
+                "branch": "else"
+              }
+            ]
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 14,
+        "registration": "annotation",
+        "registeredNames": [
+          "if"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.not",
+      "variantId": "taboolib.action.kether.not.default",
+      "name": "not",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：not",
+      "syntax": "not <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 15,
+        "registration": "annotation",
+        "registeredNames": [
+          "not"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.repeat",
+      "variantId": "taboolib.action.kether.repeat.default",
+      "name": "repeat",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：repeat",
+      "syntax": "repeat <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 16,
+        "registration": "annotation",
+        "registeredNames": [
+          "repeat"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.await",
+      "variantId": "taboolib.action.kether.await.default",
+      "name": "await",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：await",
+      "syntax": "await <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 17,
+        "registration": "annotation",
+        "registeredNames": [
+          "await"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.await-all",
+      "variantId": "taboolib.action.kether.await-all.default",
+      "name": "await_all",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：await_all",
+      "syntax": "await_all <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 18,
+        "registration": "annotation",
+        "registeredNames": [
+          "await_all"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.await-any",
+      "variantId": "taboolib.action.kether.await-any.default",
+      "name": "await_any",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：await_any",
+      "syntax": "await_any <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 19,
+        "registration": "annotation",
+        "registeredNames": [
+          "await_any"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.all",
+      "variantId": "taboolib.action.kether.all.default",
+      "name": "all",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：all",
+      "syntax": "all <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 20,
+        "registration": "annotation",
+        "registeredNames": [
+          "all"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.any",
+      "variantId": "taboolib.action.kether.any.default",
+      "name": "any",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：any",
+      "syntax": "any <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 21,
+        "registration": "annotation",
+        "registeredNames": [
+          "any"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.seq",
+      "variantId": "taboolib.action.kether.seq.default",
+      "name": "seq",
+      "aliases": [],
+      "category": "core",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：seq",
+      "syntax": "seq <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 22,
+        "registration": "annotation",
+        "registeredNames": [
+          "seq"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.command",
+      "variantId": "taboolib.action.kether.command.default",
+      "name": "command",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：command",
+      "syntax": "command <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 23,
+        "registration": "annotation",
+        "registeredNames": [
+          "command"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/ActionCommand.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.player",
+      "variantId": "taboolib.action.kether.player.default",
+      "name": "player",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：player",
+      "syntax": "player <operator> [to|add|sub <value>]",
+      "inputs": [],
+      "output": {
+        "type": "any"
+      },
+      "flow": "normal",
+      "shape": "reporter",
+      "grammar": {
+        "sequence": [
+          "player",
+          {
+            "operatorCatalog": "taboolib.player.operators"
+          },
+          {
+            "localRawRemainder": true
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 24,
+        "registration": "annotation",
+        "registeredNames": [
+          "player"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/ActionPlayer.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.tell",
+      "variantId": "taboolib.action.kether.tell.default",
+      "name": "tell",
+      "aliases": [
+        "send",
+        "message"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：tell, send, message",
+      "syntax": "tell <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 25,
+        "registration": "annotation",
+        "registeredNames": [
+          "tell",
+          "send",
+          "message"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.actionbar",
+      "variantId": "taboolib.action.kether.actionbar.default",
+      "name": "actionbar",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：actionbar",
+      "syntax": "actionbar <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 26,
+        "registration": "annotation",
+        "registeredNames": [
+          "actionbar"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.broadcast",
+      "variantId": "taboolib.action.kether.broadcast.default",
+      "name": "broadcast",
+      "aliases": [
+        "bc"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：broadcast, bc",
+      "syntax": "broadcast <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 27,
+        "registration": "annotation",
+        "registeredNames": [
+          "broadcast",
+          "bc"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.color",
+      "variantId": "taboolib.action.kether.color.default",
+      "name": "color",
+      "aliases": [
+        "colored"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：color, colored",
+      "syntax": "color <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 28,
+        "registration": "annotation",
+        "registeredNames": [
+          "color",
+          "colored"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.uncolor",
+      "variantId": "taboolib.action.kether.uncolor.default",
+      "name": "uncolor",
+      "aliases": [
+        "uncolored"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：uncolor, uncolored",
+      "syntax": "uncolor <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 29,
+        "registration": "annotation",
+        "registeredNames": [
+          "uncolor",
+          "uncolored"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.perm",
+      "variantId": "taboolib.action.kether.perm.default",
+      "name": "perm",
+      "aliases": [
+        "permission"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：perm, permission",
+      "syntax": "perm <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 30,
+        "registration": "annotation",
+        "registeredNames": [
+          "perm",
+          "permission"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.players",
+      "variantId": "taboolib.action.kether.players.default",
+      "name": "players",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：players",
+      "syntax": "players <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 31,
+        "registration": "annotation",
+        "registeredNames": [
+          "players"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.sender",
+      "variantId": "taboolib.action.kether.sender.default",
+      "name": "sender",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：sender",
+      "syntax": "sender <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 32,
+        "registration": "annotation",
+        "registeredNames": [
+          "sender"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.switch",
+      "variantId": "taboolib.action.kether.switch.default",
+      "name": "switch",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：switch",
+      "syntax": "switch <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 33,
+        "registration": "annotation",
+        "registeredNames": [
+          "switch"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.title",
+      "variantId": "taboolib.action.kether.title.default",
+      "name": "title",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：title",
+      "syntax": "title <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 34,
+        "registration": "annotation",
+        "registeredNames": [
+          "title"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.subtitle",
+      "variantId": "taboolib.action.kether.subtitle.default",
+      "name": "subtitle",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：subtitle",
+      "syntax": "subtitle <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 35,
+        "registration": "annotation",
+        "registeredNames": [
+          "subtitle"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.loc",
+      "variantId": "taboolib.action.kether.loc.default",
+      "name": "loc",
+      "aliases": [
+        "location"
+      ],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：loc, location",
+      "syntax": "loc <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 36,
+        "registration": "annotation",
+        "registeredNames": [
+          "loc",
+          "location"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.sound",
+      "variantId": "taboolib.action.kether.sound.default",
+      "name": "sound",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：sound",
+      "syntax": "sound <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 37,
+        "registration": "annotation",
+        "registeredNames": [
+          "sound"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.stopsound",
+      "variantId": "taboolib.action.kether.stopsound.default",
+      "name": "stopsound",
+      "aliases": [],
+      "category": "player",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：stopsound",
+      "syntax": "stopsound <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 38,
+        "registration": "annotation",
+        "registeredNames": [
+          "stopsound"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.itemstack",
+      "variantId": "taboolib.action.kether.itemstack.default",
+      "name": "itemstack",
+      "aliases": [],
+      "category": "platform",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：itemstack",
+      "syntax": "itemstack <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 39,
+        "registration": "annotation",
+        "registeredNames": [
+          "itemstack"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.material",
+      "variantId": "taboolib.action.kether.material.default",
+      "name": "material",
+      "aliases": [],
+      "category": "platform",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：material",
+      "syntax": "material <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 40,
+        "registration": "annotation",
+        "registeredNames": [
+          "material"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.scoreboard",
+      "variantId": "taboolib.action.kether.scoreboard.default",
+      "name": "scoreboard",
+      "aliases": [],
+      "category": "platform",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：scoreboard",
+      "syntax": "scoreboard <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 41,
+        "registration": "annotation",
+        "registeredNames": [
+          "scoreboard"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionScoreboard.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.papi",
+      "variantId": "taboolib.action.kether.papi.default",
+      "name": "papi",
+      "aliases": [
+        "placeholder"
+      ],
+      "category": "platform",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：papi, placeholder",
+      "syntax": "papi <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 42,
+        "registration": "annotation",
+        "registeredNames": [
+          "papi",
+          "placeholder"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/game/compat/ActionPlaceholder.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.for",
+      "variantId": "taboolib.action.kether.for.default",
+      "name": "for",
+      "aliases": [],
+      "category": "flow",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：for",
+      "syntax": "for <variable> in <action> then <action>",
+      "inputs": [],
+      "output": null,
+      "flow": "loop",
+      "shape": "container",
+      "slots": [
+        {
+          "name": "body",
+          "label": "循环体",
+          "multiple": false,
+          "optional": false,
+          "accepts": [
+            "action"
+          ]
+        }
+      ],
+      "grammar": {
+        "sequence": [
+          "for",
+          {
+            "literal": "variable"
+          },
+          "in",
+          {
+            "input": "iterable",
+            "accepts": [
+              "action"
+            ]
+          },
+          "then",
+          {
+            "branch": "body"
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 43,
+        "registration": "annotation",
+        "registeredNames": [
+          "for"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/loop/ActionFor.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.join",
+      "variantId": "taboolib.action.kether.join.default",
+      "name": "join",
+      "aliases": [],
+      "category": "flow",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：join",
+      "syntax": "join <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 44,
+        "registration": "annotation",
+        "registeredNames": [
+          "join"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/loop/ActionJoin.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.map",
+      "variantId": "taboolib.action.kether.map.default",
+      "name": "map",
+      "aliases": [],
+      "category": "flow",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：map",
+      "syntax": "map <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 45,
+        "registration": "annotation",
+        "registeredNames": [
+          "map"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/loop/ActionMap.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.while",
+      "variantId": "taboolib.action.kether.while.default",
+      "name": "while",
+      "aliases": [],
+      "category": "flow",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：while",
+      "syntax": "while <condition> then <action>",
+      "inputs": [],
+      "output": null,
+      "flow": "loop",
+      "shape": "container",
+      "slots": [
+        {
+          "name": "body",
+          "label": "循环体",
+          "multiple": false,
+          "optional": false,
+          "accepts": [
+            "action"
+          ]
+        }
+      ],
+      "grammar": {
+        "sequence": [
+          "while",
+          {
+            "input": "condition",
+            "accepts": [
+              "predicate",
+              "boolean"
+            ]
+          },
+          "then",
+          {
+            "branch": "body"
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 46,
+        "registration": "annotation",
+        "registeredNames": [
+          "while"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/loop/ActionWhile.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.break",
+      "variantId": "taboolib.action.kether.break.default",
+      "name": "break",
+      "aliases": [],
+      "category": "flow",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：break",
+      "syntax": "break <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 47,
+        "registration": "annotation",
+        "registeredNames": [
+          "break"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/loop/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.time",
+      "variantId": "taboolib.action.kether.time.default",
+      "name": "time",
+      "aliases": [
+        "date"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：time, date",
+      "syntax": "time <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 48,
+        "registration": "annotation",
+        "registeredNames": [
+          "time",
+          "date"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.day",
+      "variantId": "taboolib.action.kether.day.default",
+      "name": "day",
+      "aliases": [
+        "days"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：day, days",
+      "syntax": "day <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 49,
+        "registration": "annotation",
+        "registeredNames": [
+          "day",
+          "days"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.year",
+      "variantId": "taboolib.action.kether.year.default",
+      "name": "year",
+      "aliases": [
+        "years"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：year, years",
+      "syntax": "year <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 50,
+        "registration": "direct",
+        "registeredNames": [
+          "year",
+          "years"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.month",
+      "variantId": "taboolib.action.kether.month.default",
+      "name": "month",
+      "aliases": [
+        "months"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：month, months",
+      "syntax": "month <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 51,
+        "registration": "direct",
+        "registeredNames": [
+          "month",
+          "months"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.hour",
+      "variantId": "taboolib.action.kether.hour.default",
+      "name": "hour",
+      "aliases": [
+        "hours"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：hour, hours",
+      "syntax": "hour <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 52,
+        "registration": "direct",
+        "registeredNames": [
+          "hour",
+          "hours"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.minute",
+      "variantId": "taboolib.action.kether.minute.default",
+      "name": "minute",
+      "aliases": [
+        "minutes"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：minute, minutes",
+      "syntax": "minute <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 53,
+        "registration": "direct",
+        "registeredNames": [
+          "minute",
+          "minutes"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.second",
+      "variantId": "taboolib.action.kether.second.default",
+      "name": "second",
+      "aliases": [
+        "seconds"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：second, seconds",
+      "syntax": "second <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 54,
+        "registration": "direct",
+        "registeredNames": [
+          "second",
+          "seconds"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/ActionDate.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.null",
+      "variantId": "taboolib.action.kether.null.default",
+      "name": "null",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：null",
+      "syntax": "null <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 55,
+        "registration": "annotation",
+        "registeredNames": [
+          "null"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.pass",
+      "variantId": "taboolib.action.kether.pass.default",
+      "name": "pass",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：pass",
+      "syntax": "pass <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 56,
+        "registration": "annotation",
+        "registeredNames": [
+          "pass"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.vars",
+      "variantId": "taboolib.action.kether.vars.default",
+      "name": "vars",
+      "aliases": [
+        "variables"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：vars, variables",
+      "syntax": "vars <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 57,
+        "registration": "annotation",
+        "registeredNames": [
+          "vars",
+          "variables"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.size",
+      "variantId": "taboolib.action.kether.size.default",
+      "name": "size",
+      "aliases": [
+        "length"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：size, length",
+      "syntax": "size <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 58,
+        "registration": "annotation",
+        "registeredNames": [
+          "size",
+          "length"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.mutable",
+      "variantId": "taboolib.action.kether.mutable.default",
+      "name": "mutable",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：mutable",
+      "syntax": "mutable <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 59,
+        "registration": "annotation",
+        "registeredNames": [
+          "mutable"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.shuffle",
+      "variantId": "taboolib.action.kether.shuffle.default",
+      "name": "shuffle",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：shuffle",
+      "syntax": "shuffle <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 60,
+        "registration": "annotation",
+        "registeredNames": [
+          "shuffle"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.reverse",
+      "variantId": "taboolib.action.kether.reverse.default",
+      "name": "reverse",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：reverse",
+      "syntax": "reverse <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 61,
+        "registration": "annotation",
+        "registeredNames": [
+          "reverse"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.array",
+      "variantId": "taboolib.action.kether.array.default",
+      "name": "array",
+      "aliases": [
+        "arr"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：array, arr",
+      "syntax": "array <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 62,
+        "registration": "annotation",
+        "registeredNames": [
+          "array",
+          "arr"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-get",
+      "variantId": "taboolib.action.kether.arr-get.default",
+      "name": "arr-get",
+      "aliases": [
+        "element",
+        "elem"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-get, element, elem",
+      "syntax": "arr-get <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 63,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-get",
+          "element",
+          "elem"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-add",
+      "variantId": "taboolib.action.kether.arr-add.default",
+      "name": "arr-add",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-add",
+      "syntax": "arr-add <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 64,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-add"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-add-first",
+      "variantId": "taboolib.action.kether.arr-add-first.default",
+      "name": "arr-add-first",
+      "aliases": [
+        "arr-push"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-add-first, arr-push",
+      "syntax": "arr-add-first <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 65,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-add-first",
+          "arr-push"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-remove",
+      "variantId": "taboolib.action.kether.arr-remove.default",
+      "name": "arr-remove",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-remove",
+      "syntax": "arr-remove <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 66,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-remove"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-remove-at",
+      "variantId": "taboolib.action.kether.arr-remove-at.default",
+      "name": "arr-remove-at",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-remove-at",
+      "syntax": "arr-remove-at <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 67,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-remove-at"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-remove-first",
+      "variantId": "taboolib.action.kether.arr-remove-first.default",
+      "name": "arr-remove-first",
+      "aliases": [
+        "arr-take"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-remove-first, arr-take",
+      "syntax": "arr-remove-first <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 68,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-remove-first",
+          "arr-take"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-remove-last",
+      "variantId": "taboolib.action.kether.arr-remove-last.default",
+      "name": "arr-remove-last",
+      "aliases": [
+        "arr-drop"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-remove-last, arr-drop",
+      "syntax": "arr-remove-last <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 69,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-remove-last",
+          "arr-drop"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.arr-find",
+      "variantId": "taboolib.action.kether.arr-find.default",
+      "name": "arr-find",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：arr-find",
+      "syntax": "arr-find <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 70,
+        "registration": "annotation",
+        "registeredNames": [
+          "arr-find"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionArray.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.entry",
+      "variantId": "taboolib.action.kether.entry.default",
+      "name": "$",
+      "aliases": [
+        "js",
+        "javascript"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：$, js, javascript",
+      "syntax": "$ <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 71,
+        "registration": "annotation",
+        "registeredNames": [
+          "$",
+          "js",
+          "javascript"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionJavaScript.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.calc",
+      "variantId": "taboolib.action.kether.calc.default",
+      "name": "calc",
+      "aliases": [
+        "calculate"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：calc, calculate",
+      "syntax": "calc <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 72,
+        "registration": "annotation",
+        "registeredNames": [
+          "calc",
+          "calculate"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionJexl3.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.invoke",
+      "variantId": "taboolib.action.kether.invoke.default",
+      "name": "invoke",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：invoke",
+      "syntax": "invoke <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 73,
+        "registration": "annotation",
+        "registeredNames": [
+          "invoke"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionJexl3.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.match",
+      "variantId": "taboolib.action.kether.match.default",
+      "name": "match",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：match",
+      "syntax": "match <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 74,
+        "registration": "annotation",
+        "registeredNames": [
+          "match"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionMatcher.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.math",
+      "variantId": "taboolib.action.kether.math.default",
+      "name": "math",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：math",
+      "syntax": "math <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 75,
+        "registration": "annotation",
+        "registeredNames": [
+          "math"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionMath.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.random",
+      "variantId": "taboolib.action.kether.random.default",
+      "name": "random",
+      "aliases": [
+        "random2"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：random, random2",
+      "syntax": "random <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 76,
+        "registration": "annotation",
+        "registeredNames": [
+          "random",
+          "random2"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionRandom.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.type",
+      "variantId": "taboolib.action.kether.type.default",
+      "name": "type",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：type",
+      "syntax": "type <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 77,
+        "registration": "annotation",
+        "registeredNames": [
+          "type"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionType.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether-inner-when.when",
+      "variantId": "taboolib.action.kether-inner-when.when.default",
+      "name": "when",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether_inner:when",
+      "description": "TabooLib 6.3.0 注册 parser：when",
+      "syntax": "when <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 78,
+        "registration": "annotation",
+        "registeredNames": [
+          "when"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionWhen.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether-inner-when.else",
+      "variantId": "taboolib.action.kether-inner-when.else.default",
+      "name": "else",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether_inner:when",
+      "description": "TabooLib 6.3.0 注册 parser：else",
+      "syntax": "else <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 79,
+        "registration": "annotation",
+        "registeredNames": [
+          "else"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionWhen.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.case",
+      "variantId": "taboolib.action.kether.case.default",
+      "name": "case",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：case",
+      "syntax": "case <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 80,
+        "registration": "annotation",
+        "registeredNames": [
+          "case"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/ActionWhen.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.scale",
+      "variantId": "taboolib.action.kether.scale.default",
+      "name": "scale",
+      "aliases": [
+        "scaled"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：scale, scaled",
+      "syntax": "scale <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 81,
+        "registration": "annotation",
+        "registeredNames": [
+          "scale",
+          "scaled"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.round",
+      "variantId": "taboolib.action.kether.round.default",
+      "name": "round",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：round",
+      "syntax": "round <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 82,
+        "registration": "annotation",
+        "registeredNames": [
+          "round"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.split",
+      "variantId": "taboolib.action.kether.split.default",
+      "name": "split",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：split",
+      "syntax": "split <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 83,
+        "registration": "annotation",
+        "registeredNames": [
+          "split"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.format",
+      "variantId": "taboolib.action.kether.format.default",
+      "name": "format",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：format",
+      "syntax": "format <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 84,
+        "registration": "annotation",
+        "registeredNames": [
+          "format"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.printed",
+      "variantId": "taboolib.action.kether.printed.default",
+      "name": "printed",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：printed",
+      "syntax": "printed <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 85,
+        "registration": "annotation",
+        "registeredNames": [
+          "printed"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.check",
+      "variantId": "taboolib.action.kether.check.default",
+      "name": "check",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：check",
+      "syntax": "check <left> <operator> <right>",
+      "inputs": [],
+      "output": {
+        "type": "boolean"
+      },
+      "flow": "normal",
+      "shape": "predicate",
+      "grammar": {
+        "sequence": [
+          "check",
+          {
+            "input": "left",
+            "accepts": [
+              "any"
+            ]
+          },
+          {
+            "localRaw": "operator"
+          },
+          {
+            "input": "right",
+            "accepts": [
+              "any"
+            ]
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 86,
+        "registration": "annotation",
+        "registeredNames": [
+          "check"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.inline",
+      "variantId": "taboolib.action.kether.inline.default",
+      "name": "inline",
+      "aliases": [
+        "function"
+      ],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：inline, function",
+      "syntax": "inline <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 87,
+        "registration": "annotation",
+        "registeredNames": [
+          "inline",
+          "function"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.optional",
+      "variantId": "taboolib.action.kether.optional.default",
+      "name": "optional",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：optional",
+      "syntax": "optional <local-raw...>",
+      "inputs": [
+        {
+          "name": "本地原始参数",
+          "key": "arguments",
+          "type": "raw",
+          "accepts": [
+            "raw"
+          ],
+          "required": false,
+          "default": null,
+          "rawEditor": "text"
+        }
+      ],
+      "output": null,
+      "flow": "normal",
+      "shape": "raw",
+      "grammar": {
+        "localRawRemainder": true,
+        "fallback": "local-block",
+        "reason": "grammar-not-declared-by-source-extractor"
+      },
+      "source": {
+        "parserGroup": 88,
+        "registration": "annotation",
+        "registeredNames": [
+          "optional"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    },
+    {
+      "id": "taboolib.action.kether.range",
+      "variantId": "taboolib.action.kether.range.default",
+      "name": "range",
+      "aliases": [],
+      "category": "data",
+      "namespace": "kether",
+      "description": "TabooLib 6.3.0 注册 parser：range",
+      "syntax": "range <from> to <to> [step <step>]",
+      "inputs": [],
+      "output": {
+        "type": "list"
+      },
+      "flow": "normal",
+      "shape": "reporter",
+      "grammar": {
+        "sequence": [
+          "range",
+          {
+            "input": "from",
+            "accepts": [
+              "double"
+            ]
+          },
+          "to",
+          {
+            "input": "to",
+            "accepts": [
+              "double"
+            ]
+          },
+          {
+            "optional": [
+              "step",
+              {
+                "input": "step",
+                "accepts": [
+                  "double"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "source": {
+        "parserGroup": 89,
+        "registration": "annotation",
+        "registeredNames": [
+          "range"
+        ],
+        "file": "src/main/kotlin/taboolib/module/kether/action/transform/Actions.kt",
+        "baseline": "6.3.0@ae4bcf2c02e573e33f2c0dcbb02d89b8236e509b"
+      }
+    }
+  ],
+  "selectors": [],
+  "triggers": [],
+  "properties": [
+    {
+      "id": "taboolib.property.item-operator",
+      "name": "item.operator",
+      "category": "platform",
+      "description": "ItemStack 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "ItemStack",
+      "source": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+      "keys": [
+        {
+          "name": "type",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "material",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "meta",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "itemmeta",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "data",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "damage",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "durability",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "name",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "lore",
+          "type": "any",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.itemmeta-operator",
+      "name": "itemMeta.operator",
+      "category": "platform",
+      "description": "ItemMeta 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "ItemMeta",
+      "source": "src/main/kotlin/taboolib/module/kether/action/game/bukkit/ActionItemStack.kt",
+      "keys": [
+        {
+          "name": "name",
+          "type": "any",
+          "writable": true
+        },
+        {
+          "name": "lore",
+          "type": "any",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.string-operator",
+      "name": "string.operator",
+      "category": "data",
+      "description": "String 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "String",
+      "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+      "keys": [
+        {
+          "name": "upper",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "uppercase",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "lower",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "lowercase",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "length",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "size",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "trim",
+          "type": "any",
+          "writable": false
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.map-operator",
+      "name": "map.operator",
+      "category": "data",
+      "description": "Map 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "Map",
+      "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+      "keys": [
+        {
+          "name": "length",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "size",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "keys",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "values",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "@<key>",
+          "type": "any",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.list-operator",
+      "name": "list.operator",
+      "category": "data",
+      "description": "List 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "List",
+      "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+      "keys": [
+        {
+          "name": "length",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "size",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "<index>",
+          "type": "any",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.array-operator",
+      "name": "array.operator",
+      "category": "data",
+      "description": "Array 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "Array",
+      "source": "src/main/kotlin/taboolib/module/kether/action/supplier/Actions.kt",
+      "keys": [
+        {
+          "name": "length",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "size",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "<index>",
+          "type": "any",
+          "writable": true
+        }
+      ]
+    },
+    {
+      "id": "taboolib.property.matcher-operator",
+      "name": "matcher.operator",
+      "category": "data",
+      "description": "Matcher 绑定的 ScriptProperty（TabooLib 6.3.0）",
+      "usage": "&value[<key>]",
+      "bind": "Matcher",
+      "source": "src/main/kotlin/taboolib/module/kether/action/transform/ActionMatcher.kt",
+      "keys": [
+        {
+          "name": "<index>",
+          "type": "any",
+          "writable": false
+        },
+        {
+          "name": "<name>",
+          "type": "any",
+          "writable": false
+        }
+      ]
+    }
+  ],
+  "operators": [
+    {
+      "id": "taboolib.player.operator.locale",
+      "name": "LOCALE",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LOCALE（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "locale",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.world",
+      "name": "WORLD",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.WORLD（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "world",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.x",
+      "name": "X",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.X（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "x",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.y",
+      "name": "Y",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.Y（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "y",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.z",
+      "name": "Z",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.Z（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "z",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.yaw",
+      "name": "YAW",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.YAW（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "yaw",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.pitch",
+      "name": "PITCH",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.PITCH（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "pitch",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.block-x",
+      "name": "BLOCK_X",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BLOCK_X（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "block",
+          "x",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.block-y",
+      "name": "BLOCK_Y",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BLOCK_Y（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "block",
+          "y",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.block-z",
+      "name": "BLOCK_Z",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BLOCK_Z（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "block",
+          "z",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.compass-x",
+      "name": "COMPASS_X",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.COMPASS_X（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "compass",
+          "x",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.compass-y",
+      "name": "COMPASS_Y",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.COMPASS_Y（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "compass",
+          "y",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.compass-z",
+      "name": "COMPASS_Z",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.COMPASS_Z（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "compass",
+          "z",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.location",
+      "name": "LOCATION",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LOCATION（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "location",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.compass-target",
+      "name": "COMPASS_TARGET",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.COMPASS_TARGET（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "compass",
+          "target",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.bed-spawn",
+      "name": "BED_SPAWN",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BED_SPAWN（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "bed",
+          "spawn",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.bed-spawn-x",
+      "name": "BED_SPAWN_X",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BED_SPAWN_X（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "bed",
+          "spawn",
+          "x",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.bed-spawn-y",
+      "name": "BED_SPAWN_Y",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BED_SPAWN_Y（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "bed",
+          "spawn",
+          "y",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.bed-spawn-z",
+      "name": "BED_SPAWN_Z",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BED_SPAWN_Z（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "bed",
+          "spawn",
+          "z",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.name",
+      "name": "NAME",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.NAME（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "name",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.list-name",
+      "name": "LIST_NAME",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LIST_NAME（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "list",
+          "name",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.display-name",
+      "name": "DISPLAY_NAME",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.DISPLAY_NAME（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "display",
+          "name",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.uuid",
+      "name": "UUID",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.UUID（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "uuid",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.gamemode",
+      "name": "GAMEMODE",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.GAMEMODE（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "gamemode",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.address",
+      "name": "ADDRESS",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.ADDRESS（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "address",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.sneaking",
+      "name": "SNEAKING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SNEAKING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "sneaking",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.sprinting",
+      "name": "SPRINTING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SPRINTING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "sprinting",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.blocking",
+      "name": "BLOCKING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.BLOCKING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "blocking",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.gliding",
+      "name": "GLIDING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.GLIDING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "gliding",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.glowing",
+      "name": "GLOWING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.GLOWING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "glowing",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.swimming",
+      "name": "SWIMMING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SWIMMING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "swimming",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.riptiding",
+      "name": "RIPTIDING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.RIPTIDING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "riptiding",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.sleeping",
+      "name": "SLEEPING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SLEEPING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "sleeping",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.sleep-ticks",
+      "name": "SLEEP_TICKS",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SLEEP_TICKS（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "sleep",
+          "ticks",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.sleep-ignored",
+      "name": "SLEEP_IGNORED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SLEEP_IGNORED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "sleep",
+          "ignored",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.dead",
+      "name": "DEAD",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.DEAD（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "dead",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.conversing",
+      "name": "CONVERSING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.CONVERSING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "conversing",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.leashed",
+      "name": "LEASHED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LEASHED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "leashed",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.on-ground",
+      "name": "ON_GROUND",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.ON_GROUND（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "on",
+          "ground",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.is-online",
+      "name": "IS_ONLINE",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.IS_ONLINE（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "is",
+          "online",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.inside-vehicle",
+      "name": "INSIDE_VEHICLE",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.INSIDE_VEHICLE（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "inside",
+          "vehicle",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.op",
+      "name": "OP",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.OP（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "op",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.gravity",
+      "name": "GRAVITY",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.GRAVITY（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "gravity",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.attack-cooldown",
+      "name": "ATTACK_COOLDOWN",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.ATTACK_COOLDOWN（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "attack",
+          "cooldown",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.player-time",
+      "name": "PLAYER_TIME",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.PLAYER_TIME（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "player",
+          "time",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.first-played",
+      "name": "FIRST_PLAYED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.FIRST_PLAYED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "first",
+          "played",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.last-played",
+      "name": "LAST_PLAYED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LAST_PLAYED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "last",
+          "played",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.absorption-amount",
+      "name": "ABSORPTION_AMOUNT",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.ABSORPTION_AMOUNT（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "absorption",
+          "amount",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.no-damage-ticks",
+      "name": "NO_DAMAGE_TICKS",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.NO_DAMAGE_TICKS（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "no",
+          "damage",
+          "ticks",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.remaining-air",
+      "name": "REMAINING_AIR",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.REMAINING_AIR（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "remaining",
+          "air",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.maximum-air",
+      "name": "MAXIMUM_AIR",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.MAXIMUM_AIR（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "maximum",
+          "air",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.exp",
+      "name": "EXP",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.EXP（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "exp",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.level",
+      "name": "LEVEL",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.LEVEL（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "level",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.exhaustion",
+      "name": "EXHAUSTION",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.EXHAUSTION（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "exhaustion",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.saturation",
+      "name": "SATURATION",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.SATURATION（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "saturation",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.food-level",
+      "name": "FOOD_LEVEL",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.FOOD_LEVEL（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "food",
+          "level",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.health",
+      "name": "HEALTH",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.HEALTH（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "health",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.max-health",
+      "name": "MAX_HEALTH",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.MAX_HEALTH（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "max",
+          "health",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.allow-flight",
+      "name": "ALLOW_FLIGHT",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.ALLOW_FLIGHT（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "allow",
+          "flight",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.flying",
+      "name": "FLYING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.FLYING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "flying",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.fly-speed",
+      "name": "FLY_SPEED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.FLY_SPEED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "fly",
+          "speed",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.walk-speed",
+      "name": "WALK_SPEED",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.WALK_SPEED（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": true,
+      "methods": [
+        "INCREASE",
+        "DECREASE",
+        "MODIFY"
+      ],
+      "grammar": {
+        "sequence": [
+          "player",
+          "walk",
+          "speed",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.ping",
+      "name": "PING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.PING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "ping",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.pose",
+      "name": "POSE",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.POSE（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "pose",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    },
+    {
+      "id": "taboolib.player.operator.facing",
+      "name": "FACING",
+      "category": "player",
+      "inputTypes": [
+        "player"
+      ],
+      "outputType": "any",
+      "description": "PlayerOperators.FACING（TabooLib 6.3.0）",
+      "readable": true,
+      "writable": false,
+      "methods": [],
+      "grammar": {
+        "sequence": [
+          "player",
+          "facing",
+          {
+            "localRawRemainder": true
+          }
+        ],
+        "source": "src/main/kotlin/taboolib/module/kether/action/game/PlayerOperators.kt"
+      }
+    }
+  ],
+  "grammar": {
+    "parserGroups": 89,
+    "registeredNames": 126,
+    "aliasCount": 37,
+    "annotationGroups": 84,
+    "directRegistrationGroups": 5,
+    "playerOperatorCatalog": "taboolib.player.operators",
+    "rawFallback": "local-block"
+  }
+}

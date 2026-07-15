@@ -1,8 +1,9 @@
 import type { Node, Edge } from "@xyflow/react"
 import type { SchemaAction } from "@/types/schema"
 import type { ASTNode } from "@/lib/kether-ast"
+import type { BlockDocument } from "@/lib/block-document"
 
-export type KetherInputKind = "number" | "string" | "boolean" | "identifier" | "var_ref" | "lazy_ref"
+export type KetherInputKind = "number" | "string" | "boolean" | "identifier" | "var_ref" | "lazy_ref" | "raw" | "block"
 
 export interface KetherSlotLayout {
   x: number
@@ -34,7 +35,13 @@ export interface KetherNodeData extends Record<string, unknown> {
   provides?: Record<string, string>
   astRef?: ASTNode
   readOnly?: boolean
-  nodeKind: "action" | "branch" | "loop" | "data" | "set" | "calc"
+  order?: number
+  documentBlockId?: string
+  variantId?: string
+  blockShape?: "command" | "reporter" | "predicate" | "container" | "raw"
+  inputBlocks?: Record<string, string>
+  rawSource?: string
+  nodeKind: "action" | "branch" | "loop" | "data" | "set" | "calc" | "raw"
 }
 
 export interface KetherEdgeData extends Record<string, unknown> {
@@ -55,5 +62,7 @@ export type KetherEdge = Edge<KetherEdgeData>
 export interface FlowState {
   nodes: KetherNode[]
   edges: KetherEdge[]
+  /** React Flow 只是该文档的投影；执行顺序与嵌套关系来自 document。 */
+  document?: BlockDocument
   readOnlyReasons?: string[]
 }

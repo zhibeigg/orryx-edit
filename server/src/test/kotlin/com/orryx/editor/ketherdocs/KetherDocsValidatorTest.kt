@@ -73,6 +73,30 @@ class KetherDocsValidatorTest {
     }
 
     @Test
+    fun `accepts v4 schema with explicit type and variant semantics`() {
+        val schema = validSchemaV4Bytes()
+        val pointer = KetherChannelPointer(
+            releaseId = TEST_RELEASE_ID,
+            pluginVersion = TEST_PLUGIN_VERSION,
+            commit = TEST_COMMIT,
+            publishedAt = Instant.parse("2026-03-20T00:00:00Z"),
+            releaseManifest = "/Orryx/kether/releases/$TEST_PLUGIN_VERSION/$TEST_COMMIT/manifest.json"
+        )
+        val manifest = KetherReleaseManifest(
+            releaseId = TEST_RELEASE_ID,
+            pluginVersion = TEST_PLUGIN_VERSION,
+            commit = TEST_COMMIT,
+            schemaVersion = 4,
+            generatedAt = pointer.publishedAt,
+            previousReleaseId = null,
+            schema = KetherAsset("actions-schema.json", "application/json", schema.size.toLong(), sha256(schema))
+        )
+
+        val fetched = validator.validateRemoteSchema(schema, pointer, manifest)
+        assertEquals(4, fetched.schemaVersion)
+    }
+
+    @Test
     fun `rejects off-origin manifest and checksum mismatch`() {
         val channelBytes = """
             {

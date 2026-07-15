@@ -32,8 +32,8 @@ internal fun Route.ketherDocsAdminRoutes(
     }
 }
 
-internal suspend fun ApplicationCall.respondKetherDocsSchema(service: KetherDocsService) {
-    val schema = service.currentSchema()
+internal suspend fun ApplicationCall.respondKetherDocsSchema(service: KetherDocsService, legacy: Boolean = false) {
+    val schema = if (legacy) service.currentLegacySchema() else service.currentSchema()
     if (schema == null) {
         respond(
             HttpStatusCode.ServiceUnavailable,

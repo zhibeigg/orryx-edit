@@ -48,6 +48,7 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
   const station = useMemo<StationData>(() => parsed.ok
     ? { ...parsed.data, Options: parsed.data.Options ?? { Event: "" } }
     : { Options: { Event: "" } }, [parsed])
+  const stationTrigger = useMemo(() => getActionsSchema()?.triggers.find((trigger) => trigger.name === station.Options.Event), [station.Options.Event])
 
   const updateStation = useCallback((updater: (s: StationData) => StationData) => {
     const updated = updater(station)
@@ -78,7 +79,7 @@ export function StationEditor({ content, onChange, filePath }: StationEditorProp
 
       <TabsContent value="actions" className="flex-1 overflow-y-auto">
         <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}>
-          <div className="h-full"><ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" /></div>
+          <div className="h-full"><ActionsEditor value={station.Actions ?? ""} onChange={(a) => updateStation((s) => ({ ...s, Actions: a }))} height="100%" context={{ kind: "station", name: filePath, trigger: stationTrigger }} /></div>
         </YamlVisualGuard>
       </TabsContent>
 
@@ -204,7 +205,7 @@ function StationOptionsPanel({ options, onChange }: { options: StationOptions; o
         <label className="block text-sm font-medium text-foreground mb-1">
           冷却间隔 <span className="text-xs text-muted-foreground ml-2">Kether 脚本，返回 Tick 数</span>
         </label>
-        <ActionsEditor value={options.BaffleAction ?? ""} onChange={(v) => onChange({ BaffleAction: v })} height="60px" />
+        <ActionsEditor value={options.BaffleAction ?? ""} onChange={(v) => onChange({ BaffleAction: v })} height="96px" context={{ kind: "station", trigger: selectedTrigger }} />
       </div>
     </div>
   )

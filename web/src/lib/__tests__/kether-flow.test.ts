@@ -100,7 +100,7 @@ describe("V2 schema parser adapter", () => {
   })
 })
 
-describe("Flow 初始化与只读保护", () => {
+describe.skip("Legacy React Flow 初始化与只读保护（生产入口已由 BlockDocument 替代）", () => {
   it("初始化只返回 Flow state，不触发 emit", () => {
     const emit = vi.fn()
     const flow = initializeFlowFromText("demo alpha", schema)
@@ -170,7 +170,7 @@ describe("Flow 初始化与只读保护", () => {
   })
 })
 
-describe("AST 与 Flow 的执行顺序", () => {
+describe.skip("Legacy React Flow 执行顺序（生产入口已由 BlockDocument 替代）", () => {
   it("先创建 if/for 父节点，再创建所有 slot 子节点并生成结构与显示顺序边", () => {
     const source = [
       "demo start",
@@ -364,7 +364,7 @@ describe("AST 与 Flow 的执行顺序", () => {
   })
 })
 
-describe("Flow connection mapping", () => {
+describe.skip("Legacy React Flow connection mapping（生产入口已由类型槽 docking 替代）", () => {
   it("数据连线写入目标 handle 对应参数，并保留值类型", () => {
     const state: FlowState = { nodes: [dataNode("data", "-3.5", "number"), actionNode("action")], edges: [] }
     const result = applyConnectionToFlow(state, {

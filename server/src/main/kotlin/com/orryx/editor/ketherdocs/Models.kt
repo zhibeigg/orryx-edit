@@ -48,20 +48,28 @@ internal data class KetherReleaseManifest(
     val releaseId: String,
     val pluginVersion: String,
     val commit: String,
+    /** legacy actions-schema.json 的版本。 */
     val schemaVersion: Int,
+    /** 独立 Registry 版本；旧发布清单可缺省。 */
+    val registryVersion: Int? = null,
     val generatedAt: Instant,
     val previousReleaseId: String?,
-    val schema: KetherAsset
+    val schema: KetherAsset,
+    val registry: KetherAsset? = null
 )
 
 internal data class FetchedKetherDocs(
     val releaseId: String,
     val pluginVersion: String,
     val commit: String,
+    /** 当前供新编辑器消费的文档版本（优先 Registry v4）。 */
     val schemaVersion: Int,
     val publishedAt: Instant,
     val schemaSha256: String,
-    val schemaBytes: ByteArray
+    val schemaBytes: ByteArray,
+    /** 兼容旧客户端的 actions-schema.json v3。 */
+    val legacySchemaSha256: String? = null,
+    val legacySchemaBytes: ByteArray? = null
 )
 
 internal data class CachedKetherDocs(
@@ -94,7 +102,9 @@ internal data class ActiveKetherDocs(
     val schemaSha256: String,
     val schemaBytes: ByteArray,
     val publishedAt: Instant?,
-    val syncedAt: Instant?
+    val syncedAt: Instant?,
+    val legacySchemaSha256: String? = null,
+    val legacySchemaBytes: ByteArray? = null
 )
 
 class KetherDocsFailure(val code: String) : RuntimeException(code)
@@ -114,6 +124,7 @@ object KetherDocsErrorCode {
     const val SCHEMA_INVALID = "KETHER_DOCS_SCHEMA_INVALID"
     const val CACHE_INVALID = "KETHER_DOCS_CACHE_INVALID"
     const val BUNDLED_FALLBACK = "KETHER_DOCS_BUNDLED_FALLBACK"
+    const val REMOTE_SCHEMA_OLDER = "KETHER_DOCS_REMOTE_SCHEMA_OLDER"
     const val NO_USABLE_SCHEMA = "KETHER_DOCS_NO_USABLE_SCHEMA"
     const val SYNC_FAILED = "KETHER_DOCS_SYNC_FAILED"
 }

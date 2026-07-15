@@ -4,8 +4,9 @@ import type {
   IfNode, ForNode, CalcNode as ASTCalcNode, VarRefNode,
   NumberNode, StringNode, BooleanNode, IdentifierNode, LazyRefNode
 } from "./kether-ast"
-import { parseKether } from "./kether-ast"
-import { toParserActionsSchema, type ActionsSchemaV2, type SchemaAction, type SchemaInput } from "@/types/schema"
+import { parseKether, stringifyNode } from "./kether-ast"
+import { buildSchemaCatalog, catalogActionsForName, keywordAlternatives, toParserActionsSchema, type ActionsSchemaV2, type SchemaAction, type SchemaCatalog, type SchemaInput } from "@/types/schema"
+import { parseBlockDocument } from "./block-document"
 import type {
   KetherNode, KetherEdge, KetherNodeData, FlowState, KetherInputKind
 } from "@/components/editor/flow/flow-types"
@@ -28,13 +29,13 @@ const SIMPLE_EXPRESSION_TYPES = new Set<ASTNode["type"]>([
   "number", "string", "boolean", "identifier", "var_ref", "lazy_ref",
 ])
 
-function buildActionMap(schema: ActionsSchemaV2): Map<string, SchemaAction> {
-  const map = new Map<string, SchemaAction>()
-  for (const action of schema.actions) {
-    map.set(action.name.toLowerCase(), action)
-    for (const alias of action.aliases ?? []) map.set(alias.toLowerCase(), action)
-  }
-  return map
+function buildActionMap(schema: ActionsSchemaV2): SchemaCatalog {
+  return buildSchemaCatalog(schema)
+}
+
+function resolveAction(catalog: SchemaCatalog, name: string, variantId?: string | null): SchemaAction | null {
+  if (variantId) return catalog.byVariantId.get(variantId) ?? catalog.byId.get(variantId) ?? null
+  return catalogActionsForName(catalog, name)[0] ?? null
 }
 
 function hasComment(source: string): boolean {
@@ -89,7 +90,7 @@ export function analyzeFlowCompatibility(
   const visit = (node: ASTNode, context: string) => {
     switch (node.type) {
       case "action_call": {
-        const action = actionMap.get(node.name.toLowerCase())
+        const action = resolveAction(actionMap, node.name, node.variantId)
         if (!action && (node.args.length > 0 || Object.keys(node.keywordArgs).length > 0)) {
           reasons.add(`未知 action ${node.name} 带有参数`)
         }
@@ -184,19 +185,17 @@ export function astToFlow(
   const nodes: KetherNode[] = []
   const edges: KetherEdge[] = []
   const actionMap = buildActionMap(schema)
-  const compatibility = analyzeFlowCompatibility(ast, schema, source)
-
   convertSequence(ast.body, nodes, edges, actionMap, schema, null, {
     scopeId: "script",
     semantic: true,
   })
 
   for (const node of nodes) {
-    node.data.readOnly = !compatibility.writable
+    node.data.readOnly = false
     const savedPosition = existingPositions?.get(node.id)
     if (savedPosition) node.position = savedPosition
   }
-  return { nodes, edges, readOnlyReasons: compatibility.reasons }
+  return { nodes, edges, document: parseBlockDocument(source || ast.body.map(stringifyNode).join("\n"), schema), readOnlyReasons: [] }
 }
 
 interface SequenceContext {
@@ -209,7 +208,7 @@ function convertSequence(
   statements: ASTNode[],
   nodes: KetherNode[],
   edges: KetherEdge[],
-  actionMap: Map<string, SchemaAction>,
+  actionMap: SchemaCatalog,
   schema: ActionsSchemaV2,
   parentId: string | null,
   context: SequenceContext
@@ -217,6 +216,10 @@ function convertSequence(
   const ids = statements.flatMap((statement) => (
     convertNode(statement, nodes, edges, actionMap, schema, parentId)
   ))
+  ids.forEach((id, order) => {
+    const projected = nodes.find((node) => node.id === id)
+    if (projected) projected.data.order = order
+  })
 
   for (let index = 0; index < ids.length - 1; index += 1) {
     const source = ids[index]
@@ -245,7 +248,7 @@ function convertNode(
   node: ASTNode,
   nodes: KetherNode[],
   edges: KetherEdge[],
-  actionMap: Map<string, SchemaAction>,
+  actionMap: SchemaCatalog,
   schema: ActionsSchemaV2,
   parentId: string | null
 ): string[] {
@@ -263,10 +266,20 @@ function convertNode(
       return [convertDataNode(node, nodes, parentId)]
     case "calc": return [convertCalcNode(node, nodes, parentId)]
     case "block":
-      return node.body.flatMap((child) => (
-        convertNode(child, nodes, edges, actionMap, schema, parentId)
-      ))
-    default: return []
+      return [convertRawNode(node, nodes, parentId)]
+    case "case":
+    case "check":
+    case "logic":
+    case "math":
+    case "flag":
+    case "inline":
+    case "lazy":
+    case "selector":
+    case "comment":
+    case "error":
+    case "raw":
+      return [convertRawNode(node, nodes, parentId)]
+    default: return [convertRawNode(node, nodes, parentId)]
   }
 }
 
@@ -297,11 +310,11 @@ function addStructureEdge(
 function convertActionCall(
   node: ActionCallNode,
   nodes: KetherNode[],
-  actionMap: Map<string, SchemaAction>,
+  actionMap: SchemaCatalog,
   parentId: string | null
 ): string {
   const id = nextId("action")
-  const schemaAction = actionMap.get(node.name.toLowerCase()) ?? null
+  const schemaAction = resolveAction(actionMap, node.name, node.variantId)
   const inputs: Record<string, unknown> = {}
   const inputKinds: Record<string, KetherInputKind> = {}
 
@@ -310,17 +323,17 @@ function convertActionCall(
     node.args.forEach((argument, index) => {
       const input = positional[index]
       const extracted = extractFlowValue(argument)
-      if (input && extracted) {
-        inputs[input.key] = extracted.value
-        inputKinds[input.key] = extracted.kind
+      if (input) {
+        inputs[input.key] = extracted?.value ?? stringifyNode(argument)
+        inputKinds[input.key] = extracted?.kind ?? "raw"
       }
     })
     for (const [keyword, value] of Object.entries(node.keywordArgs)) {
-      const input = schemaAction.inputs.find((candidate) => candidate.keyword?.toLowerCase() === keyword.toLowerCase())
+      const input = schemaAction.inputs.find((candidate) => candidate.keyword?.toLowerCase() === keyword.toLowerCase() || keywordAlternatives(candidate).some((alternative) => alternative.toLowerCase() === keyword.toLowerCase()))
       const extracted = extractFlowValue(value)
-      if (input && extracted) {
-        inputs[input.key] = extracted.value
-        inputKinds[input.key] = extracted.kind
+      if (input) {
+        inputs[input.key] = extracted?.value ?? stringifyNode(value)
+        inputKinds[input.key] = extracted?.kind ?? "raw"
       }
     }
   }
@@ -337,6 +350,8 @@ function convertActionCall(
       inputKinds,
       slotChildren: {},
       nodeKind: "action",
+      variantId: schemaAction?.variantId ?? node.variantId ?? undefined,
+      blockShape: schemaAction?.shape ?? "command",
       astRef: node,
     },
   })
@@ -368,7 +383,7 @@ function convertIf(
   node: IfNode,
   nodes: KetherNode[],
   edges: KetherEdge[],
-  actionMap: Map<string, SchemaAction>,
+  actionMap: SchemaCatalog,
   schema: ActionsSchemaV2,
   parentId: string | null
 ): string {
@@ -411,7 +426,7 @@ function convertFor(
   node: ForNode,
   nodes: KetherNode[],
   edges: KetherEdge[],
-  actionMap: Map<string, SchemaAction>,
+  actionMap: SchemaCatalog,
   schema: ActionsSchemaV2,
   parentId: string | null
 ): string {
@@ -488,6 +503,29 @@ function convertCalcNode(node: ASTCalcNode, nodes: KetherNode[], parentId: strin
   return id
 }
 
+function convertRawNode(node: ASTNode, nodes: KetherNode[], parentId: string | null): string {
+  const id = nextId("raw")
+  const rawSource = node.type === "error" || node.type === "raw" ? node.raw : stringifyNode(node)
+  nodes.push({
+    id,
+    type: "rawNode",
+    position: { x: 0, y: 0 },
+    parentId: parentId ?? undefined,
+    data: {
+      label: "Raw Kether",
+      schemaAction: null,
+      inputs: { source: rawSource },
+      inputKinds: { source: "raw" },
+      slotChildren: {},
+      nodeKind: "raw",
+      blockShape: "raw",
+      rawSource,
+      astRef: node,
+    },
+  })
+  return id
+}
+
 function extractFlowValue(node: ASTNode): { value: unknown; kind: KetherInputKind } | null {
   switch (node.type) {
     case "number": return { value: String((node as NumberNode).value), kind: "number" }
@@ -517,7 +555,7 @@ export function inferInputKind(input: SchemaInput, value: unknown): KetherInputK
 export function inferEditedInputKind(previous: KetherInputKind | undefined, value: unknown): KetherInputKind {
   if (typeof value === "boolean") return "boolean"
   const text = String(value ?? "")
-  if (previous === "string") return "string"
+  if (previous === "string" || previous === "raw") return previous
   if (previous === "number" && (text === "" || /^-?(?:\d*(?:\.\d*)?)$/.test(text))) return "number"
   if (text.startsWith("&") && !/\s/.test(text)) return "var_ref"
   if (text.startsWith("*") && !/\s/.test(text)) return "lazy_ref"
@@ -536,6 +574,7 @@ function isMappedInput(node: KetherNode, handle: string): boolean {
     case "branch": return handle === "condition"
     case "loop": return handle === "iterable"
     case "calc": return handle === "formula"
+    case "raw": return handle === "source"
     default: return false
   }
 }
@@ -608,25 +647,19 @@ export function applyConnectionToFlow(
   }
   if (source.id === target.id) return { accepted: false, state, reason: "执行连线不能连接自身" }
 
-  const edges = [
-    ...state.edges.filter((edge) => {
-      const generatedTopLevelExecution = edge.data?.kind === "execution"
-        && edge.data.generated === true
-        && edge.data.semantic === true
-      const sameExecutionConnection = isExecutionEdge(edge)
-        && edge.source === source.id
-        && edge.target === target.id
-      return !generatedTopLevelExecution && !sameExecutionConnection
-    }),
-    {
-      ...connection,
-      id: edgeId,
-      animated: true,
-      style: { stroke: "#38bdf8", strokeWidth: 1.5 },
-      data: { kind: "execution" as const, generated: false, semantic: true },
-    },
-  ]
-  return { accepted: true, state: { ...state, edges }, kind: "execution" }
+  const ordered = state.nodes
+    .filter((node) => !node.parentId && node.data.nodeKind !== "data")
+    .sort((left, right) => (left.data.order ?? 0) - (right.data.order ?? 0) || left.id.localeCompare(right.id))
+    .filter((node) => node.id !== target.id)
+  const sourceIndex = ordered.findIndex((node) => node.id === source.id)
+  ordered.splice(sourceIndex + 1, 0, target)
+  const orderById = new Map(ordered.map((node, order) => [node.id, order]))
+  const nodes = state.nodes.map((node) => orderById.has(node.id) ? {
+    ...node,
+    data: { ...node.data, order: orderById.get(node.id) },
+  } : node)
+  const edges = state.edges.filter((edge) => edge.data?.kind !== "execution")
+  return { accepted: true, state: { ...state, nodes, edges }, kind: "execution" }
 }
 
 // ============ Flow → AST ============
@@ -634,85 +667,12 @@ export function applyConnectionToFlow(
 export function flowToAst(state: FlowState, schema: ActionsSchemaV2): ScriptNode {
   if ((state.readOnlyReasons?.length ?? 0) > 0) throw new Error("只读 Flow 不允许回写")
   const nodeMap = new Map(state.nodes.map((node) => [node.id, node]))
-  const topLevel = sortTopLevelByEdges(state.nodes, state.edges)
+  const topLevel = state.nodes
+    .filter((node) => !node.parentId && node.data.nodeKind !== "data")
+    .sort((left, right) => (left.data.order ?? 0) - (right.data.order ?? 0) || left.id.localeCompare(right.id))
   const body = topLevel.map((node) => nodeToAst(node, nodeMap, schema)).filter((node): node is ASTNode => node !== null)
   const position = { offset: 0, line: 1, column: 1 }
   return { type: "script", body, start: position, end: position }
-}
-
-function isExecutionEdge(edge: KetherEdge): boolean {
-  return edge.data?.kind === "execution" || (!edge.data?.kind && !edge.targetHandle)
-}
-
-function isSemanticExecutionEdge(edge: KetherEdge): boolean {
-  return isExecutionEdge(edge) && edge.data?.semantic !== false
-}
-
-function sortTopLevelByEdges(nodes: KetherNode[], edges: KetherEdge[]): KetherNode[] {
-  const dataSourceIds = new Set(
-    edges
-      .filter((edge) => edge.data?.kind === "data")
-      .map((edge) => edge.source)
-  )
-  const topLevel = nodes.filter((node) => (
-    !node.parentId && !(node.data.nodeKind === "data" && dataSourceIds.has(node.id))
-  ))
-  const executionEdges = edges.filter(isSemanticExecutionEdge)
-  if (topLevel.length <= 1 || executionEdges.length === 0) {
-    return [...topLevel].sort((left, right) => left.position.y - right.position.y)
-  }
-
-  const topIds = new Set(topLevel.map((node) => node.id))
-  const outgoing = new Map<string, string[]>()
-  const incomingCount = new Map<string, number>()
-  for (const node of topLevel) {
-    outgoing.set(node.id, [])
-    incomingCount.set(node.id, 0)
-  }
-
-  for (const edge of executionEdges) {
-    if (!topIds.has(edge.source) || !topIds.has(edge.target)) continue
-    outgoing.get(edge.source)?.push(edge.target)
-    incomingCount.set(edge.target, (incomingCount.get(edge.target) ?? 0) + 1)
-  }
-
-  const nodeById = new Map(topLevel.map((node) => [node.id, node]))
-  const queue = topLevel
-    .filter((node) => (incomingCount.get(node.id) ?? 0) === 0)
-    .sort((left, right) => left.position.y - right.position.y)
-    .map((node) => node.id)
-  const result: KetherNode[] = []
-  const visited = new Set<string>()
-
-  while (queue.length > 0) {
-    queue.sort((leftId, rightId) => {
-      const left = nodeById.get(leftId)
-      const right = nodeById.get(rightId)
-      if (!left || !right) return 0
-      return left.position.y - right.position.y || left.position.x - right.position.x
-    })
-    const id = queue.shift()
-    if (!id || visited.has(id)) continue
-    visited.add(id)
-    const node = nodeById.get(id)
-    if (node) result.push(node)
-
-    const targets = outgoing.get(id) ?? []
-    targets.sort((leftId, rightId) => {
-      const left = nodeById.get(leftId)
-      const right = nodeById.get(rightId)
-      return left && right ? left.position.y - right.position.y : 0
-    })
-    for (const targetId of targets) {
-      incomingCount.set(targetId, (incomingCount.get(targetId) ?? 0) - 1)
-      if ((incomingCount.get(targetId) ?? 0) <= 0) queue.push(targetId)
-    }
-  }
-
-  for (const node of [...topLevel].sort((left, right) => left.position.y - right.position.y)) {
-    if (!visited.has(node.id)) result.push(node)
-  }
-  return result
 }
 
 function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>, schema: ActionsSchemaV2): ASTNode | null {
@@ -733,7 +693,7 @@ function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>, schema: A
           keywordArgs[input.keyword] = valueToAst(data.inputs[input.key], data.inputKinds[input.key], position)
         }
       }
-      return { type: "action_call", name: data.label, args, keywordArgs, start: position, end: position }
+      return { type: "action_call", name: data.label, variantId: data.variantId ?? data.schemaAction?.variantId ?? null, args, keywordArgs, start: position, end: position }
     }
     case "set":
       return {
@@ -767,6 +727,7 @@ function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>, schema: A
       return valueToAst(data.inputs[valueKey], data.inputKinds[valueKey], position)
     }
     case "calc": return { type: "calc", formula: String(data.inputs.formula ?? ""), start: position, end: position }
+    case "raw": return { type: "raw", raw: String(data.inputs.source ?? data.rawSource ?? ""), start: position, end: position }
     default: return null
   }
 }
@@ -841,5 +802,9 @@ function valueToAst(
       return { type: "lazy_ref", name: text.slice(1), start: position, end: position }
     case "string":
       return { type: "string", value: text, start: position, end: position }
+    case "raw":
+      return { type: "raw", raw: text, start: position, end: position }
+    case "block":
+      return { type: "raw", raw: text, start: position, end: position }
   }
 }

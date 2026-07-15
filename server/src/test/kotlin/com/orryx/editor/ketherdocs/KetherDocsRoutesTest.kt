@@ -46,6 +46,9 @@ class KetherDocsRoutesTest {
             assertEquals("bundled", response.headers["X-Orryx-Kether-Source"])
             assertTrue(response.bodyAsText().contains("\"schemaVersion\": 3"))
             val etag = assertNotNull(response.headers[HttpHeaders.ETag])
+            val registryResponse = client.get("/api/kether-registry")
+            assertEquals(HttpStatusCode.OK, registryResponse.status)
+            assertEquals(etag, registryResponse.headers[HttpHeaders.ETag])
             assertEquals(
                 HttpStatusCode.NotModified,
                 client.get("/actions-schema.json") { header(HttpHeaders.IfNoneMatch, etag) }.status

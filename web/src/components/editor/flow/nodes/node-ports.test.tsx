@@ -23,15 +23,19 @@ vi.mock("@xyflow/react", async (importOriginal) => {
 })
 
 const action: SchemaAction = {
+  id: "orryx.action.damage.test",
+  variantId: "orryx.action.damage.test",
   name: "damage",
   aliases: [],
   category: "combat",
   namespace: "orryx",
   description: "造成伤害",
+  syntax: "damage <target> <amount>",
+  shape: "reporter",
   inputs: [
-    { name: "目标", key: "target", type: "ENTITY", required: true, default: null },
-    { name: "伤害", key: "amount", type: "NUMBER", required: true, default: 1 },
-    { name: "伤害类型", key: "damageType", type: "STRING", required: false, default: "skill" },
+    { name: "目标", key: "target", type: "ENTITY", accepts: ["ENTITY"], required: true, default: null },
+    { name: "伤害", key: "amount", type: "NUMBER", accepts: ["NUMBER"], required: true, default: 1 },
+    { name: "伤害类型", key: "damageType", type: "STRING", accepts: ["STRING"], required: false, default: "skill" },
   ],
   output: { type: "NUMBER", description: "实际伤害" },
   flow: "normal",
@@ -40,13 +44,15 @@ const action: SchemaAction = {
 const schema: ActionsSchemaV2 = {
   version: 2,
   types: {
-    ENTITY: { widget: "text", color: "#60a5fa" },
-    NUMBER: { widget: "number", color: "#f59e0b" },
-    STRING: { widget: "text", color: "#a78bfa" },
+    ENTITY: { widget: "text", color: "#60a5fa", ketherFillable: true, inputStrategy: "expression", serialization: "raw" },
+    NUMBER: { widget: "number", color: "#f59e0b", ketherFillable: true, inputStrategy: "expression", serialization: "token" },
+    STRING: { widget: "text", color: "#a78bfa", ketherFillable: true, inputStrategy: "expression", serialization: "quoted" },
   },
   categories: { combat: { color: "#9f2f28", icon: "sword" } },
   actions: [action],
   selectors: [],
+  triggers: [],
+  properties: [],
 }
 
 function renderNode(id: string, data: KetherNodeData, Component: typeof ActionNode): string {

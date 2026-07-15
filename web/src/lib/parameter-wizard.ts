@@ -1,4 +1,12 @@
-import type { ActionsSchemaV2, SchemaAction, SchemaInput } from "@/types/schema"
+import {
+  buildSchemaCatalog,
+  catalogActionsForName,
+  keywordAlternatives,
+  selectActionVariant,
+  type ActionsSchemaV2,
+  type SchemaAction,
+  type SchemaInput,
+} from "@/types/schema"
 
 export interface WizardState {
   action: SchemaAction
@@ -8,10 +16,7 @@ export interface WizardState {
 }
 
 export function findAction(name: string, schema: ActionsSchemaV2): SchemaAction | null {
-  const lower = name.toLowerCase()
-  return schema.actions.find(a =>
-    a.name.toLowerCase() === lower || (a.aliases ?? []).some(al => al.toLowerCase() === lower)
-  ) ?? null
+  return catalogActionsForName(buildSchemaCatalog(schema), name)[0] ?? null
 }
 
 /**
@@ -19,32 +24,7 @@ export function findAction(name: string, schema: ActionsSchemaV2): SchemaAction 
  * 通过检查文本中是否包含某个重载的 keyword 来判断。
  */
 export function findBestOverload(name: string, line: string, schema: ActionsSchemaV2): SchemaAction | null {
-  const lower = name.toLowerCase()
-  const candidates = schema.actions.filter(a =>
-    a.name.toLowerCase() === lower || (a.aliases ?? []).some(al => al.toLowerCase() === lower)
-  )
-  if (candidates.length === 0) return null
-  if (candidates.length === 1) return candidates[0]
-
-  // 对每个重载，计算它的 keyword 在文本中的匹配数
-  const lineTokens = new Set(line.trim().toLowerCase().split(/\s+/))
-  let bestScore = -1
-  let best: SchemaAction = candidates[0]
-
-  for (const candidate of candidates) {
-    let score = 0
-    for (const input of candidate.inputs ?? []) {
-      if (!input.keyword) continue
-      // 支持 "set/to" 复合 keyword
-      const kwParts = input.keyword.toLowerCase().split("/")
-      if (kwParts.some(kw => lineTokens.has(kw))) score++
-    }
-    if (score > bestScore) {
-      bestScore = score
-      best = candidate
-    }
-  }
-  return best
+  return selectActionVariant(buildSchemaCatalog(schema), name, tokenizeLine(line.trim()).slice(1))
 }
 
 export function generateKetherText(action: SchemaAction, values: Record<string, unknown>): string {
@@ -62,7 +42,7 @@ export function generateKetherText(action: SchemaAction, values: Record<string, 
       if (val == null) continue
       // 标记型 keyword (type === "keyword")：值是 keyword 的某个部分，只输出一次
       if (input.type === "keyword") {
-        const kwParts = input.keyword.toLowerCase().split("/")
+        const kwParts = keywordAlternatives(input).map((keyword) => keyword.toLowerCase())
         const valLower = String(val).toLowerCase()
         if (kwParts.includes(valLower)) {
           parts.push(String(val))
@@ -72,8 +52,8 @@ export function generateKetherText(action: SchemaAction, values: Record<string, 
       } else {
         // 前缀型 keyword：输出 keyword + value
         if (val === input.default) continue
-        const kwParts = input.keyword.split("/")
-        parts.push(kwParts[0])
+        const kwParts = keywordAlternatives(input)
+        parts.push(kwParts[0] ?? input.keyword)
         parts.push(formatValue(val, input))
       }
     } else if (input.required) {
@@ -125,16 +105,18 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
 
   tokens.shift() // skip action name
 
-  // 构建已知 action 查找表（用于嵌套表达式消费）
-  const actionLookup = new Map<string, SchemaAction>()
+  // 构建保留全部重载的 action 查找表（用于嵌套表达式消费）
+  const actionLookup = new Map<string, SchemaAction[]>()
   if (schema) {
-    for (const a of schema.actions) {
-      const n = a.name.toLowerCase()
-      if (!actionLookup.has(n)) actionLookup.set(n, a)
-      for (const al of a.aliases ?? []) {
-        const aln = al.toLowerCase()
-        if (!actionLookup.has(aln)) actionLookup.set(aln, a)
-      }
+    const add = (name: string, candidate: SchemaAction) => {
+      const key = name.toLowerCase()
+      const variants = actionLookup.get(key)
+      if (variants) variants.push(candidate)
+      else actionLookup.set(key, [candidate])
+    }
+    for (const candidate of schema.actions) {
+      add(candidate.name, candidate)
+      for (const alias of candidate.aliases) add(alias, candidate)
     }
   }
 
@@ -151,7 +133,7 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
 
     if (input.keyword) {
       // 有 keyword 字段的参数 → 必须匹配标识符
-      const kwParts = input.keyword.toLowerCase().split("/")
+      const kwParts = keywordAlternatives(input).map((keyword) => keyword.toLowerCase())
       if (kwParts.includes(lower)) {
         if (input.type === "keyword") {
           values[input.key] = tok
@@ -187,7 +169,7 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
   if (optionalInputs.length > 0) {
     const optKeyMap = new Map<string, SchemaInput>()
     for (const inp of optionalInputs) {
-      const markers = inp.keyword ? inp.keyword.toLowerCase().split("/") : [inp.key.toLowerCase()]
+      const markers = inp.keyword ? keywordAlternatives(inp).map((keyword) => keyword.toLowerCase()) : [inp.key.toLowerCase()]
       for (const marker of markers) optKeyMap.set(marker, inp)
     }
 
@@ -225,7 +207,7 @@ export function parseLineValues(line: string, action: SchemaAction, schema?: Act
 function consumeExpression(
   tokens: string[],
   startIdx: number,
-  actionLookup: Map<string, SchemaAction> = new Map()
+  actionLookup: Map<string, SchemaAction[]> = new Map()
 ): { value: string; nextIndex: number } {
   if (startIdx >= tokens.length) return { value: "", nextIndex: startIdx }
 
@@ -263,8 +245,13 @@ function consumeExpression(
     return { value: merged, nextIndex: startIdx + 4 }
   }
 
-  // 已知 action 名 → 按 schema 参数结构递归消费
-  const nestedAction = actionLookup.get(lower)
+  // 已知 action 名 → 先按后续 keyword 选择稳定重载，再按参数结构递归消费
+  const nestedVariants = actionLookup.get(lower) ?? []
+  const nestedAction = nestedVariants.length <= 1 ? nestedVariants[0] : [...nestedVariants].sort((left, right) => {
+    const remaining = new Set(tokens.slice(startIdx + 1).map((token) => token.toLowerCase()))
+    const score = (candidate: SchemaAction) => candidate.inputs.reduce((total, input) => total + (keywordAlternatives(input).some((keyword) => remaining.has(keyword.toLowerCase())) ? 4 : 0), 0)
+    return score(right) - score(left) || left.variantId.localeCompare(right.variantId)
+  })[0]
   if (nestedAction) {
     const parts: string[] = [tok]
     let idx = startIdx + 1
@@ -275,7 +262,7 @@ function consumeExpression(
       const curTok = tokens[idx]
 
       if (input.keyword) {
-        const kwParts = input.keyword.toLowerCase().split("/")
+        const kwParts = keywordAlternatives(input).map((keyword) => keyword.toLowerCase())
         if (kwParts.includes(curTok.toLowerCase())) {
           if (input.type === "keyword") {
             parts.push(curTok)

@@ -144,10 +144,12 @@ fun Application.configureRouting(
         commercialServices?.let { commercialRoutes(it, releaseCoordinator) }
 
         if (ketherDocsService != null) {
-            get("/actions-schema.json") { call.respondKetherDocsSchema(ketherDocsService) }
-            get("/api/actions-schema") { call.respondKetherDocsSchema(ketherDocsService) }
+            get("/actions-schema.json") { call.respondKetherDocsSchema(ketherDocsService, legacy = true) }
+            get("/api/actions-schema") { call.respondKetherDocsSchema(ketherDocsService, legacy = true) }
+            get("/api/kether-registry") { call.respondKetherDocsSchema(ketherDocsService) }
         } else {
             get("/api/actions-schema") { call.respondRedirect("/actions-schema.json", permanent = false) }
+            get("/api/kether-registry") { call.respondRedirect("/actions-schema.json", permanent = false) }
         }
         staticResources("/", "static") { default("index.html") }
 

@@ -9,15 +9,19 @@ internal class BundledKetherDocsLoader(
     private val classLoader: ClassLoader = BundledKetherDocsLoader::class.java.classLoader
 ) {
     suspend fun load(): ActiveKetherDocs? {
-        val bytes = try {
+        val documents = try {
             withContext(Dispatchers.IO) {
-                classLoader.getResourceAsStream("static/actions-schema.json")?.use { it.readBytes() }
+                val registry = classLoader.getResourceAsStream("static/kether-registry.json")?.use { it.readBytes() }
+                val legacy = classLoader.getResourceAsStream("static/actions-schema.json")?.use { it.readBytes() }
+                registry to legacy
             }
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Throwable) {
             throw KetherDocsFailure(KetherDocsErrorCode.CACHE_INVALID)
-        } ?: return null
-        return validator.validateBundled(bytes)
+        }
+        val primary = documents.first ?: documents.second ?: return null
+        val legacy = documents.second?.takeUnless { it.contentEquals(primary) }
+        return validator.validateBundled(primary, legacy)
     }
 }

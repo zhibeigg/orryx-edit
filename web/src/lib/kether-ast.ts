@@ -23,6 +23,8 @@ export interface ScriptNode extends BaseNode {
 export interface ActionCallNode extends BaseNode {
   type: "action_call"
   name: string
+  /** 解析时选中的稳定重载 ID。 */
+  variantId: string | null
   args: ASTNode[]
   keywordArgs: Record<string, ASTNode>
 }
@@ -150,16 +152,24 @@ export interface ErrorNode extends BaseNode {
   raw: string
 }
 
+export interface RawKetherNode extends BaseNode {
+  type: "raw"
+  raw: string
+  reason?: string
+}
+
 export type ASTNode =
   | ScriptNode | ActionCallNode | SetNode | IfNode | ForNode
   | CaseNode | BlockNode | CheckNode | LogicNode | MathNode
   | CalcNode | InlineNode | LazyNode | FlagNode | VarRefNode
   | LazyRefNode | SelectorNode | NumberNode | StringNode
-  | BooleanNode | IdentifierNode | CommentNode | ErrorNode
+  | BooleanNode | IdentifierNode | CommentNode | ErrorNode | RawKetherNode
 
 // ============ Schema 类型 ============
 
 export interface SchemaAction {
+  id?: string
+  variantId?: string
   name: string
   aliases?: string[]
   params: SchemaParam[]
@@ -170,12 +180,15 @@ export interface SchemaParam {
   name: string
   type: string
   keyword?: string
+  keywords?: { alternatives: string[]; mode: "flag" | "prefix"; optional?: boolean }
   optional?: boolean
   default?: unknown
   options?: string[]
+  accepts?: string[]
 }
 
 export interface SchemaSelector {
+  id?: string
   name: string
   aliases?: string[]
   params: { name: string; type: string; default?: unknown }[]
@@ -349,25 +362,33 @@ class KetherParser {
   private reader: KetherReader
   private _schema: ActionsSchema | undefined
 
-  private actionMap: Map<string, SchemaAction> = new Map()
-  private selectorMap: Map<string, SchemaSelector> = new Map()
+  private actionMap: Map<string, SchemaAction[]> = new Map()
+  private selectorMap: Map<string, SchemaSelector[]> = new Map()
 
   constructor(source: string, schema?: ActionsSchema) {
     this.reader = new KetherReader(source)
     this._schema = schema
-    void this._schema // used via actionMap/selectorMap
+    void this._schema
     if (schema) {
-      for (const a of schema.actions) {
-        this.actionMap.set(a.name.toLowerCase(), a)
-        for (const alias of a.aliases ?? []) {
-          this.actionMap.set(alias.toLowerCase(), a)
-        }
+      const addAction = (name: string, action: SchemaAction) => {
+        const key = name.toLowerCase()
+        const variants = this.actionMap.get(key)
+        if (variants) variants.push(action)
+        else this.actionMap.set(key, [action])
       }
-      for (const s of schema.selectors ?? []) {
-        this.selectorMap.set(s.name.toLowerCase(), s)
-        for (const alias of s.aliases ?? []) {
-          this.selectorMap.set(alias.toLowerCase(), s)
-        }
+      const addSelector = (name: string, selector: SchemaSelector) => {
+        const key = name.toLowerCase()
+        const variants = this.selectorMap.get(key)
+        if (variants) variants.push(selector)
+        else this.selectorMap.set(key, [selector])
+      }
+      for (const action of schema.actions) {
+        addAction(action.name, action)
+        for (const alias of action.aliases ?? []) addAction(alias, action)
+      }
+      for (const selector of schema.selectors ?? []) {
+        addSelector(selector.name, selector)
+        for (const alias of selector.aliases ?? []) addSelector(alias, selector)
       }
     }
   }
@@ -422,7 +443,7 @@ class KetherParser {
     if (lower === "calc") return this.parseCalc()
     if (lower === "inline") return this.parseInline()
     if (lower === "lazy") return this.parseLazy()
-    if (lower === "exit") { this.reader.nextToken(); return { type: "action_call", name: "exit", args: [], keywordArgs: {}, start, end: this.reader.getPosition() } }
+    if (lower === "exit") { this.reader.nextToken(); return { type: "action_call", name: "exit", variantId: null, args: [], keywordArgs: {}, start, end: this.reader.getPosition() } }
 
     // { } 匿名块
     if (token === "{") return this.parseBlock(null)
@@ -649,45 +670,63 @@ class KetherParser {
     return { type: "lazy_ref", name, start, end: this.reader.getPosition() }
   }
 
-  // ---- Action 调用（schema 驱动） ----
+  private keywordAlternatives(param: SchemaParam): string[] {
+    return param.keywords?.alternatives ?? (param.keyword ? param.keyword.split("/") : [])
+  }
+
+  private selectActionVariant(name: string): SchemaAction | undefined {
+    const variants = this.actionMap.get(name.toLowerCase()) ?? []
+    if (variants.length <= 1) return variants[0]
+    const source = this.reader.getSource()
+    const restOfLine = source.slice(this.reader.getIndex()).split(/\r?\n/, 1)[0] ?? ""
+    const tokens = new Set(restOfLine.trim().toLowerCase().split(/\s+/).filter(Boolean))
+    return [...variants].sort((left, right) => {
+      const score = (action: SchemaAction) => action.params.reduce((total, param) => (
+        total + (this.keywordAlternatives(param).some((keyword) => tokens.has(keyword.toLowerCase())) ? 8 : 0)
+      ), 0) + action.params.filter((param) => !param.optional).length
+      return score(right) - score(left) || String(left.variantId ?? left.id ?? "").localeCompare(String(right.variantId ?? right.id ?? ""))
+    })[0]
+  }
+
+  // ---- Action 调用（schema 驱动且保留同名重载） ----
   private parseActionCall(): ActionCallNode {
     const start = this.reader.getPosition()
     const name = this.reader.nextToken()
-    const schemaAction = this.actionMap.get(name.toLowerCase())
+    const schemaAction = this.selectActionVariant(name)
     const args: ASTNode[] = []
     const keywordArgs: Record<string, ASTNode> = {}
 
     if (schemaAction) {
-      // 按 schema 定义消费参数
-      const positionalParams = (schemaAction.params ?? []).filter(p => !p.keyword)
-      const keywordParams = new Map((schemaAction.params ?? []).filter(p => p.keyword).map(p => [p.keyword!.toLowerCase(), p]))
+      const positionalParams = schemaAction.params.filter((param) => this.keywordAlternatives(param).length === 0)
+      const keywordParams = new Map<string, SchemaParam>()
+      for (const param of schemaAction.params) {
+        for (const keyword of this.keywordAlternatives(param)) keywordParams.set(keyword.toLowerCase(), param)
+      }
       let posIdx = 0
 
       while (this.reader.hasNext()) {
         const peek = this.reader.peekToken()
         if (!peek || peek === "}" || peek === "]") break
-
-        // 检查是否是 keyword 参数
         const kwParam = keywordParams.get(peek.toLowerCase())
         if (kwParam) {
-          this.reader.nextToken() // consume keyword
-          keywordArgs[kwParam.keyword!] = this.parseExpression()
+          const actualKeyword = this.reader.nextToken()
+          const canonicalKeyword = kwParam.keyword ?? this.keywordAlternatives(kwParam).join("/")
+          if (kwParam.type.toLowerCase() === "keyword" || kwParam.keywords?.mode === "flag") {
+            const position = this.reader.getPosition()
+            keywordArgs[canonicalKeyword] = { type: "identifier", name: actualKeyword, start: position, end: position }
+          } else {
+            keywordArgs[canonicalKeyword] = this.parseExpression()
+          }
           continue
         }
-
-        // 还有位置参数要消费 → parseExpression(asArgument=true)
-        // asArgument 模式下 set/if/for/case 当作标识符，不递归解析
         if (posIdx < positionalParams.length) {
           args.push(this.parseExpression(true))
           posIdx++
           continue
         }
-
-        // 位置参数已消费完，检查是否是语句边界
         break
       }
     } else {
-      // 未知 action：贪婪消费到行尾或块结束
       while (this.reader.hasNext()) {
         const peek = this.reader.peekToken()
         if (!peek || peek === "}" || peek === "]") break
@@ -696,7 +735,15 @@ class KetherParser {
       }
     }
 
-    return { type: "action_call", name, args, keywordArgs, start, end: this.reader.getPosition() }
+    return {
+      type: "action_call",
+      name,
+      variantId: schemaAction?.variantId ?? schemaAction?.id ?? null,
+      args,
+      keywordArgs,
+      start,
+      end: this.reader.getPosition(),
+    }
   }
 
   // ---- 表达式解析 ----
@@ -871,7 +918,8 @@ class KetherStringifier {
       case "boolean": return String((n as BooleanNode).value)
       case "identifier": return (n as IdentifierNode).name
       case "comment": return `# ${(n as CommentNode).text}`
-      case "error": return `# ERROR: ${(n as ErrorNode).raw}`
+      case "error": return (n as ErrorNode).raw
+      case "raw": return (n as RawKetherNode).raw
       default: return ""
     }
   }

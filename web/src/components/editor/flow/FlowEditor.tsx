@@ -6,6 +6,7 @@ import {
   type Connection, type EdgeChange, type NodeChange, type NodeTypes
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import "./flow-editor.css"
 import type { ActionsSchemaV2 } from "@/types/schema"
 import { stringifyKether } from "@/lib/kether-ast"
 import type { KetherNode, KetherEdge, KetherInputKind } from "./flow-types"
@@ -16,8 +17,9 @@ import { CalcNode } from "./nodes/CalcNode"
 import { SetNode } from "./nodes/SetNode"
 import { BranchNode } from "./nodes/BranchNode"
 import { LoopNode } from "./nodes/LoopNode"
+import { RawNode } from "./nodes/RawNode"
 import { SchemaProvider } from "./SchemaContext"
-import { BookmarkPlus, History, Link2, Sparkles, Undo2, Redo2, X } from "lucide-react"
+import { AlignVerticalSpaceAround, BookmarkPlus, History, Link2, Undo2, Redo2, X } from "lucide-react"
 import { NodePalette } from "./NodePalette"
 import type { SchemaAction } from "@/types/schema"
 import { bindFlowNodeInteractions, semanticFlowSnapshotKey } from "./flow-history"
@@ -25,6 +27,7 @@ import { layoutFlowGraph } from "./flow-layout"
 import { rebuildGeneratedFlowEdges } from "./flow-edges"
 import { createDeferredSemanticWriteback, type DeferredSemanticWriteback } from "@/lib/deferred-semantic-writeback"
 import { useEditorInputFlush } from "@/lib/editor-input-flush"
+import { ScratchEditor } from "./ScratchEditor"
 
 const nodeTypes: NodeTypes = {
   actionNode: ActionNode,
@@ -33,6 +36,7 @@ const nodeTypes: NodeTypes = {
   setNode: SetNode,
   branchNode: BranchNode,
   loopNode: LoopNode,
+  rawNode: RawNode,
 }
 
 interface FlowEditorProps {
@@ -221,6 +225,11 @@ function parseImportedCheckpoints(value: unknown): SerializedCheckpoint[] {
 }
 
 export function FlowEditor(props: FlowEditorProps) {
+  return <ScratchEditor {...props} />
+}
+
+/** 仅保留给旧快照/回归测试；生产入口已切换到 BlockDocument Scratch 编辑器。 */
+export function LegacyFlowEditor(props: FlowEditorProps) {
   return (
     <ReactFlowProvider>
       <SchemaProvider value={props.schema}>
@@ -662,6 +671,8 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         slotChildren: {},
         onSlotDrop: undefined,
         nodeKind: "action",
+        variantId: action.variantId,
+        blockShape: action.shape,
       },
     }
   }, [nextNodeId])
@@ -728,7 +739,14 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
           id: nextNodeId("calc"),
           type: "calcNode",
           position: { x, y },
-          data: { label: "calc", schemaAction: null, inputs: { formula: "" }, inputKinds: { formula: "string" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "calc" },
+          data: { label: "calc", schemaAction: null, inputs: { formula: "" }, inputKinds: { formula: "string" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "calc", blockShape: "reporter" },
+        }
+      case "raw":
+        return {
+          id: nextNodeId("raw"),
+          type: "rawNode",
+          position: { x, y },
+          data: { label: "Raw Kether", schemaAction: null, inputs: { source: "" }, inputKinds: { source: "raw" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "raw", blockShape: "raw", rawSource: "" },
         }
       default:
         return null
@@ -817,7 +835,9 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     [nodes, handleSlotDrop, handleNodeInputChange]
   )
 
-  const visualEdges = useMemo(() => edges.map((edge) => {
+  const visualEdges = useMemo(() => edges.filter((edge) => (
+    edge.data?.kind === "structure" || (edge.data?.kind === "execution" && edge.data.generated !== true)
+  )).map((edge) => {
     const kind = edge.data?.kind ?? (edge.targetHandle && edge.sourceHandle !== "flow-out" ? "data" : "execution")
     const color = kind === "data" ? "#22d3ee" : kind === "structure" ? "#b74732" : "#f59e0b"
     return {
@@ -1015,12 +1035,12 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   }
 
   return (
-    <div ref={flowRootRef} className="flex h-full max-md:flex-col bg-[#17191d]">
+    <div ref={flowRootRef} className="kether-editor flex h-full max-md:flex-col">
       <NodePalette schema={schema} onDragStart={() => {}} />
       <div className="flex-1 min-w-0 relative">
-        <div className="h-8 px-3 border-b border-[#2f3136] bg-[#1b1d22]/95 flex items-center justify-between gap-2 text-[11px]">
+        <div className="kether-flow-toolbar h-8 px-3 flex items-center justify-between gap-2 text-[11px]">
           <div className="flex shrink-0 items-center gap-2 text-[#a6adbb] max-lg:hidden">
-            <Sparkles className="w-3.5 h-3.5 text-[#56b6c2]" />
+            <AlignVerticalSpaceAround className="w-3.5 h-3.5 text-[#56b6c2]" />
             {isReadOnly ? "当前脚本仅提供只读节点预览" : "拖拽左侧节点到画布，显式编辑后同步到脚本文本"}
           </div>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto whitespace-nowrap text-[#7f8795]">
@@ -1031,7 +1051,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title="清除手工位置并自动排列"
             >
-              <Sparkles className="w-3 h-3" />
+              <AlignVerticalSpaceAround className="w-3 h-3" />
               自动排列
             </button>
             <button
@@ -1086,7 +1106,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
           </div>
         )}
         {showHistory && (
-          <div className="absolute z-20 top-10 right-3 w-64 rounded-lg border border-[#2f3136] bg-[#171a21]/95 shadow-[0_16px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+          <div className="absolute z-20 top-10 right-3 w-64 rounded-lg border border-[#2f3136] bg-[#191411] shadow-[0_12px_24px_rgba(0,0,0,0.45)]">
             <input
               ref={checkpointImportRef}
               type="file"

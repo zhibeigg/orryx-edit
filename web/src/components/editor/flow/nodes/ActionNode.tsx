@@ -1,13 +1,15 @@
 import { memo, useCallback } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 import type { KetherInputKind, KetherNodeData } from "../flow-types"
+import type { SchemaType } from "@/types/schema"
 import { getNodeColor, getPortColor } from "./node-styles"
 import { useSchema } from "../SchemaContext"
 import { NODE_CONTROL_CLASS, stopNodeInteraction, useNodeInternalsSync } from "./node-interaction"
 import { ExecutionHandles } from "./ExecutionHandles"
 
-function ParamWidget({ type, value, options, disabled, onChange }: {
+function ParamWidget({ type, typeDef, value, options, disabled, onChange }: {
   type: string
+  typeDef?: SchemaType
   value: unknown
   options?: string[]
   disabled: boolean
@@ -16,6 +18,21 @@ function ParamWidget({ type, value, options, disabled, onChange }: {
   const normalizedType = type.toLowerCase()
   const commonClass = `${NODE_CONTROL_CLASS} w-full min-w-0 disabled:cursor-not-allowed disabled:opacity-55`
   const interactionProps = { onPointerDown: stopNodeInteraction, onWheel: stopNodeInteraction }
+
+  if (typeDef && !typeDef.ketherFillable && typeDef.inputStrategy === "raw") {
+    return (
+      <textarea
+        rows={2}
+        value={String(value ?? "")}
+        disabled={disabled}
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value, "raw")}
+        {...interactionProps}
+        className={`${commonClass} resize-y border border-[oklch(0.38_0.055_34)] bg-[oklch(0.13_0.012_35)] px-2 py-1.5 font-mono text-[10px] text-[oklch(0.91_0.025_78)]`}
+        aria-label={`${type} 原始值`}
+      />
+    )
+  }
 
   if (["double", "int", "long", "number"].includes(normalizedType)) {
     return (
@@ -90,12 +107,13 @@ export const ActionNode = memo(function ActionNode({ id, data, selected }: NodeP
     <div className="relative overflow-visible" style={{ width }}>
       <ExecutionHandles disabled={Boolean(nodeData.readOnly)} />
       <div
-        className={`rounded-md bg-[#111318] transition-shadow duration-150 ${selected ? "shadow-[0_0_0_2px_rgba(245,158,11,0.35),0_14px_28px_rgba(0,0,0,0.34)]" : "shadow-[0_10px_20px_rgba(0,0,0,0.25)]"}`}
-        style={{ border: `1px solid ${color}` }}
+        className={`kether-block ${selected ? "is-selected" : ""} ${nodeData.readOnly ? "is-readonly" : ""}`}
+        style={{ borderColor: color }}
+        data-shape={schemaAction?.shape ?? "command"}
       >
-        <div className="flex min-h-8 items-center gap-2 rounded-t-[5px] px-3 py-1.5 text-[12px] font-semibold text-white" style={{ backgroundColor: color }}>
+        <div className="kether-block__header" style={{ borderTop: `2px solid ${color}` }}>
           <span className="min-w-0 flex-1 truncate" title={nodeData.label}>{nodeData.label}</span>
-          {schemaAction && <span className="shrink-0 text-[9px] font-medium uppercase tracking-[0.12em] opacity-75">{schemaAction.category}</span>}
+          {schemaAction && <span className="kether-block__variant">{schemaAction.syntax.split(/\s+/).slice(1, 3).join(" ") || schemaAction.shape}</span>}
         </div>
 
         <div className="grid gap-1.5 px-3 py-2.5">
@@ -123,6 +141,7 @@ export const ActionNode = memo(function ActionNode({ id, data, selected }: NodeP
               <span className="min-w-0 break-words text-white/75" title={input.description ?? input.name}>{input.name}</span>
               <ParamWidget
                 type={input.type}
+                typeDef={schema?.types[input.type]}
                 value={Object.prototype.hasOwnProperty.call(nodeData.inputs, input.key) ? nodeData.inputs[input.key] : input.default}
                 options={input.options}
                 disabled={Boolean(nodeData.readOnly)}

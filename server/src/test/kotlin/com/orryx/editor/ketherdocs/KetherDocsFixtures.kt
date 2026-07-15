@@ -58,6 +58,19 @@ internal fun validSchemaBytes(): ByteArray = """
     }
 """.trimIndent().plus("\n").toByteArray()
 
+internal fun validSchemaV4Bytes(): ByteArray = validSchemaBytes().toString(Charsets.UTF_8)
+    .replace("actions-schema-v3.schema.json", "actions-schema-v4.schema.json")
+    .replace("\"schemaVersion\": 3", "\"schemaVersion\": 4")
+    .replace(
+        "\"text\": { \"widget\": \"text\", \"color\": \"#aaa\" }",
+        "\"text\": { \"widget\": \"text\", \"color\": \"#aaa\", \"extends\": [], \"ketherFillable\": true, \"inputStrategy\": \"expression\", \"serialization\": \"quoted\" }"
+    )
+    .replace(
+        "\"id\": \"orryx.action.test.0123456789ab\",",
+        "\"id\": \"orryx.action.test.0123456789ab\",\n          \"variantId\": \"orryx.action.test.0123456789ab.default\",\n          \"shape\": \"command\","
+    )
+    .toByteArray()
+
 internal fun validFetchedSchema(): FetchedKetherDocs {
     val bytes = validSchemaBytes()
     return FetchedKetherDocs(

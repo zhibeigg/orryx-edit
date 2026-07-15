@@ -32,24 +32,33 @@ class KetherDocsService internal constructor(
 
     suspend fun initialize() {
         syncState = repository.loadState(config.channel)
-        val cached = repository.load(config.channel)
         var initialError: String? = null
-
-        if (cached != null) {
+        val cached = repository.load(config.channel)?.let { stored ->
             try {
-                active = validator.validateCached(cached)
+                validator.validateCached(stored)
             } catch (failure: KetherDocsFailure) {
                 initialError = failure.code
+                null
             }
         }
+        val bundled = try {
+            bundledLoader()
+        } catch (failure: KetherDocsFailure) {
+            if (initialError == null) initialError = failure.code
+            null
+        }
 
-        if (active == null) {
-            try {
-                active = bundledLoader()
-                if (active != null && initialError == null) initialError = KetherDocsErrorCode.BUNDLED_FALLBACK
-            } catch (failure: KetherDocsFailure) {
-                initialError = failure.code
+        active = when {
+            cached != null && (bundled == null || cached.schemaVersion >= bundled.schemaVersion) -> cached.copy(
+                legacySchemaSha256 = cached.legacySchemaSha256 ?: bundled?.legacySchemaSha256,
+                legacySchemaBytes = cached.legacySchemaBytes ?: bundled?.legacySchemaBytes
+            )
+            bundled != null -> {
+                initialError = if (cached != null) KetherDocsErrorCode.REMOTE_SCHEMA_OLDER
+                else initialError ?: KetherDocsErrorCode.BUNDLED_FALLBACK
+                bundled
             }
+            else -> null
         }
 
         if (active == null) initialError = KetherDocsErrorCode.NO_USABLE_SCHEMA
@@ -76,6 +85,11 @@ class KetherDocsService internal constructor(
         val attempt = clock()
         try {
             val fetched = source.fetchLatest()
+            val current = active
+            if (current != null && current.schemaVersion > fetched.schemaVersion) {
+                recordFailure(attempt, KetherDocsErrorCode.REMOTE_SCHEMA_OLDER)
+                return status()
+            }
             val completed = clock()
             val cache = CachedKetherDocs(
                 channel = config.channel,
@@ -97,7 +111,11 @@ class KetherDocsService internal constructor(
                 errorCode = null
             )
             repository.saveSuccess(cache, state)
-            active = validator.validateCached(cache).copy(source = KetherDocsSource.REMOTE)
+            active = validator.validateCached(cache).copy(
+                source = KetherDocsSource.REMOTE,
+                legacySchemaSha256 = fetched.legacySchemaSha256 ?: current?.legacySchemaSha256,
+                legacySchemaBytes = fetched.legacySchemaBytes ?: current?.legacySchemaBytes
+            )
             syncState = state
         } catch (failure: KetherDocsFailure) {
             recordFailure(attempt, failure.code)
@@ -152,6 +170,16 @@ class KetherDocsService internal constructor(
         ServedKetherDocs(
             bytes = current.schemaBytes,
             sha256 = current.schemaSha256,
+            releaseId = current.releaseId,
+            source = current.source
+        )
+    }
+
+    internal fun currentLegacySchema(): ServedKetherDocs? = active?.let { current ->
+        val bytes = current.legacySchemaBytes ?: current.schemaBytes
+        ServedKetherDocs(
+            bytes = bytes,
+            sha256 = current.legacySchemaSha256 ?: current.schemaSha256,
             releaseId = current.releaseId,
             source = current.source
         )
