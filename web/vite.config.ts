@@ -20,7 +20,7 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
-            { name: "vendor-monaco", test: /node_modules[\\/](?:monaco-editor|@monaco-editor)[\\/]/, priority: 70, includeDependenciesRecursively: false },
+            { name: "vendor-monaco", test: /node_modules[\\/]monaco-editor[\\/]/, priority: 70, includeDependenciesRecursively: false },
             { name: "vendor-three", test: /node_modules[\\/]three[\\/]/, priority: 60, includeDependenciesRecursively: false },
             { name: "vendor-flow", test: /node_modules[\\/](?:@xyflow|@dagrejs)[\\/]/, priority: 50, includeDependenciesRecursively: false },
             { name: "vendor-radix", test: /node_modules[\\/](?:@radix-ui|cmdk)[\\/]/, priority: 40, includeDependenciesRecursively: false },

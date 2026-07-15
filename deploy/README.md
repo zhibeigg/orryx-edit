@@ -12,7 +12,7 @@ sudo install -d -o orryx -g orryx -m 0750 /opt/orryx-editor /var/lib/orryx-edito
 2. 将发布包中的 JAR、`start.sh` 放入 `/opt/orryx-editor`：
 
 ```bash
-sudo install -o orryx -g orryx -m 0640 orryx-editor-0.11.16.jar /opt/orryx-editor/orryx-editor.jar
+sudo install -o orryx -g orryx -m 0640 orryx-editor-0.11.17.jar /opt/orryx-editor/orryx-editor.jar
 sudo install -o orryx -g orryx -m 0750 start.sh /opt/orryx-editor/start.sh
 ```
 

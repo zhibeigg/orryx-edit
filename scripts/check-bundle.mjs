@@ -33,4 +33,11 @@ for (const forbidden of [/^css\.worker-.*\.js$/, /^html\.worker-.*\.js$/, /^ts\.
   if (file) throw new Error(`当前编辑器未使用该 Monaco worker，不应打包: ${file}`)
 }
 
+const monacoVendor = files.find((name) => /^vendor-monaco-.*\.js$/.test(name))
+const monacoLoader = files.find((name) => /^monaco-loader-.*\.js$/.test(name))
+const monacoVendorSource = await readFile(resolve(assetsDir, monacoVendor), "utf8")
+if (monacoVendorSource.includes(monacoLoader)) {
+  throw new Error(`${monacoVendor} 不应反向引用 ${monacoLoader}，否则动态加载会形成循环 chunk`)
+}
+
 console.log("Bundle budgets passed")
