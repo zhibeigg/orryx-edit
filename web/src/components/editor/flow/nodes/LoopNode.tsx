@@ -1,81 +1,148 @@
 import { memo, type DragEvent } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
-import type { KetherNodeData } from "../flow-types"
-import type { SchemaAction } from "@/types/schema"
-import { NODE_CONTROL_CLASS, stopNodeInteraction } from "./node-interaction"
+import type { KetherNodeData, KetherSlotLayout } from "../flow-types"
+import { useSchema } from "../SchemaContext"
+import { getPortColor } from "./node-styles"
+import { NODE_CONTROL_CLASS, stopNodeInteraction, useNodeInternalsSync } from "./node-interaction"
 import { ExecutionHandles } from "./ExecutionHandles"
 
-export const LoopNode = memo(function LoopNode({ data, selected }: NodeProps) {
-  const nodeData = data as KetherNodeData
-  const bodyCount = nodeData.slotChildren.body?.length ?? 0
-
-  const handleBodyDrop = (event: DragEvent) => {
+function BodyZone({
+  layout,
+  count,
+  disabled,
+  onDrop,
+}: {
+  layout: KetherSlotLayout
+  count: number
+  disabled: boolean
+  onDrop: KetherNodeData["onSlotDrop"]
+}) {
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (disabled) return
     event.preventDefault()
     event.stopPropagation()
-    if (nodeData.readOnly) return
-    const raw = event.dataTransfer.getData("application/kether-node")
-    if (!raw) return
     try {
-      const payload = JSON.parse(raw) as SchemaAction | { builtin: string }
-      nodeData.onSlotDrop?.("body", payload)
+      const payload = JSON.parse(event.dataTransfer.getData("application/kether-node"))
+      onDrop?.("body", payload)
     } catch {
-      return
+      // 忽略非节点拖拽数据。
     }
   }
 
   return (
-    <div className={`rounded-xl overflow-hidden min-w-[280px] border-2 border-orange-600 transition-all duration-200 ${selected ? "shadow-[0_0_0_2px_rgba(251,146,60,0.35),0_14px_28px_rgba(0,0,0,0.34)]" : "shadow-[0_10px_20px_rgba(0,0,0,0.25)]"}`}>
-      <ExecutionHandles disabled={Boolean(nodeData.readOnly)} />
-      <div className="px-3 py-1.5 bg-orange-600 text-[12px] font-medium text-white flex items-center gap-2">
-        <span>for</span>
-        <input
-          type="text"
-          value={String(nodeData.inputs.variable ?? "i")}
-          disabled={Boolean(nodeData.readOnly)}
-          onChange={(event) => nodeData.onInputChange?.("variable", event.target.value, "identifier")}
-          onPointerDown={stopNodeInteraction}
-          onWheel={stopNodeInteraction}
-          className={`${NODE_CONTROL_CLASS} w-14 px-1 py-0.5 text-[11px] bg-black/35 border border-white/10 rounded text-white font-mono focus:outline-none focus:ring-1 focus:ring-orange-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
-        />
-        <span className="text-[10px] opacity-70">in</span>
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="iterable"
-          isConnectable={!nodeData.readOnly}
-          style={{ background: "#6b7280", width: 8, height: 8, left: -4 }}
-        />
-        <input
-          type="text"
-          value={String(nodeData.inputs.iterable ?? "")}
-          disabled={Boolean(nodeData.readOnly)}
-          onChange={(event) => nodeData.onInputChange?.("iterable", event.target.value)}
-          onPointerDown={stopNodeInteraction}
-          onWheel={stopNodeInteraction}
-          className={`${NODE_CONTROL_CLASS} min-w-0 flex-1 px-1 py-0.5 text-[11px] bg-black/35 border border-white/10 rounded text-white font-mono focus:outline-none focus:ring-1 focus:ring-orange-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
-        />
+    <div
+      className="absolute overflow-visible rounded border border-amber-700/60 bg-amber-950/20"
+      style={{ left: layout.x, top: layout.y, width: layout.width, height: layout.height }}
+      onDragOver={(event) => {
+        if (!disabled) event.preventDefault()
+      }}
+      onDrop={handleDrop}
+    >
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="body-out"
+        isConnectable={!disabled}
+        title="循环体入口"
+        style={{
+          background: "#fbbf24",
+          border: "2px solid #111318",
+          width: 10,
+          height: 10,
+          top: -5,
+          left: 28,
+          zIndex: 8,
+        }}
+      />
+      <div className="flex h-7 items-center justify-between gap-3 border-b border-white/10 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/74">
+        <span>循环体</span>
+        <span className="font-mono text-[9px] font-normal text-white/38">{count}</span>
       </div>
-
-      {nodeData.provides && Object.keys(nodeData.provides).length > 0 && (
-        <div className="bg-[#252526] px-2 py-0.5 text-[9px] text-green-400 border-b border-white/10">
-          可用变量: {Object.keys(nodeData.provides).map((key) => `&${key}`).join(", ")}
+      {count === 0 && (
+        <div className="flex h-[calc(100%-1.75rem)] min-h-10 items-center justify-center px-3 text-center text-[10px] text-white/30">
+          {disabled ? "空循环体" : "拖入节点"}
         </div>
       )}
+    </div>
+  )
+}
 
-      <div className="bg-[#111318]">
-        <div className="px-2 py-1 text-[10px] text-orange-400 uppercase tracking-wider">循环体 ({bodyCount})</div>
-        <div
-          className={`${NODE_CONTROL_CLASS} min-h-[40px] px-2 py-1 bg-orange-900/10 border-l-2 border-orange-600 ml-2 mr-2 mb-1 rounded-sm`}
-          onPointerDown={stopNodeInteraction}
-          onWheel={stopNodeInteraction}
-          onDragOver={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onDrop={handleBodyDrop}
-        >
-          {bodyCount === 0 && <div className="text-[10px] text-white/35 italic py-2 text-center">{nodeData.readOnly ? "只读" : "拖入节点..."}</div>}
+export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps) {
+  const nodeData = data as KetherNodeData
+  const schema = useSchema()
+  const layout = nodeData.layout
+  const width = layout?.width ?? 380
+  const height = layout?.height ?? 214
+  const headerHeight = layout?.headerHeight ?? 76
+  const bodyLayout = layout?.slots?.body ?? {
+    x: 12,
+    y: headerHeight + 10,
+    width: width - 24,
+    height: height - headerHeight - 22,
+    contentX: 12,
+    contentY: headerHeight + 38,
+    contentWidth: width - 24,
+    contentHeight: height - headerHeight - 50,
+  }
+  const bodyCount = nodeData.slotChildren.body?.length ?? 0
+  const iterableType = String(nodeData.inputKinds.iterable ?? "any")
+  useNodeInternalsSync(id, `iterable:${iterableType}|body:${bodyCount}|${width}x${height}`)
+
+  return (
+    <div className="relative overflow-visible" style={{ width, height }}>
+      <ExecutionHandles disabled={Boolean(nodeData.readOnly)} />
+      <div className={`absolute inset-0 rounded-md border bg-[#111318] transition-shadow duration-150 ${selected ? "border-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.24),0_16px_32px_rgba(0,0,0,0.34)]" : "border-amber-800/90 shadow-[0_12px_26px_rgba(0,0,0,0.28)]"}`}>
+        <div className="absolute inset-x-0 top-0 rounded-t-[5px] border-b border-amber-700/40 bg-amber-950/80 px-3 py-2" style={{ height: headerHeight }}>
+          <div className="flex items-center justify-between gap-3 text-[12px] font-semibold text-amber-50">
+            <span>循环</span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-amber-200/55">for</span>
+          </div>
+          <div className="relative mt-2 flex min-h-7 items-center justify-between gap-3 rounded border border-white/10 bg-black/20 px-2 text-[10px] text-white/68">
+            <Handle
+              type="target"
+              position={Position.Left}
+              id="iterable"
+              isConnectable={!nodeData.readOnly}
+              title="循环迭代输入"
+              style={{
+                background: schema ? getPortColor(iterableType, schema) : "#fbbf24",
+                border: "2px solid #111318",
+                width: 10,
+                height: 10,
+                left: -14,
+                top: "50%",
+                zIndex: 8,
+              }}
+            />
+            <span className="shrink-0">for</span>
+            <input
+              type="text"
+              value={String(nodeData.inputs.variable ?? "i")}
+              disabled={Boolean(nodeData.readOnly)}
+              onChange={(event) => nodeData.onInputChange?.("variable", event.target.value, "identifier")}
+              onPointerDown={stopNodeInteraction}
+              onWheel={stopNodeInteraction}
+              className={`${NODE_CONTROL_CLASS} w-14 shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-1 font-mono text-[10px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
+            />
+            <span className="shrink-0 text-white/40">in</span>
+            <input
+              type="text"
+              value={String(nodeData.inputs.iterable ?? "")}
+              disabled={Boolean(nodeData.readOnly)}
+              onChange={(event) => nodeData.onInputChange?.("iterable", event.target.value)}
+              onPointerDown={stopNodeInteraction}
+              onWheel={stopNodeInteraction}
+              className={`${NODE_CONTROL_CLASS} min-w-0 flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 font-mono text-[10px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
+            />
+          </div>
         </div>
+
+        <BodyZone
+          layout={bodyLayout}
+          count={bodyCount}
+          disabled={Boolean(nodeData.readOnly)}
+          onDrop={nodeData.onSlotDrop}
+        />
       </div>
     </div>
   )

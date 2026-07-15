@@ -1,4 +1,3 @@
-import dagre from "@dagrejs/dagre"
 import type { Connection } from "@xyflow/react"
 import type {
   ASTNode, ScriptNode, ActionCallNode, SetNode as ASTSetNode,
@@ -187,13 +186,59 @@ export function astToFlow(
   const actionMap = buildActionMap(schema)
   const compatibility = analyzeFlowCompatibility(ast, schema, source)
 
-  for (const statement of ast.body) {
-    convertNode(statement, nodes, edges, actionMap, schema, null)
+  convertSequence(ast.body, nodes, edges, actionMap, schema, null, {
+    scopeId: "script",
+    semantic: true,
+  })
+
+  for (const node of nodes) {
+    node.data.readOnly = !compatibility.writable
+    const savedPosition = existingPositions?.get(node.id)
+    if (savedPosition) node.position = savedPosition
+  }
+  return { nodes, edges, readOnlyReasons: compatibility.reasons }
+}
+
+interface SequenceContext {
+  scopeId: string
+  slot?: string
+  semantic: boolean
+}
+
+function convertSequence(
+  statements: ASTNode[],
+  nodes: KetherNode[],
+  edges: KetherEdge[],
+  actionMap: Map<string, SchemaAction>,
+  schema: ActionsSchemaV2,
+  parentId: string | null,
+  context: SequenceContext
+): string[] {
+  const ids = statements.flatMap((statement) => (
+    convertNode(statement, nodes, edges, actionMap, schema, parentId)
+  ))
+
+  for (let index = 0; index < ids.length - 1; index += 1) {
+    const source = ids[index]
+    const target = ids[index + 1]
+    edges.push({
+      id: `execution:${context.scopeId}:${context.slot ?? "top"}:${index}:${source}->${target}`,
+      source,
+      sourceHandle: "flow-out",
+      target,
+      targetHandle: "flow-in",
+      data: {
+        kind: "execution",
+        generated: true,
+        semantic: context.semantic,
+        scopeId: context.scopeId,
+        slot: context.slot,
+        order: index,
+      },
+    })
   }
 
-  for (const node of nodes) node.data.readOnly = !compatibility.writable
-  applyLayout(nodes, edges, existingPositions)
-  return { nodes, edges, readOnlyReasons: compatibility.reasons }
+  return ids
 }
 
 function convertNode(
@@ -203,25 +248,50 @@ function convertNode(
   actionMap: Map<string, SchemaAction>,
   schema: ActionsSchemaV2,
   parentId: string | null
-): string | null {
+): string[] {
   switch (node.type) {
-    case "action_call": return convertActionCall(node, nodes, actionMap, parentId)
-    case "set": return convertSet(node, nodes, parentId)
-    case "if": return convertIf(node, nodes, edges, actionMap, schema, parentId)
-    case "for": return convertFor(node, nodes, edges, actionMap, schema, parentId)
+    case "action_call": return [convertActionCall(node, nodes, actionMap, parentId)]
+    case "set": return [convertSet(node, nodes, parentId)]
+    case "if": return [convertIf(node, nodes, edges, actionMap, schema, parentId)]
+    case "for": return [convertFor(node, nodes, edges, actionMap, schema, parentId)]
     case "var_ref":
     case "lazy_ref":
     case "number":
     case "string":
     case "boolean":
     case "identifier":
-      return convertDataNode(node, nodes, parentId)
-    case "calc": return convertCalcNode(node, nodes, parentId)
+      return [convertDataNode(node, nodes, parentId)]
+    case "calc": return [convertCalcNode(node, nodes, parentId)]
     case "block":
-      for (const child of node.body) convertNode(child, nodes, edges, actionMap, schema, parentId)
-      return null
-    default: return null
+      return node.body.flatMap((child) => (
+        convertNode(child, nodes, edges, actionMap, schema, parentId)
+      ))
+    default: return []
   }
+}
+
+function addStructureEdge(
+  edges: KetherEdge[],
+  source: string,
+  target: string | undefined,
+  slot: "then" | "else" | "body"
+) {
+  if (!target) return
+  edges.push({
+    id: `structure:${source}:${slot}:${target}`,
+    source,
+    sourceHandle: `${slot}-out`,
+    target,
+    targetHandle: "flow-in",
+    data: {
+      kind: "structure",
+      generated: true,
+      semantic: false,
+      scopeId: source,
+      slot,
+      order: 0,
+    },
+  })
 }
 
 function convertActionCall(
@@ -260,6 +330,8 @@ function convertActionCall(
     type: "actionNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: node.name,
       schemaAction,
@@ -281,6 +353,8 @@ function convertSet(node: ASTSetNode, nodes: KetherNode[], parentId: string | nu
     type: "setNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: `set ${node.variable}`,
       schemaAction: null,
@@ -306,20 +380,13 @@ function convertIf(
   const condition = extractFlowValue(node.condition)
   const slotChildren: Record<string, string[]> = { then: [], else: [] }
 
-  for (const child of node.thenBody) {
-    const childId = convertNode(child, nodes, edges, actionMap, schema, id)
-    if (childId) slotChildren.then.push(childId)
-  }
-  for (const child of node.elseBody ?? []) {
-    const childId = convertNode(child, nodes, edges, actionMap, schema, id)
-    if (childId) slotChildren.else.push(childId)
-  }
-
   nodes.push({
     id,
     type: "branchNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: "if",
       schemaAction: null,
@@ -330,6 +397,19 @@ function convertIf(
       astRef: node,
     },
   })
+
+  slotChildren.then = convertSequence(node.thenBody, nodes, edges, actionMap, schema, id, {
+    scopeId: id,
+    slot: "then",
+    semantic: false,
+  })
+  slotChildren.else = convertSequence(node.elseBody ?? [], nodes, edges, actionMap, schema, id, {
+    scopeId: id,
+    slot: "else",
+    semantic: false,
+  })
+  addStructureEdge(edges, id, slotChildren.then[0], "then")
+  addStructureEdge(edges, id, slotChildren.else[0], "else")
   return id
 }
 
@@ -345,16 +425,13 @@ function convertFor(
   const iterable = extractFlowValue(node.iterable)
   const slotChildren: Record<string, string[]> = { body: [] }
 
-  for (const child of node.body) {
-    const childId = convertNode(child, nodes, edges, actionMap, schema, id)
-    if (childId) slotChildren.body.push(childId)
-  }
-
   nodes.push({
     id,
     type: "loopNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: `for ${node.variable}`,
       schemaAction: null,
@@ -366,6 +443,13 @@ function convertFor(
       provides: { [node.variable]: node.variable },
     },
   })
+
+  slotChildren.body = convertSequence(node.body, nodes, edges, actionMap, schema, id, {
+    scopeId: id,
+    slot: "body",
+    semantic: false,
+  })
+  addStructureEdge(edges, id, slotChildren.body[0], "body")
   return id
 }
 
@@ -379,6 +463,8 @@ function convertDataNode(node: ASTNode, nodes: KetherNode[], parentId: string | 
     type: "dataNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: String(value),
       schemaAction: null,
@@ -399,6 +485,8 @@ function convertCalcNode(node: ASTCalcNode, nodes: KetherNode[], parentId: strin
     type: "calcNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
+    extent: parentId ? "parent" : undefined,
+    expandParent: Boolean(parentId),
     data: {
       label: "calc",
       schemaAction: null,
@@ -451,34 +539,6 @@ export function inferEditedInputKind(previous: KetherInputKind | undefined, valu
   return "identifier"
 }
 
-// ============ 自动布局 ============
-
-function applyLayout(
-  nodes: KetherNode[],
-  edges: KetherEdge[],
-  existingPositions?: Map<string, { x: number; y: number }>
-) {
-  const graph = new dagre.graphlib.Graph()
-  graph.setDefaultEdgeLabel(() => ({}))
-  graph.setGraph({ rankdir: "TB", nodesep: 20, ranksep: 40 })
-
-  const topLevel = nodes.filter((node) => !node.parentId)
-  for (const node of topLevel) graph.setNode(node.id, { width: 260, height: 80 })
-  for (const edge of edges) graph.setEdge(edge.source, edge.target)
-
-  dagre.layout(graph)
-
-  for (const node of topLevel) {
-    const savedPosition = existingPositions?.get(node.id)
-    if (savedPosition) {
-      node.position = savedPosition
-    } else {
-      const layoutNode = graph.node(node.id)
-      if (layoutNode) node.position = { x: layoutNode.x - 130, y: layoutNode.y - 40 }
-    }
-  }
-}
-
 // ============ Connection mutation ============
 
 function isMappedInput(node: KetherNode, handle: string): boolean {
@@ -487,6 +547,7 @@ function isMappedInput(node: KetherNode, handle: string): boolean {
     case "set": return handle === "value"
     case "branch": return handle === "condition"
     case "loop": return handle === "iterable"
+    case "calc": return handle === "formula"
     default: return false
   }
 }
@@ -522,8 +583,10 @@ export function applyConnectionToFlow(
       return { accepted: false, state, reason: "只有数据节点输出可写入参数输入" }
     }
 
-    const value = source.data.inputs.value
-    const kind = source.data.inputKinds.value ?? "string"
+    const value = Object.prototype.hasOwnProperty.call(source.data.inputs, "value")
+      ? source.data.inputs.value
+      : source.data.inputs.literal
+    const kind = source.data.inputKinds.value ?? source.data.inputKinds.literal ?? "string"
     const nodes = state.nodes.map((node) => node.id === target.id ? {
       ...node,
       data: {
@@ -558,13 +621,21 @@ export function applyConnectionToFlow(
   if (source.id === target.id) return { accepted: false, state, reason: "执行连线不能连接自身" }
 
   const edges = [
-    ...state.edges.filter((edge) => !(edge.data?.kind === "execution" && edge.source === source.id && edge.target === target.id)),
+    ...state.edges.filter((edge) => {
+      const generatedTopLevelExecution = edge.data?.kind === "execution"
+        && edge.data.generated === true
+        && edge.data.semantic === true
+      const sameExecutionConnection = isExecutionEdge(edge)
+        && edge.source === source.id
+        && edge.target === target.id
+      return !generatedTopLevelExecution && !sameExecutionConnection
+    }),
     {
       ...connection,
       id: edgeId,
       animated: true,
       style: { stroke: "#38bdf8", strokeWidth: 1.5 },
-      data: { kind: "execution" as const },
+      data: { kind: "execution" as const, generated: false, semantic: true },
     },
   ]
   return { accepted: true, state: { ...state, edges }, kind: "execution" }
@@ -585,9 +656,20 @@ function isExecutionEdge(edge: KetherEdge): boolean {
   return edge.data?.kind === "execution" || (!edge.data?.kind && !edge.targetHandle)
 }
 
+function isSemanticExecutionEdge(edge: KetherEdge): boolean {
+  return isExecutionEdge(edge) && edge.data?.semantic !== false
+}
+
 function sortTopLevelByEdges(nodes: KetherNode[], edges: KetherEdge[]): KetherNode[] {
-  const topLevel = nodes.filter((node) => !node.parentId)
-  const executionEdges = edges.filter(isExecutionEdge)
+  const dataSourceIds = new Set(
+    edges
+      .filter((edge) => edge.data?.kind === "data")
+      .map((edge) => edge.source)
+  )
+  const topLevel = nodes.filter((node) => (
+    !node.parentId && !(node.data.nodeKind === "data" && dataSourceIds.has(node.id))
+  ))
+  const executionEdges = edges.filter(isSemanticExecutionEdge)
   if (topLevel.length <= 1 || executionEdges.length === 0) {
     return [...topLevel].sort((left, right) => left.position.y - right.position.y)
   }
@@ -615,6 +697,12 @@ function sortTopLevelByEdges(nodes: KetherNode[], edges: KetherEdge[]): KetherNo
   const visited = new Set<string>()
 
   while (queue.length > 0) {
+    queue.sort((leftId, rightId) => {
+      const left = nodeById.get(leftId)
+      const right = nodeById.get(rightId)
+      if (!left || !right) return 0
+      return left.position.y - right.position.y || left.position.x - right.position.x
+    })
     const id = queue.shift()
     if (!id || visited.has(id)) continue
     visited.add(id)
@@ -686,7 +774,10 @@ function nodeToAst(node: KetherNode, nodeMap: Map<string, KetherNode>, schema: A
         start: position,
         end: position,
       }
-    case "data": return valueToAst(data.inputs.value, data.inputKinds.value, position)
+    case "data": {
+      const valueKey = Object.prototype.hasOwnProperty.call(data.inputs, "value") ? "value" : "literal"
+      return valueToAst(data.inputs[valueKey], data.inputKinds[valueKey], position)
+    }
     case "calc": return { type: "calc", formula: String(data.inputs.formula ?? ""), start: position, end: position }
     default: return null
   }

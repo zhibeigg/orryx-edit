@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "必须与根 VERSION 一致，例如 0.11.17"
+        description: "必须与根 VERSION 一致，例如 0.12.17"
         required: true
         type: string
       publish_image:

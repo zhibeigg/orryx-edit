@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react"
 import {
-  ReactFlow, Background, Controls, MiniMap, Panel,
+  ReactFlow, Background, Controls, MiniMap, Panel, MarkerType,
   applyEdgeChanges, applyNodeChanges,
-  useNodesState, useEdgesState, useReactFlow, ReactFlowProvider,
+  useNodesState, useEdgesState, useReactFlow, useNodesInitialized, ReactFlowProvider,
   type Connection, type EdgeChange, type NodeChange, type NodeTypes
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -20,7 +20,9 @@ import { SchemaProvider } from "./SchemaContext"
 import { BookmarkPlus, History, Link2, Sparkles, Undo2, Redo2, X } from "lucide-react"
 import { NodePalette } from "./NodePalette"
 import type { SchemaAction } from "@/types/schema"
-import { bindFlowNodeInteractions, hasSemanticFlowChange } from "./flow-history"
+import { bindFlowNodeInteractions, semanticFlowSnapshotKey } from "./flow-history"
+import { layoutFlowGraph } from "./flow-layout"
+import { rebuildGeneratedFlowEdges } from "./flow-edges"
 import { createDeferredSemanticWriteback, type DeferredSemanticWriteback } from "@/lib/deferred-semantic-writeback"
 import { useEditorInputFlush } from "@/lib/editor-input-flush"
 
@@ -101,6 +103,45 @@ function cloneSnapshot(nodes: KetherNode[], edges: KetherEdge[]): FlowSnapshot {
     nodes: normalizeSnapshotNodes(nodes).map((node) => ({ ...node, data: { ...node.data } })),
     edges: edges.map((edge) => ({ ...edge })),
   }
+}
+
+function semanticSnapshotKey(snapshot: FlowSnapshot): string {
+  return semanticFlowSnapshotKey({
+    nodes: snapshot.nodes.map((node) => {
+      const nodeWithoutStyle = { ...node }
+      const dataWithoutLayout = { ...node.data }
+      delete nodeWithoutStyle.style
+      delete dataWithoutLayout.layout
+      return { ...nodeWithoutStyle, data: dataWithoutLayout } as KetherNode
+    }).sort((left, right) => left.id.localeCompare(right.id)),
+    edges: [...snapshot.edges].sort((left, right) => left.id.localeCompare(right.id)),
+  })
+}
+
+function stableDimension(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value * 10) / 10 : 0
+}
+
+function flowLayoutInputSignature(nodes: KetherNode[], edges: KetherEdge[]): string {
+  return JSON.stringify({
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      parentId: node.parentId ?? null,
+      type: node.type,
+      width: stableDimension(node.measured?.width ?? node.width),
+      height: stableDimension(node.measured?.height ?? node.height),
+      slots: Object.entries(node.data.slotChildren ?? {}).map(([slot, ids]) => [slot, ids]),
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      sourceHandle: edge.sourceHandle ?? null,
+      target: edge.target,
+      targetHandle: edge.targetHandle ?? null,
+      kind: edge.data?.kind ?? null,
+      semantic: edge.data?.semantic ?? null,
+    })),
+  })
 }
 
 function snapshotKey(snapshot: FlowSnapshot): string {
@@ -209,6 +250,11 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   const historyPastRef = useRef<HistoryEntry[]>([])
   const historyFutureRef = useRef<HistoryEntry[]>([])
   const historyKeyRef = useRef("")
+  const manualLockedNodeIdsRef = useRef(new Set<string>())
+  const pendingNewNodeIdsRef = useRef(new Set<string>())
+  const initialLayoutDoneRef = useRef(false)
+  const lastLayoutInputSignatureRef = useRef("")
+  const fitViewFrameRef = useRef<number | null>(null)
 
   valueRef.current = value
   onChangeRef.current = onChange
@@ -266,7 +312,8 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   // 初始节点和边为空，在useEffect中设置
   const [nodes, setNodes] = useNodesState<KetherNode>([])
   const [edges, setEdges] = useEdgesState<KetherEdge>([])
-  const { screenToFlowPosition } = useReactFlow<KetherNode, KetherEdge>()
+  const nodesInitialized = useNodesInitialized()
+  const { screenToFlowPosition, fitView } = useReactFlow<KetherNode, KetherEdge>()
 
   useEffect(() => {
     nodesRef.current = nodes
@@ -332,7 +379,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     const restored = cloneSnapshot(snapshot.nodes, snapshot.edges)
     const nodesValue = restored.nodes
     const edgesValue = restored.edges
-    const semanticChanged = hasSemanticFlowChange(currentSnapshot, restored)
+    const semanticChanged = semanticSnapshotKey(currentSnapshot) !== semanticSnapshotKey(restored)
     setNodes(nodesValue)
     setEdges(edgesValue)
     nodesRef.current = nodesValue
@@ -494,19 +541,56 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     }
 
     setNodes((current) => {
-      const next = applyNodeChanges(applicableChanges, current)
       const removed = new Set(
         effectiveSemanticChanges
           .filter((change) => change.type === "remove")
-          .map((change) => change.id)
+          .map((change) => change.id),
       )
-      let nextEdges = edgesRef.current
+      let foundDescendant = true
+      while (foundDescendant) {
+        foundDescendant = false
+        for (const node of current) {
+          if (node.parentId && removed.has(node.parentId) && !removed.has(node.id)) {
+            removed.add(node.id)
+            foundDescendant = true
+          }
+        }
+      }
+
+      let next = applyNodeChanges(applicableChanges, current)
       if (removed.size > 0) {
-        nextEdges = edgesRef.current.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target))
+        next = next
+          .filter((node) => !removed.has(node.id))
+          .map((node) => ({
+            ...node,
+            data: {
+              ...node.data,
+              slotChildren: Object.fromEntries(
+                Object.entries(node.data.slotChildren ?? {}).map(([slot, ids]) => [
+                  slot,
+                  ids.filter((id) => !removed.has(id)),
+                ]),
+              ),
+            },
+          }))
+        for (const id of removed) {
+          manualLockedNodeIdsRef.current.delete(id)
+          pendingNewNodeIdsRef.current.delete(id)
+          positionsRef.current.delete(id)
+        }
+      }
+
+      let nextEdges = edgesRef.current
+      if (effectiveSemanticChanges.length > 0) {
+        nextEdges = rebuildGeneratedFlowEdges(
+          next,
+          edgesRef.current.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)),
+        )
         edgesRef.current = nextEdges
         setEdges(nextEdges)
+        pushToText(next, nextEdges)
       }
-      if (effectiveSemanticChanges.length > 0) pushToText(next, nextEdges)
+      nodesRef.current = next
       return next
     })
   }, [isReadOnly, rememberBeforeChange, setEdges, setNodes, pushToText])
@@ -524,7 +608,10 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       inlineMergeActiveRef.current = false
     }
     setEdges((current) => {
-      const next = applyEdgeChanges(applicableChanges, current)
+      const changedEdges = applyEdgeChanges(applicableChanges, current)
+      const next = effectiveSemanticChanges.length > 0
+        ? rebuildGeneratedFlowEdges(nodesRef.current, changedEdges)
+        : changedEdges
       edgesRef.current = next
       if (effectiveSemanticChanges.length > 0) pushToText(nodesRef.current, next)
       return next
@@ -546,11 +633,12 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     rememberBeforeChange(result.kind === "data" ? "连接参数" : "创建执行连线")
     inlineMergeActiveRef.current = false
     setConnectionError(null)
+    const nextEdges = rebuildGeneratedFlowEdges(result.state.nodes, result.state.edges)
     nodesRef.current = result.state.nodes
-    edgesRef.current = result.state.edges
+    edgesRef.current = nextEdges
     setNodes(result.state.nodes)
-    setEdges(result.state.edges)
-    pushToText(result.state.nodes, result.state.edges)
+    setEdges(nextEdges)
+    pushToText(result.state.nodes, nextEdges)
   }, [isReadOnly, rememberBeforeChange, setEdges, setNodes, pushToText])
 
   const createActionNode = useCallback((action: SchemaAction, x: number, y: number): KetherNode => {
@@ -586,6 +674,23 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
           type: "setNode",
           position: { x, y },
           data: { label: "set", schemaAction: null, inputs: { variable: "x", value: "" }, inputKinds: { variable: "identifier", value: "string" }, slotChildren: {}, onSlotDrop: undefined, nodeKind: "set" },
+        }
+      case "data":
+      case "literal":
+        return {
+          id: nextNodeId("data"),
+          type: "dataNode",
+          position: { x, y },
+          data: {
+            label: "数据",
+            schemaAction: null,
+            inputs: { builtin: "literal", value: "" },
+            inputKinds: { builtin: "identifier", value: "string" },
+            slotChildren: {},
+            onSlotDrop: undefined,
+            nodeKind: "data",
+            provides: { output: "string" },
+          },
         }
       case "if":
         return {
@@ -651,6 +756,8 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       const childNode: KetherNode = {
         ...nextNode,
         parentId,
+        extent: "parent",
+        expandParent: true,
         position: nextNode.position,
       }
 
@@ -669,10 +776,15 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       })
 
       nextNodes.push(childNode)
-      pushToText(nextNodes, edgesRef.current)
+      const nextEdges = rebuildGeneratedFlowEdges(nextNodes, edgesRef.current)
+      pendingNewNodeIdsRef.current.add(childNode.id)
+      nodesRef.current = nextNodes
+      edgesRef.current = nextEdges
+      setEdges(nextEdges)
+      pushToText(nextNodes, nextEdges)
       return nextNodes
     })
-  }, [createNodeFromPayload, rememberBeforeChange, setNodes, pushToText])
+  }, [createNodeFromPayload, rememberBeforeChange, setEdges, setNodes, pushToText])
 
   const handleNodeInputChange = useCallback((nodeId: string, key: string, value: unknown, kind?: KetherInputKind) => {
     if (readOnlyReasonsRef.current.length > 0) return
@@ -706,6 +818,29 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     [nodes, handleSlotDrop, handleNodeInputChange]
   )
 
+  const visualEdges = useMemo(() => edges.map((edge) => {
+    const kind = edge.data?.kind ?? (edge.targetHandle && edge.sourceHandle !== "flow-out" ? "data" : "execution")
+    const color = kind === "data" ? "#22d3ee" : kind === "structure" ? "#b74732" : "#f59e0b"
+    return {
+      ...edge,
+      type: "smoothstep",
+      animated: false,
+      deletable: edge.data?.generated !== true,
+      style: {
+        ...edge.style,
+        stroke: color,
+        strokeWidth: kind === "execution" ? 2 : 1.7,
+        strokeDasharray: kind === "structure" ? "7 5" : undefined,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color,
+        width: kind === "execution" ? 18 : 16,
+        height: kind === "execution" ? 18 : 16,
+      },
+    } as KetherEdge
+  }), [edges])
+
   const handleDrop = useCallback((event: DragEvent) => {
     event.preventDefault()
     if (readOnlyReasonsRef.current.length > 0) return
@@ -722,13 +857,19 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       inlineMergeActiveRef.current = false
       setNodes((current) => {
         const next = [...current, nextNode]
-        pushToText(next, edgesRef.current)
+        const nextEdges = rebuildGeneratedFlowEdges(next, edgesRef.current)
+        manualLockedNodeIdsRef.current.add(nextNode.id)
+        positionsRef.current.set(nextNode.id, { ...nextNode.position })
+        nodesRef.current = next
+        edgesRef.current = nextEdges
+        setEdges(nextEdges)
+        pushToText(next, nextEdges)
         return next
       })
     } catch {
       return
     }
-  }, [createActionNode, createBuiltinNode, rememberBeforeChange, screenToFlowPosition, setNodes, pushToText])
+  }, [createActionNode, createBuiltinNode, rememberBeforeChange, screenToFlowPosition, setEdges, setNodes, pushToText])
 
   // 初始化和更新节点图
   useEffect(() => {
@@ -750,6 +891,12 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         readOnlyReasonsRef.current = reasons
         setReadOnlyReasons(reasons)
         setConnectionError(null)
+        lastLayoutInputSignatureRef.current = ""
+        pendingNewNodeIdsRef.current.clear()
+        manualLockedNodeIdsRef.current = new Set(
+          [...manualLockedNodeIdsRef.current].filter((id) => flow.nodes.some((node) => node.id === id))
+        )
+        initialLayoutDoneRef.current = flow.nodes.length === 0 || manualLockedNodeIdsRef.current.size > 0
         setNodes(flow.nodes)
         setEdges(flow.edges)
         nodesRef.current = flow.nodes
@@ -759,6 +906,65 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     }, 0) // 使用0ms超时确保在渲染后执行
     return () => { if (parseTimerRef.current) clearTimeout(parseTimerRef.current) }
   }, [value, schema, setNodes, setEdges, resetHistory, flushSemanticWriteback])
+
+  const layoutInputSignature = useMemo(
+    () => flowLayoutInputSignature(nodes, edges),
+    [nodes, edges]
+  )
+
+  const scheduleFitView = useCallback(() => {
+    if (fitViewFrameRef.current !== null) cancelAnimationFrame(fitViewFrameRef.current)
+    fitViewFrameRef.current = requestAnimationFrame(() => {
+      fitViewFrameRef.current = requestAnimationFrame(() => {
+        fitViewFrameRef.current = null
+        void fitView({ padding: 0.24, duration: 300 })
+      })
+    })
+  }, [fitView])
+
+  useEffect(() => {
+    if (!nodesInitialized || nodes.length === 0) return
+    if (layoutInputSignature === lastLayoutInputSignatureRef.current) return
+
+    const mode = initialLayoutDoneRef.current ? "preserve" : "force"
+    lastLayoutInputSignatureRef.current = layoutInputSignature
+    const currentNodes = nodesRef.current
+    const result = layoutFlowGraph(currentNodes, edgesRef.current, {
+      mode,
+      lockedNodeIds: manualLockedNodeIdsRef.current,
+      newNodeIds: mode === "preserve" ? pendingNewNodeIdsRef.current : undefined,
+    })
+    initialLayoutDoneRef.current = true
+    pendingNewNodeIdsRef.current.clear()
+
+    const orderChanged = result.nodes.some((node, index) => node.id !== currentNodes[index]?.id)
+    if (result.changedNodeIds.length > 0 || orderChanged) {
+      nodesRef.current = result.nodes
+      setNodes(result.nodes)
+    }
+    if (mode === "force") scheduleFitView()
+  }, [layoutInputSignature, nodes.length, nodesInitialized, scheduleFitView, setNodes])
+
+  const handleAutoLayout = useCallback(() => {
+    const currentNodes = nodesRef.current
+    if (currentNodes.length === 0) return
+
+    manualLockedNodeIdsRef.current.clear()
+    pendingNewNodeIdsRef.current.clear()
+    positionsRef.current.clear()
+    const result = layoutFlowGraph(currentNodes, edgesRef.current, { mode: "force" })
+    const orderChanged = result.nodes.some((node, index) => node.id !== currentNodes[index]?.id)
+    const changed = result.changedNodeIds.length > 0 || orderChanged
+    if (changed && readOnlyReasonsRef.current.length === 0) rememberBeforeChange("自动布局")
+
+    initialLayoutDoneRef.current = true
+    lastLayoutInputSignatureRef.current = flowLayoutInputSignature(result.nodes, edgesRef.current)
+    if (changed) {
+      nodesRef.current = result.nodes
+      setNodes(result.nodes)
+    }
+    scheduleFitView()
+  }, [rememberBeforeChange, scheduleFitView, setNodes])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -791,6 +997,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       // 卸载前同步提交有效的语义快照；dispose 不会因清理定时器而丢弃 pending。
       writebackRef.current?.dispose()
       if (inlineMergeTimerRef.current) clearTimeout(inlineMergeTimerRef.current)
+      if (fitViewFrameRef.current !== null) cancelAnimationFrame(fitViewFrameRef.current)
     }
   }, [])
 
@@ -798,6 +1005,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   const onNodeDragStop = (_: unknown, node: KetherNode) => {
     draggingRef.current = false
     inlineMergeActiveRef.current = false
+    manualLockedNodeIdsRef.current.add(node.id)
     positionsRef.current.set(node.id, { ...node.position })
   }
 
@@ -808,7 +1016,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
   }
 
   return (
-    <div ref={flowRootRef} className="flex h-full max-md:flex-col bg-[radial-gradient(circle_at_top_left,#243447_0%,#1c1f24_35%,#17191d_100%)]">
+    <div ref={flowRootRef} className="flex h-full max-md:flex-col bg-[#17191d]">
       <NodePalette schema={schema} onDragStart={() => {}} />
       <div className="flex-1 min-w-0 relative">
         <div className="h-8 px-3 border-b border-[#2f3136] bg-[#1b1d22]/95 flex items-center justify-between text-[11px]">
@@ -817,6 +1025,16 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             {isReadOnly ? "当前脚本仅提供只读节点预览" : "拖拽左侧节点到画布，显式编辑后同步到脚本文本"}
           </div>
           <div className="flex items-center gap-1 text-[#7f8795]">
+            <button
+              type="button"
+              onClick={handleAutoLayout}
+              disabled={nodes.length === 0}
+              className="inline-flex items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              title="清除手工位置并自动排列"
+            >
+              <Sparkles className="w-3 h-3" />
+              自动排列
+            </button>
             <button
               type="button"
               onClick={() => setShowHistory((value) => !value)}
@@ -1021,7 +1239,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
         <div className="h-[calc(100%-2rem)] max-md:h-[calc(100%-4.25rem)]">
           <ReactFlow
             nodes={interactiveNodes}
-            edges={edges}
+            edges={visualEdges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={handleConnect}
@@ -1037,9 +1255,8 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             nodesConnectable={!isReadOnly}
             deleteKeyCode={isReadOnly ? null : ["Backspace", "Delete"]}
             elementsSelectable
-            fitView
             fitViewOptions={{ padding: 0.24, duration: 300 }}
-            className="bg-[linear-gradient(160deg,#16181d_0%,#101216_100%)]"
+            className="bg-[#101216]"
           >
             <Panel position="top-right" className="max-md:hidden rounded-md border border-[#2f3136] bg-[#181a1f]/90 px-2 py-1 text-[10px] text-[#99a0ad] shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
               {isReadOnly ? "复杂脚本：只读预览" : "仅显式语义修改 220ms 保存"}

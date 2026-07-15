@@ -6,8 +6,8 @@ interface FlowSnapshotLike {
   edges: KetherEdge[]
 }
 
-const layoutNodeKeys = ["position", "positionAbsolute", "measured", "width", "height", "selected", "dragging"]
-const transientDataKeys = ["onSlotDrop", "onInputChange"]
+const layoutNodeKeys = ["position", "positionAbsolute", "measured", "width", "height", "style", "selected", "dragging"]
+const transientDataKeys = ["layout", "onSlotDrop", "onInputChange"]
 const transientEdgeKeys = ["selected"]
 
 function withoutKeys(value: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {

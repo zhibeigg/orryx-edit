@@ -170,6 +170,197 @@ describe("Flow 初始化与只读保护", () => {
   })
 })
 
+describe("AST 与 Flow 的执行顺序", () => {
+  it("先创建 if/for 父节点，再创建所有 slot 子节点并生成结构与显示顺序边", () => {
+    const source = [
+      "demo start",
+      "if true then {",
+      "  demo then-one",
+      "  for i in items then {",
+      "    demo loop-one",
+      "    demo loop-two",
+      "  }",
+      "  demo then-last",
+      "} else {",
+      "  demo else-one",
+      "  demo else-two",
+      "}",
+      "demo end",
+    ].join("\n")
+    const ast = parseKether(source, toParserActionsSchema(schema))
+    const flow = astToFlow(ast, schema)
+    const branch = flow.nodes.find((node) => node.data.nodeKind === "branch")
+    const loop = flow.nodes.find((node) => node.data.nodeKind === "loop")
+
+    expect(branch).toBeDefined()
+    expect(loop).toBeDefined()
+    if (!branch || !loop) return
+
+    const branchIndex = flow.nodes.findIndex((node) => node.id === branch.id)
+    const loopIndex = flow.nodes.findIndex((node) => node.id === loop.id)
+    const branchDescendantIndexes = flow.nodes
+      .map((node, index) => ({ node, index }))
+      .filter(({ node }) => node.parentId === branch.id || node.parentId === loop.id)
+      .map(({ index }) => index)
+    const loopChildIndexes = flow.nodes
+      .map((node, index) => ({ node, index }))
+      .filter(({ node }) => node.parentId === loop.id)
+      .map(({ index }) => index)
+    expect(branchDescendantIndexes.every((index) => branchIndex < index)).toBe(true)
+    expect(loopChildIndexes.every((index) => loopIndex < index)).toBe(true)
+
+    const structureEdges = flow.edges.filter((edge) => edge.data?.kind === "structure")
+    expect(structureEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: branch.id,
+        target: branch.data.slotChildren.then[0],
+        sourceHandle: "then-out",
+        targetHandle: "flow-in",
+        data: expect.objectContaining({ generated: true, semantic: false, slot: "then" }),
+      }),
+      expect.objectContaining({
+        source: branch.id,
+        target: branch.data.slotChildren.else[0],
+        sourceHandle: "else-out",
+        targetHandle: "flow-in",
+        data: expect.objectContaining({ generated: true, semantic: false, slot: "else" }),
+      }),
+      expect.objectContaining({
+        source: loop.id,
+        target: loop.data.slotChildren.body[0],
+        sourceHandle: "body-out",
+        targetHandle: "flow-in",
+        data: expect.objectContaining({ generated: true, semantic: false, slot: "body" }),
+      }),
+    ]))
+
+    const topLevelIds = flow.nodes.filter((node) => !node.parentId).map((node) => node.id)
+    const topExecutionEdges = flow.edges.filter((edge) => (
+      edge.data?.kind === "execution" && edge.data.semantic === true
+    ))
+    expect(topExecutionEdges.map((edge) => [edge.source, edge.target])).toEqual([
+      [topLevelIds[0], topLevelIds[1]],
+      [topLevelIds[1], topLevelIds[2]],
+    ])
+    expect(topExecutionEdges.every((edge) => edge.data?.generated === true)).toBe(true)
+
+    const thenExecutionEdges = flow.edges.filter((edge) => (
+      edge.data?.kind === "execution" && edge.data.slot === "then"
+    ))
+    expect(thenExecutionEdges.map((edge) => [edge.source, edge.target])).toEqual([
+      [branch.data.slotChildren.then[0], branch.data.slotChildren.then[1]],
+      [branch.data.slotChildren.then[1], branch.data.slotChildren.then[2]],
+    ])
+    expect(thenExecutionEdges.every((edge) => edge.data?.generated === true && edge.data.semantic === false)).toBe(true)
+  })
+
+  it("透明 block 展开多个节点时仍按可视顺序生成相邻执行边", () => {
+    const pos = { offset: 0, line: 1, column: 1 }
+    const action = (value: string) => ({
+      type: "action_call" as const,
+      name: "demo",
+      args: [{ type: "identifier" as const, name: value, start: pos, end: pos }],
+      keywordArgs: {},
+      start: pos,
+      end: pos,
+    })
+    const ast: ScriptNode = {
+      type: "script",
+      start: pos,
+      end: pos,
+      body: [
+        action("before"),
+        {
+          type: "block",
+          modifier: null,
+          body: [
+            action("inside-one"),
+            { type: "block", modifier: null, body: [action("inside-two")], start: pos, end: pos },
+          ],
+          start: pos,
+          end: pos,
+        },
+        action("after"),
+      ],
+    }
+
+    const flow = astToFlow(ast, schema)
+    expect(flow.nodes.map((node) => node.data.inputs.value)).toEqual([
+      "before",
+      "inside-one",
+      "inside-two",
+      "after",
+    ])
+    expect(flow.edges.filter((edge) => edge.data?.kind === "execution").map((edge) => [edge.source, edge.target])).toEqual([
+      [flow.nodes[0].id, flow.nodes[1].id],
+      [flow.nodes[1].id, flow.nodes[2].id],
+      [flow.nodes[2].id, flow.nodes[3].id],
+    ])
+  })
+
+  it("部分执行边与孤立节点并存时，每轮都按画布位置稳定选择下一个节点", () => {
+    const first = actionNode("first", 0)
+    first.data.inputs.value = "first"
+    const second = actionNode("second", 100)
+    second.data.inputs.value = "second"
+    const isolated = actionNode("isolated", 300)
+    isolated.data.inputs.value = "isolated"
+    const state: FlowState = {
+      nodes: [first, second, isolated],
+      edges: [{
+        id: "first-to-second",
+        source: first.id,
+        sourceHandle: "flow-out",
+        target: second.id,
+        targetHandle: "flow-in",
+        data: { kind: "execution", semantic: true, generated: false },
+      }],
+    }
+
+    expect(stringifyKether(flowToAst(state, schema))).toBe([
+      "demo first",
+      "demo second",
+      "demo isolated",
+    ].join("\n"))
+  })
+
+  it("结构边和 semantic=false 的显示边不会改变 AST 往返结果", () => {
+    const source = [
+      "demo start",
+      "if true then {",
+      "  demo then-one",
+      "  demo then-two",
+      "} else {",
+      "  demo else-one",
+      "}",
+      "demo end",
+    ].join("\n")
+    const ast = parseKether(source, toParserActionsSchema(schema))
+    const flow = astToFlow(ast, schema)
+    const topLevel = flow.nodes.filter((node) => !node.parentId)
+    flow.edges.push(
+      {
+        id: "display-reverse",
+        source: topLevel[2].id,
+        target: topLevel[0].id,
+        sourceHandle: "flow-out",
+        targetHandle: "flow-in",
+        data: { kind: "execution", generated: true, semantic: false },
+      },
+      {
+        id: "structure-reverse",
+        source: topLevel[2].id,
+        target: topLevel[0].id,
+        sourceHandle: "body-out",
+        targetHandle: "flow-in",
+        data: { kind: "structure", generated: true, semantic: false },
+      },
+    )
+
+    expect(stringifyKether(flowToAst(flow, schema))).toBe(stringifyKether(ast))
+  })
+})
+
 describe("Flow connection mapping", () => {
   it("数据连线写入目标 handle 对应参数，并保留值类型", () => {
     const state: FlowState = { nodes: [dataNode("data", "-3.5", "number"), actionNode("action")], edges: [] }
@@ -185,6 +376,35 @@ describe("Flow connection mapping", () => {
     expect(result.state.nodes[1].data.inputs.count).toBe("-3.5")
     expect(result.state.nodes[1].data.inputKinds.count).toBe("number")
     expect(result.state.edges[0].data?.kind).toBe("data")
+    expect(stringifyKether(flowToAst(result.state, schema))).toBe("demo old count -3.5")
+  })
+
+  it("Calc 的 formula 数据端口保留原有表达式编辑与回写能力", () => {
+    const calc: KetherNode = {
+      id: "calc",
+      type: "calcNode",
+      position: position(1),
+      data: {
+        label: "calc",
+        schemaAction: null,
+        inputs: { formula: "1+1" },
+        inputKinds: { formula: "string" },
+        slotChildren: {},
+        nodeKind: "calc",
+      },
+    }
+    const state: FlowState = { nodes: [dataNode("data", "2+3*level"), calc], edges: [] }
+    const result = applyConnectionToFlow(state, {
+      source: "data",
+      sourceHandle: "output",
+      target: "calc",
+      targetHandle: "formula",
+    })
+
+    expect(result.accepted).toBe(true)
+    if (!result.accepted) return
+    expect(result.state.nodes[1].data.inputs.formula).toBe("2+3*level")
+    expect(stringifyKether(flowToAst(result.state, schema))).toBe('calc "2+3*level"')
   })
 
   it("无法映射的目标 handle 会明确拒绝且不修改 state", () => {
@@ -211,22 +431,37 @@ describe("Flow connection mapping", () => {
     expect(result.accepted).toBe(false)
   })
 
-  it("顶层 flow 端口连线只改变执行排序，不覆盖输入", () => {
-    const first = actionNode("first", 0)
-    first.data.inputs.value = "first"
-    const second = actionNode("second", 100)
-    second.data.inputs.value = "second"
-    const state: FlowState = { nodes: [first, second], edges: [] }
+  it("用户创建顶层执行边时替换自动语义边，且不覆盖输入", () => {
+    const state = initializeFlowFromText("demo first\ndemo second", schema)
+    const [first, second] = state.nodes
+    expect(state.edges).toEqual([
+      expect.objectContaining({
+        source: first.id,
+        target: second.id,
+        data: expect.objectContaining({ kind: "execution", generated: true, semantic: true }),
+      }),
+    ])
+
     const result = applyConnectionToFlow(state, {
-      source: "second",
+      source: second.id,
       sourceHandle: "flow-out",
-      target: "first",
+      target: first.id,
       targetHandle: "flow-in",
     })
     expect(result.accepted).toBe(true)
     if (!result.accepted) return
     expect(result.kind).toBe("execution")
     expect(result.state.nodes.map((node) => node.data.inputs.value)).toEqual(["first", "second"])
+    expect(result.state.edges.some((edge) => (
+      edge.data?.kind === "execution" && edge.data.generated === true && edge.data.semantic === true
+    ))).toBe(false)
+    expect(result.state.edges).toEqual([
+      expect.objectContaining({
+        source: second.id,
+        target: first.id,
+        data: expect.objectContaining({ kind: "execution", generated: false, semantic: true }),
+      }),
+    ])
     expect(stringifyKether(flowToAst(result.state, schema))).toBe("demo second\ndemo first")
   })
 })

@@ -4,12 +4,31 @@ import type { ASTNode } from "@/lib/kether-ast"
 
 export type KetherInputKind = "number" | "string" | "boolean" | "identifier" | "var_ref" | "lazy_ref"
 
+export interface KetherSlotLayout {
+  x: number
+  y: number
+  width: number
+  height: number
+  contentX: number
+  contentY: number
+  contentWidth: number
+  contentHeight: number
+}
+
+export interface KetherNodeLayout {
+  width: number
+  height: number
+  headerHeight?: number
+  slots?: Record<string, KetherSlotLayout>
+}
+
 export interface KetherNodeData extends Record<string, unknown> {
   label: string
   schemaAction: SchemaAction | null
   inputs: Record<string, unknown>
   inputKinds: Record<string, KetherInputKind>
   slotChildren: Record<string, string[]>
+  layout?: KetherNodeLayout
   onSlotDrop?: (slot: string, payload: SchemaAction | { builtin: string }) => void
   onInputChange?: (key: string, value: unknown, kind?: KetherInputKind) => void
   provides?: Record<string, string>
@@ -19,10 +38,15 @@ export interface KetherNodeData extends Record<string, unknown> {
 }
 
 export interface KetherEdgeData extends Record<string, unknown> {
-  kind: "execution" | "data"
+  kind: "execution" | "data" | "structure"
   sourcePort?: string
   targetPort?: string
   dataType?: string
+  generated?: boolean
+  semantic?: boolean
+  scopeId?: string
+  slot?: string
+  order?: number
 }
 
 export type KetherNode = Node<KetherNodeData>

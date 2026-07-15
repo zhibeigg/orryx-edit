@@ -23,8 +23,24 @@ const edges: KetherEdge[] = []
 describe("Flow 历史语义判定", () => {
   it("仅坐标、尺寸或选择态变化不属于文本语义变化", () => {
     const current = { nodes: [node({ x: 10, y: 20 })], edges }
+    const layoutNode = node({ x: 300, y: 400 })
     const layoutOnly = {
-      nodes: [{ ...node({ x: 300, y: 400 }), selected: true, measured: { width: 180, height: 80 } } as KetherNode],
+      nodes: [{
+        ...layoutNode,
+        selected: true,
+        measured: { width: 180, height: 80 },
+        style: { width: 320, height: 240 },
+        data: {
+          ...layoutNode.data,
+          layout: {
+            width: 320,
+            height: 240,
+            slots: {
+              then: { x: 12, y: 76, width: 296, height: 64, contentX: 24, contentY: 112, contentWidth: 272, contentHeight: 28 },
+            },
+          },
+        },
+      } as KetherNode],
       edges,
     }
 

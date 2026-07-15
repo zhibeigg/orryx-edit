@@ -8,8 +8,11 @@ export function getNodeColor(action: SchemaAction, schema: ActionsSchemaV2) {
 
 // 根据 schema type 获取端口颜色
 export function getPortColor(typeName: string, schema: ActionsSchemaV2) {
-  const t = schema?.types?.[typeName]
-  return t?.color ?? "#6b7280"
+  const exact = schema?.types?.[typeName]
+  if (exact?.color) return exact.color
+  const normalized = typeName.toLowerCase()
+  const fallback = Object.entries(schema?.types ?? {}).find(([name]) => name.toLowerCase() === normalized)?.[1]
+  return fallback?.color ?? "#6b7280"
 }
 
 // 节点类型 → 默认颜色（内置节点用）
