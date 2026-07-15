@@ -2,8 +2,8 @@ import { Handle, Position } from "@xyflow/react"
 
 export function ExecutionHandles({ disabled }: { disabled: boolean }) {
   const style = {
-    background: "#d7c4a7",
-    border: "2px solid #252018",
+    background: "var(--ke-fg)",
+    border: "2px solid var(--ke-bg-editor)",
     width: 10,
     height: 10,
     zIndex: 8,

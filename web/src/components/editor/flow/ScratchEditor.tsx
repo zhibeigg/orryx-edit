@@ -17,6 +17,7 @@ import {
   type DocumentBlock,
 } from "@/lib/block-document"
 import { NodePalette } from "./NodePalette"
+import { getKetherBuiltinColor, getKetherCategoryColor } from "./category-presentation"
 import "./flow-editor.css"
 
 const BLOCK_MIME = "application/kether-block-ref"
@@ -360,9 +361,9 @@ function BlockView({ blockId, document, schema, catalog, onDelete, onMove, onInp
   const inputs = action?.inputs ?? builtinInputs(block)
   const slots = action?.slots?.map((slot) => ({ name: slot.name, label: slot.label }))
     ?? Object.keys(block.branches).map((name) => ({ name, label: name === "then" ? "条件为真" : name === "else" ? "否则" : name === "body" ? "执行体" : name.startsWith("when:") ? `分支 ${Number(name.split(":")[1]) + 1}` : name }))
-  const categoryColor = action ? schema.categories[action.category]?.color : undefined
+  const categoryColor = action ? getKetherCategoryColor(action.category) : getKetherBuiltinColor(block.opcode)
   return (
-    <article className="scratch-block" data-shape={block.kind} style={{ "--block-accent": categoryColor ?? "oklch(0.66 0.14 44)" } as React.CSSProperties}>
+    <article className="scratch-block" data-shape={block.kind} style={{ "--block-accent": categoryColor } as React.CSSProperties}>
       <header className="scratch-block__header" draggable onDragStart={(event) => { event.dataTransfer.setData(BLOCK_MIME, blockId); event.dataTransfer.effectAllowed = "move" }}>
         <GripVertical className="h-3.5 w-3.5" aria-hidden />
         <strong>{block.opcode}</strong>

@@ -28,7 +28,7 @@ function ParamWidget({ type, typeDef, value, options, disabled, onChange }: {
         spellCheck={false}
         onChange={(event) => onChange(event.target.value, "raw")}
         {...interactionProps}
-        className={`${commonClass} resize-y border border-[oklch(0.38_0.055_34)] bg-[oklch(0.13_0.012_35)] px-2 py-1.5 font-mono text-[10px] text-[oklch(0.91_0.025_78)]`}
+        className={`${commonClass} resize-y border border-[var(--ke-border)] bg-[var(--ke-bg-editor)] px-2 py-1.5 font-mono text-[10px] text-[var(--ke-fg)]`}
         aria-label={`${type} 原始值`}
       />
     )
@@ -100,7 +100,7 @@ export const ActionNode = memo(function ActionNode({ id, data, selected }: NodeP
     nodeData.onInputChange?.(key, value, kind)
   }, [nodeData])
 
-  const color = schemaAction && schema ? getNodeColor(schemaAction, schema) : "#6b7280"
+  const color = schemaAction ? getNodeColor(schemaAction) : "var(--ke-border-strong)"
   const width = nodeData.layout?.width ?? 320
 
   return (
@@ -129,8 +129,8 @@ export const ActionNode = memo(function ActionNode({ id, data, selected }: NodeP
                 isConnectable={!nodeData.readOnly}
                 title={`输入：${input.name}`}
                 style={{
-                  background: schema ? getPortColor(input.type, schema) : "#6b7280",
-                  border: "2px solid #111318",
+                  background: schema ? getPortColor(input.type, schema) : "var(--ke-symbol-blue)",
+                  border: "2px solid var(--ke-bg-editor)",
                   width: 10,
                   height: 10,
                   left: -14,
@@ -164,8 +164,8 @@ export const ActionNode = memo(function ActionNode({ id, data, selected }: NodeP
               isConnectable={!nodeData.readOnly}
               title={`输出：${schemaAction.output.type}`}
               style={{
-                background: schema ? getPortColor(schemaAction.output.type, schema) : "#6b7280",
-                border: "2px solid #111318",
+                background: schema ? getPortColor(schemaAction.output.type, schema) : "var(--ke-symbol-blue)",
+                border: "2px solid var(--ke-bg-editor)",
                 width: 10,
                 height: 10,
                 right: -6,
