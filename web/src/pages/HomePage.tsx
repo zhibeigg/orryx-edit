@@ -56,7 +56,7 @@ export function HomePage() {
       <main id="main-content">
         <section id="demo" className="clean-hero" aria-labelledby="home-title">
           <div className="clean-hero__copy portal-reveal">
-            <p className="clean-release"><span aria-hidden="true" />Editor 0.12.19 · 只读交互演示</p>
+            <p className="clean-release"><span aria-hidden="true" />Editor 0.12.20 · 只读交互演示</p>
             <div className="clean-product-lockup">
               <BrandMark className="clean-product-lockup__mark" />
               <strong>Orryx Editor</strong>
@@ -132,7 +132,7 @@ export function HomePage() {
           <a href="/connect">连接页</a>
           <a href="https://o0vvjwgpeju.feishu.cn/wiki/Syzzw7aQwixJ4YkXoOAcyYkfnOg" target="_blank" rel="noreferrer">文档</a>
         </nav>
-        <p><Code2 aria-hidden="true" />Editor 0.12.19 · Protocol V1/V2</p>
+        <p><Code2 aria-hidden="true" />Editor 0.12.20 · Protocol V1/V2</p>
       </footer>
     </div>
   )

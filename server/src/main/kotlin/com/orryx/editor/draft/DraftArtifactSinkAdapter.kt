@@ -53,7 +53,7 @@ class DraftArtifactSinkAdapter(
         }
         return listOf(
             AiDraftArtifact(
-                path = ".orryx/ai/${request.operation.name.lowercase()}-${request.jobId}.json",
+                path = "orryx/ai/${request.operation.name.lowercase()}-${request.jobId}.json",
                 content = json.encodeToString(JsonElement.serializer(), request.artifact),
                 baseRevision = null
             )

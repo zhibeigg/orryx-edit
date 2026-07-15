@@ -1,5 +1,7 @@
 package com.orryx.editor.draft
 
+import com.orryx.editor.ai.AiOperation
+import com.orryx.editor.ai.DraftArtifactRequest
 import com.orryx.editor.snapshot.CreateSnapshotCommand
 import com.orryx.editor.snapshot.InMemorySnapshotRepository
 import com.orryx.editor.snapshot.SnapshotFile
@@ -11,6 +13,8 @@ import com.orryx.editor.versioning.DraftFile
 import com.orryx.editor.versioning.DraftFileChangeType
 import com.orryx.editor.versioning.DraftVersionSource
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -18,6 +22,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DraftServiceTest {
@@ -99,13 +104,37 @@ class DraftServiceTest {
     }
 
     @Test
+    fun `fallback ai artifact uses a snapshot-safe path`() = runTest {
+        val accountId = UUID.randomUUID()
+        val serverInstanceId = UUID.randomUUID()
+        val fixture = fixture(accountId.toString(), serverInstanceId.toString())
+        val draft = fixture.createDraft()
+        val jobId = UUID.randomUUID()
+
+        val artifact = DraftArtifactSinkAdapter(fixture.drafts).store(
+            DraftArtifactRequest(
+                jobId = jobId,
+                accountId = accountId,
+                serverInstanceId = serverInstanceId,
+                draftId = draft.id,
+                baseVersionId = null,
+                operation = AiOperation.PLAN,
+                artifact = buildJsonObject { put("plan", "test") }
+            )
+        )
+
+        val stored = assertNotNull(fixture.drafts.getVersion(UUID.fromString(artifact.artifactId)))
+        assertEquals("orryx/ai/plan-$jobId.json", stored.files.single().path)
+    }
+
+    @Test
     fun `restoring snapshot creates a new open draft without mutating snapshot`() = runTest {
         val fixture = fixture()
         val before = fixture.snapshots.get(fixture.snapshotId)
         val restored = fixture.drafts.createDraft(
             CreateDraftCommand(
                 accountId = "account-restore",
-                serverInstanceId = "server-1",
+                serverInstanceId = fixture.serverInstanceId,
                 baseSnapshotId = fixture.snapshotId,
                 title = "Restore point",
                 createdAt = NOW.plusSeconds(10)
@@ -124,7 +153,10 @@ class DraftServiceTest {
         assertEquals("PostgresSnapshotRepository", com.orryx.editor.snapshot.PostgresSnapshotRepository::class.simpleName)
     }
 
-    private suspend fun fixture(): Fixture {
+    private suspend fun fixture(
+        accountId: String = "account-1",
+        serverInstanceId: String = "server-1"
+    ): Fixture {
         val clock = Clock.fixed(NOW, ZoneOffset.UTC)
         val snapshotRepository = InMemorySnapshotRepository()
         val snapshots = SnapshotService(snapshotRepository, clock = clock)
@@ -132,7 +164,7 @@ class DraftServiceTest {
         val baseRevision = SnapshotManifest.contentRevision(baseContent)
         val snapshot = snapshots.createSnapshot(
             CreateSnapshotCommand(
-                serverInstanceId = "server-1",
+                serverInstanceId = serverInstanceId,
                 files = listOf(
                     SnapshotFile(
                         "config.yml",
@@ -149,7 +181,9 @@ class DraftServiceTest {
             snapshots = snapshots,
             drafts = DraftService(InMemoryDraftRepository(), snapshotRepository, clock = clock),
             snapshotId = snapshot.id,
-            baseRevision = baseRevision
+            baseRevision = baseRevision,
+            accountId = accountId,
+            serverInstanceId = serverInstanceId
         )
     }
 
@@ -157,12 +191,14 @@ class DraftServiceTest {
         val snapshots: SnapshotService,
         val drafts: DraftService,
         val snapshotId: UUID,
-        val baseRevision: String
+        val baseRevision: String,
+        val accountId: String,
+        val serverInstanceId: String
     ) {
         suspend fun createDraft(): Draft = drafts.createDraft(
             CreateDraftCommand(
-                accountId = "account-1",
-                serverInstanceId = "server-1",
+                accountId = accountId,
+                serverInstanceId = serverInstanceId,
                 baseSnapshotId = snapshotId,
                 title = "Test draft",
                 createdAt = NOW
