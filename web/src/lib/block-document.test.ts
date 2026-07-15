@@ -22,6 +22,7 @@ const schema = normalizeSchema({
     { id: "test.action.buff-send", variantId: "test.action.buff-send", name: "buff", aliases: [], category: "test", namespace: "test", description: "buff send", syntax: "buff send <text> [long] [they <container>]", flow: "normal", shape: "command", inputs: [{ name: "send", key: "send", type: "keyword", accepts: ["keyword"], required: true, default: null, keyword: "send", keywords: { mode: "flag", alternatives: ["send"] } }, { name: "buff", key: "buff", type: "text", accepts: ["text"], required: true, default: null }, { name: "duration", key: "duration", type: "long", accepts: ["long"], required: false, default: null }, { name: "target", key: "target", type: "container", accepts: ["container"], required: false, default: null, keyword: "they", keywords: { mode: "value", alternatives: ["they"] } }], output: null },
     { id: "test.action.opaque", variantId: "test.action.opaque", name: "opaque", aliases: [], category: "test", namespace: "test", description: "opaque", syntax: "opaque <raw...>", flow: "normal", shape: "raw", inputs: [{ name: "arguments", key: "arguments", type: "raw", accepts: ["raw"], required: false, default: null }], output: null, grammar: { localRawRemainder: true } },
     { id: "test.action.grammar-only", variantId: "test.action.grammar-only", name: "grammar-only", aliases: [], category: "test", namespace: "test", description: "grammar only", syntax: "grammar-only <value> then <action>", flow: "normal", shape: "command", inputs: [], output: null, grammar: { sequence: ["grammar-only", { input: "value" }, "then", { input: "body" }] } },
+    { id: "test.action.summon", variantId: "test.action.summon", name: "summon", aliases: [], category: "test", namespace: "test", description: "summon", syntax: "summon <text>", flow: "normal", shape: "command", inputs: [{ name: "实体类型", key: "entityType", type: "text", accepts: ["text"], required: true, default: "ZOMBIE", options: ["ZOMBIE", "SKELETON"] }], output: null },
   ],
   selectors: [], triggers: [], properties: [],
 })
@@ -82,6 +83,18 @@ describe("BlockDocument", () => {
     const source = "buff send 石更 200\nbuff send 超级石更 they @self"
     const document = parseBlockDocument(source, schema)
     expect(serializeBlockDocument(document, schema)).toBe('buff send "石更" 200\nbuff send "超级石更" they @self')
+  })
+
+  it("枚举 literal 与 Raw Kether 表达式往返时均不丢值", () => {
+    const literal = parseBlockDocument("summon ZOMBIE", schema)
+    const literalBlock = literal.blocks[literal.roots[0]]
+    expect(literalBlock?.inputs.entityType).toEqual(expect.objectContaining({ kind: "literal", value: "ZOMBIE" }))
+    expect(serializeBlockDocument(literal, schema)).toBe('summon "ZOMBIE"')
+
+    const raw = parseBlockDocument("summon &entityType", schema)
+    const rawBlock = raw.blocks[raw.roots[0]]
+    expect(rawBlock?.inputs.entityType).toEqual(expect.objectContaining({ kind: "raw", source: "&entityType" }))
+    expect(serializeBlockDocument(raw, schema)).toBe("summon &entityType")
   })
 
   it("grammar 参数无法映射到公开输入时整段 raw，禁止保存时静默丢参", () => {

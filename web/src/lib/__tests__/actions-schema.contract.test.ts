@@ -67,6 +67,19 @@ describe("actions schema v2 contract", () => {
     }
   })
 
+  it("实体、药水、声音与材质输入发布有限值目录", () => {
+    const optionsFor = (actionName: string, inputName: string, syntaxIncludes?: string) => schema.actions
+      .find((action) => action.name === actionName
+        && (!syntaxIncludes || action.syntax.includes(syntaxIncludes))
+        && action.inputs.some((input) => input.name === inputName))
+      ?.inputs.find((input) => input.name === inputName)?.options ?? []
+
+    expect(optionsFor("entity", "实体类型", "spawn")).toContain("ZOMBIE")
+    expect(optionsFor("potion", "效果", "set")).toContain("SPEED")
+    expect(optionsFor("sound", "音效名称")).toContain("ENTITY_EXPERIENCE_ORB_PICKUP")
+    expect(optionsFor("itemstack", "材质名")).toContain("DIAMOND_SWORD")
+  })
+
   it("保留审计到的同名重载而不是按 name 覆盖", () => {
     const groups = new Map<string, number>()
     for (const action of schema.actions) groups.set(action.name.toLowerCase(), (groups.get(action.name.toLowerCase()) ?? 0) + 1)

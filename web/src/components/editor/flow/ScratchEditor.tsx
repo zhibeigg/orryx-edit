@@ -16,6 +16,8 @@ import {
   type BlockInput,
   type DocumentBlock,
 } from "@/lib/block-document"
+import { EnumCombobox } from "./EnumCombobox"
+import { resolveEnumOptions } from "./enum-input"
 import { NodePalette } from "./NodePalette"
 import { getKetherBuiltinColor, getKetherCategoryColor } from "./category-presentation"
 import "./flow-editor.css"
@@ -406,6 +408,10 @@ function InputSlot({ block, input, document, schema, catalog, onInput, onAttach,
   const value = block.inputs[input.key]
   const type = schema.types[input.type]
   const rawValue = value?.kind === "raw" ? value.source : value?.kind === "literal" ? value.value : input.default ?? ""
+  const enumOptions = useMemo(() => resolveEnumOptions(input, type), [input, type])
+  const hasEnumOptions = enumOptions.length > 0
+  const rawMode = value?.kind === "raw" || (!hasEnumOptions && !value && type?.inputStrategy === "raw")
+  const allowRawMode = hasEnumOptions && input.type !== "keyword"
   const drop = (event: DragEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -418,12 +424,29 @@ function InputSlot({ block, input, document, schema, catalog, onInput, onAttach,
       <div className="scratch-input-slot" data-fillable={type?.ketherFillable !== false} onDragOver={(event) => { if (type?.ketherFillable !== false) event.preventDefault() }} onDrop={drop}>
         {value?.kind === "block" ? (
           <BlockView blockId={value.blockId} document={document} schema={schema} catalog={catalog} onDelete={onDelete} onMove={onMove} onInput={onInput} onAttach={onAttach} renderStack={renderStack} />
+        ) : hasEnumOptions ? (
+          <div className="scratch-enum-control">
+            {allowRawMode && (
+              <div className="scratch-input-mode" role="group" aria-label={`${input.name}输入方式`}>
+                <button type="button" aria-pressed={!rawMode} onClick={() => onInput(block.id, input, String(rawValue ?? ""))}>选项</button>
+                <button type="button" aria-pressed={rawMode} onClick={() => onInput(block.id, input, String(rawValue ?? ""), true)}>Raw</button>
+              </div>
+            )}
+            {rawMode ? (
+              <textarea aria-label={`${input.name} Raw Kether 片段`} rows={2} value={String(rawValue ?? "")} onChange={(event) => onInput(block.id, input, event.target.value, true)} />
+            ) : (
+              <EnumCombobox
+                label={input.name}
+                value={String(rawValue ?? "")}
+                options={enumOptions}
+                onChange={(nextValue) => onInput(block.id, input, nextValue)}
+              />
+            )}
+          </div>
         ) : type?.inputStrategy === "raw" || value?.kind === "raw" ? (
           <textarea rows={2} value={String(rawValue ?? "")} onChange={(event) => onInput(block.id, input, event.target.value, true)} />
         ) : input.type === "boolean" ? (
           <button type="button" className="scratch-bool" aria-pressed={rawValue === true || String(rawValue) === "true"} onClick={() => onInput(block.id, input, !(rawValue === true || String(rawValue) === "true"))}>{rawValue === true || String(rawValue) === "true" ? "真" : "假"}</button>
-        ) : (input.options?.length ?? 0) > 0 || input.type === "keyword" ? (
-          <select value={String(rawValue ?? "")} onChange={(event) => onInput(block.id, input, event.target.value)}>{(input.options ?? keywordAlternatives(input)).map((option) => <option key={option}>{option}</option>)}</select>
         ) : (
           <input type="text" inputMode={["number", "int", "long", "double", "float"].includes(input.type) ? "decimal" : undefined} value={String(rawValue ?? "")} onChange={(event) => onInput(block.id, input, event.target.value)} />
         )}

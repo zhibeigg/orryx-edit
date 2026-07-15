@@ -42,6 +42,7 @@ describe("Kether 编辑器舒适可读尺寸", () => {
     expect(toPixels(declaration(".kether-editor__modebar", "min-height"))).toBeGreaterThanOrEqual(44)
     expect(toPixels(declaration(".scratch-block__header", "min-height"))).toBeGreaterThanOrEqual(40)
     expect(toPixels(declaration(".scratch-input-slot", "min-height"))).toBeGreaterThanOrEqual(40)
+    expect(toPixels(declaration(".scratch-enum-trigger", "min-height"))).toBeGreaterThanOrEqual(32)
     expect(toPixels(declaration(".kether-editor .react-flow__controls-button", "width"))).toBeGreaterThanOrEqual(36)
   })
 

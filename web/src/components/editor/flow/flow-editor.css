@@ -661,6 +661,180 @@
 .scratch-input-slot > textarea { resize: vertical; }
 .scratch-input-slot > .scratch-block { border-width: 1px; box-shadow: none; }
 
+.scratch-enum-control {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scratch-input-mode {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.scratch-input-mode button {
+  min-height: 1.5rem;
+  border: 1px solid transparent;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--ke-fg-subtle);
+  font: 600 var(--ke-text-micro)/1.2 var(--font-ui);
+  cursor: pointer;
+}
+
+.scratch-input-mode button:hover {
+  background: var(--ke-bg-hover);
+  color: var(--ke-fg);
+}
+
+.scratch-input-mode button[aria-pressed="true"] {
+  border-color: var(--ke-border-strong);
+  background: var(--ke-bg-active);
+  color: var(--ke-fg-bright);
+}
+
+.scratch-enum-trigger,
+.scratch-enum-control > textarea {
+  width: 100%;
+  min-height: var(--ke-control-sm);
+  border: 0;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--ke-fg);
+  font: var(--ke-text-caption)/1.55 var(--font-mono);
+}
+
+.scratch-enum-control > textarea { resize: vertical; }
+
+.scratch-enum-trigger {
+  min-height: var(--ke-control-sm);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scratch-enum-trigger:hover { background: var(--ke-bg-hover); }
+.scratch-enum-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scratch-enum-trigger > span.is-placeholder { color: var(--ke-fg-subtle); }
+.scratch-enum-trigger > small {
+  padding: 1px 5px;
+  border: 1px solid var(--ke-warning);
+  color: var(--ke-symbol-yellow);
+  font: 600 var(--ke-text-micro)/1.25 var(--font-ui);
+}
+.scratch-enum-trigger > svg { width: 14px; height: 14px; color: var(--ke-fg-subtle); }
+
+.scratch-enum-popup {
+  position: fixed;
+  z-index: 100;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  border: 1px solid var(--ke-border-strong);
+  background: var(--ke-bg-sidebar);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 34%);
+}
+
+.scratch-enum-search {
+  min-height: 2.5rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--ke-border);
+  background: var(--ke-bg-panel);
+}
+
+.scratch-enum-search > svg { width: 15px; height: 15px; color: var(--ke-fg-subtle); }
+.scratch-enum-search > input {
+  min-width: 0;
+  min-height: var(--ke-control-sm);
+  border: 0;
+  padding: 4px 2px;
+  background: transparent;
+  color: var(--ke-fg-bright);
+  font: var(--ke-text-caption)/1.45 var(--font-mono);
+}
+.scratch-enum-search > input::placeholder { color: var(--ke-fg-subtle); }
+.scratch-enum-search > kbd {
+  border: 1px solid var(--ke-border-strong);
+  padding: 1px 5px;
+  color: var(--ke-fg-subtle);
+  font: var(--ke-text-micro)/1.4 var(--font-mono);
+}
+
+.scratch-enum-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+}
+
+.scratch-enum-list > button {
+  width: 100%;
+  min-height: 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  padding: 5px 8px;
+  background: transparent;
+  color: var(--ke-fg);
+  font: var(--ke-text-caption)/1.45 var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scratch-enum-list > button:hover,
+.scratch-enum-list > button[data-active="true"] {
+  border-color: var(--ke-border);
+  background: var(--ke-bg-active);
+  color: var(--ke-fg-bright);
+}
+
+.scratch-enum-list > button[aria-selected="true"] { color: var(--ke-symbol-teal); }
+.scratch-enum-list > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scratch-enum-list > button svg { width: 14px; height: 14px; }
+.scratch-enum-empty { padding: 24px 12px; color: var(--ke-fg-subtle); font-size: var(--ke-text-caption); text-align: center; }
+
+.scratch-enum-custom {
+  min-height: 2.25rem;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-top: 1px solid var(--ke-border);
+  padding: 6px 10px;
+  background: var(--ke-bg-panel);
+  color: var(--ke-fg-muted);
+  font-size: var(--ke-text-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scratch-enum-custom:hover { background: var(--ke-bg-active); color: var(--ke-fg-bright); }
+.scratch-enum-custom svg { width: 14px; height: 14px; color: var(--ke-symbol-yellow); }
+.scratch-enum-custom code { overflow: hidden; color: var(--ke-symbol-coral); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+
+.scratch-enum-footer {
+  min-height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--ke-border);
+  color: var(--ke-fg-subtle);
+  font-size: var(--ke-text-micro);
+}
+
 .scratch-bool {
   width: 100%;
   min-height: var(--ke-control-md);
@@ -927,6 +1101,13 @@
   .scratch-canvas { padding: 16px 10px 64px; }
   .scratch-input-row { grid-template-columns: 1fr; gap: 6px; }
   .scratch-input-row > label { padding-top: 2px; }
+}
+
+@media (pointer: coarse) {
+  .scratch-enum-trigger,
+  .scratch-enum-list > button,
+  .scratch-enum-custom,
+  .scratch-input-mode button { min-height: 2.75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
