@@ -3,7 +3,7 @@ import { parseTimeline, type TimelineEvent } from "@/lib/skill-timeline"
 import { Box } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import type { SelectorType } from "@/lib/selector-parser"
+import type { ParsedSelector } from "@/lib/selector-parser"
 
 const SelectorPreview = lazy(() =>
   import("./SelectorPreview").then(m => ({ default: m.SelectorPreview }))
@@ -31,7 +31,7 @@ const TYPE_LABELS: Record<TimelineEvent["type"], string> = {
   sleep: "等待",
   damage: "伤害",
   animation: "动画",
-  launch: "位移",
+  launch: "速度",
   flash: "闪现",
   sound: "音效",
   effect: "特效",
@@ -41,11 +41,7 @@ const TYPE_LABELS: Record<TimelineEvent["type"], string> = {
   other: "其他",
 }
 
-interface SelectorPreviewState {
-  type: SelectorType
-  params: number[]
-  offset?: [number, number, number]
-  label: string
+interface SelectorPreviewState extends ParsedSelector {
   tick: number
 }
 
@@ -104,8 +100,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                         onClick={() => setPreviewSelector({
                           type: event.selector!.type,
                           params: event.selector!.params,
-                          offset: event.selector!.offset,
-                          label: event.label,
+                          label: event.selector!.label,
                           tick: event.tick,
                         })}
                       >
@@ -152,8 +147,7 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
                         setPreviewSelector({
                           type: event.selector.type,
                           params: event.selector.params,
-                          offset: event.selector.offset,
-                          label: event.label,
+                          label: event.selector.label,
                           tick: event.tick,
                         })
                       }
@@ -193,11 +187,8 @@ export function SkillTimeline({ script }: SkillTimelineProps) {
           </DialogHeader>
           <div className="h-[400px]">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-[13px] text-[#858585]">加载 3D 预览...</div>}>
-              {previewSelector && <SelectorPreview type={previewSelector.type} params={previewSelector.params} offset={previewSelector.offset} />}
+              {previewSelector && <SelectorPreview type={previewSelector.type} params={previewSelector.params} />}
             </Suspense>
-          </div>
-          <div className="px-3 py-1.5 border-t border-[#3c3c3c] text-[11px] text-[#858585] shrink-0">
-            鼠标拖拽旋转，滚轮缩放。黄色线框为玩家参考位置。
           </div>
         </DialogContent>
       </Dialog>

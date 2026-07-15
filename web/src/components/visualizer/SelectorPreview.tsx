@@ -1,256 +1,352 @@
-import { useRef, useEffect, useState, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
 import { Slider } from "@/components/ui/slider"
-import type { SelectorType } from "@/lib/selector-parser"
+import { Switch } from "@/components/ui/switch"
+import {
+  getSelectorDefinition,
+  type SelectorParamValue,
+  type SelectorType,
+} from "@/lib/selector-parser"
+import {
+  createSelectorPreviewModel,
+  PLAYER_EYE_HEIGHT,
+  PLAYER_HEIGHT,
+  selectorOriginLabel,
+  type SelectorPreviewModel,
+} from "@/lib/selector-preview-geometry"
 
 interface SelectorPreviewProps {
   type: SelectorType
-  params: number[]
-  /** 原点偏移 [前方x, 上方y, 右方z] */
-  offset?: [number, number, number]
+  params: SelectorParamValue[]
 }
 
-function createSelectorMesh(type: SelectorType, params: number[]): THREE.Object3D {
-  const group = new THREE.Group()
-  const material = new THREE.MeshBasicMaterial({ color: 0x4ec9b0, wireframe: true, transparent: true, opacity: 0.6 })
-  const solidMaterial = new THREE.MeshBasicMaterial({ color: 0x4ec9b0, transparent: true, opacity: 0.15 })
+interface OrbitView {
+  theta: number
+  phi: number
+  radius: number
+  target: THREE.Vector3
+}
 
-  if (type === "range") {
-    const radius = params[0] ?? 4
-    const geo = new THREE.SphereGeometry(radius, 24, 16)
-    group.add(new THREE.Mesh(geo, material))
-    group.add(new THREE.Mesh(geo.clone(), solidMaterial))
+interface SceneState {
+  scene: THREE.Scene
+  camera: THREE.PerspectiveCamera
+  renderer: THREE.WebGLRenderer
+  animId: number
+  selector: THREE.Object3D | null
+  view: OrbitView
+}
 
-  } else if (type === "obb") {
-    const [l = 5, w = 3, h = 3, ox = 0, oy = 0] = params
-    const geo = new THREE.BoxGeometry(l, h, w)
-    const mesh = new THREE.Mesh(geo, material)
-    mesh.position.set(l / 2 + ox, oy, 0)
-    group.add(mesh)
-    const solidMesh = new THREE.Mesh(geo.clone(), solidMaterial)
-    solidMesh.position.copy(mesh.position)
-    group.add(solidMesh)
+const selectorColor = 0x4ec9b0
 
-  } else if (type === "sector") {
-    const [r = 4, angle = 120, h = 2] = params
-    const halfAngle = (angle / 2) * (Math.PI / 180)
-    const segments = 32
-    const shape = new THREE.Shape()
-    shape.moveTo(0, 0)
-    for (let i = 0; i <= segments; i++) {
-      const a = -halfAngle + (2 * halfAngle * i) / segments
-      shape.lineTo(Math.cos(a) * r, Math.sin(a) * r)
+function createEdgeMaterial(color = selectorColor): THREE.LineBasicMaterial {
+  return new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+  })
+}
+
+function createSolidMaterial(color = selectorColor): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.14,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+}
+
+function addSolid(group: THREE.Group, geometry: THREE.BufferGeometry, color = selectorColor) {
+  group.add(new THREE.Mesh(geometry, createSolidMaterial(color)))
+}
+
+function addSurface(group: THREE.Group, geometry: THREE.BufferGeometry, color = selectorColor) {
+  addSolid(group, geometry, color)
+  group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 5), createEdgeMaterial(color)))
+}
+
+function addLine(group: THREE.Group, start: THREE.Vector3, end: THREE.Vector3, color = selectorColor) {
+  const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
+  group.add(new THREE.Line(geometry, createEdgeMaterial(color)))
+}
+
+function addPolyline(group: THREE.Group, points: THREE.Vector3[], color = selectorColor) {
+  const geometry = new THREE.BufferGeometry().setFromPoints(points)
+  group.add(new THREE.Line(geometry, createEdgeMaterial(color)))
+}
+
+function addAxialCircleGuide(group: THREE.Group, radius: number, z: number, color = selectorColor) {
+  if (radius <= 0) return
+  const points: THREE.Vector3[] = []
+  for (let index = 0; index <= 64; index++) {
+    const angle = Math.PI * 2 * index / 64
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, z))
+  }
+  addPolyline(group, points, color)
+}
+
+function addAxialSideLines(group: THREE.Group, nearRadius: number, farRadius: number, nearZ: number, farZ: number, color = selectorColor) {
+  for (let index = 0; index < 4; index++) {
+    const angle = Math.PI * 2 * index / 4
+    addLine(
+      group,
+      new THREE.Vector3(Math.cos(angle) * nearRadius, Math.sin(angle) * nearRadius, nearZ),
+      new THREE.Vector3(Math.cos(angle) * farRadius, Math.sin(angle) * farRadius, farZ),
+      color,
+    )
+  }
+}
+
+function addSectorOutline(group: THREE.Group, radius: number, angleDegrees: number, height: number) {
+  const halfAngle = THREE.MathUtils.degToRad(angleDegrees / 2)
+  const segments = Math.max(8, Math.ceil(angleDegrees / 5))
+  const levels = height > 0 ? [-height / 2, height / 2] : [0]
+  const edgePoints: THREE.Vector3[][] = []
+
+  for (const y of levels) {
+    const arc: THREE.Vector3[] = []
+    for (let index = 0; index <= segments; index++) {
+      const angle = -halfAngle + 2 * halfAngle * index / segments
+      arc.push(new THREE.Vector3(Math.sin(angle) * radius, y, Math.cos(angle) * radius))
     }
-    shape.lineTo(0, 0)
-    const extrudeSettings = { depth: h, bevelEnabled: false }
-    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-    geo.rotateX(-Math.PI / 2)
-    geo.translate(0, -h / 2, 0)
-    group.add(new THREE.Mesh(geo, material))
-    group.add(new THREE.Mesh(geo.clone(), solidMaterial))
-
-  } else if (type === "line") {
-    const [l = 5, w = 1, h = 1] = params
-    const geo = new THREE.BoxGeometry(w, h, l)
-    const mesh = new THREE.Mesh(geo, material)
-    mesh.position.set(0, 0, l / 2)
-    group.add(mesh)
-    const solidMesh = new THREE.Mesh(geo.clone(), solidMaterial)
-    solidMesh.position.copy(mesh.position)
-    group.add(solidMesh)
-
-  } else if (type === "cone") {
-    const [r = 2, l = 5] = params
-    const geo = new THREE.ConeGeometry(r, l, 24)
-    geo.rotateX(Math.PI / 2)
-    const mesh = new THREE.Mesh(geo, material)
-    mesh.position.set(0, 0, l / 2)
-    group.add(mesh)
-    const solidMesh = new THREE.Mesh(geo.clone(), solidMaterial)
-    solidMesh.position.copy(mesh.position)
-    group.add(solidMesh)
-
-  } else if (type === "cylinder") {
-    const [r = 2, h = 3, fwd = 0, yOff = 0] = params
-    const geo = new THREE.CylinderGeometry(r, r, h, 24)
-    const mesh = new THREE.Mesh(geo, material)
-    mesh.position.set(0, yOff, fwd)
-    group.add(mesh)
-    const solidMesh = new THREE.Mesh(geo.clone(), solidMaterial)
-    solidMesh.position.copy(mesh.position)
-    group.add(solidMesh)
-
-  } else if (type === "frustum") {
-    const [topR = 1, bottomR = 3, l = 5] = params
-    const geo = new THREE.CylinderGeometry(topR, bottomR, l, 24)
-    geo.rotateX(Math.PI / 2)
-    const mesh = new THREE.Mesh(geo, material)
-    mesh.position.set(0, 0, l / 2)
-    group.add(mesh)
-    const solidMesh = new THREE.Mesh(geo.clone(), solidMaterial)
-    solidMesh.position.copy(mesh.position)
-    group.add(solidMesh)
-
-  } else if (type === "annular") {
-    const [minR = 2, maxR = 5, h = 2] = params
-    // 外圆柱 wireframe
-    const outerGeo = new THREE.CylinderGeometry(maxR, maxR, h, 32)
-    group.add(new THREE.Mesh(outerGeo, material))
-    // 内圆柱 wireframe
-    const innerGeo = new THREE.CylinderGeometry(minR, minR, h, 32)
-    const innerMat = new THREE.MeshBasicMaterial({ color: 0xff6b6b, wireframe: true, transparent: true, opacity: 0.5 })
-    group.add(new THREE.Mesh(innerGeo, innerMat))
-
-  } else if (type === "ring") {
-    const [r = 4, n = 8, yOff = 0] = params
-    const count = Math.max(1, Math.round(n))
-    const markerGeo = new THREE.SphereGeometry(0.2, 8, 8)
-    const markerMat = new THREE.MeshBasicMaterial({ color: 0x4ec9b0 })
-    for (let i = 0; i < count; i++) {
-      const angle = (2 * Math.PI * i) / count
-      const marker = new THREE.Mesh(markerGeo, markerMat)
-      marker.position.set(Math.cos(angle) * r, yOff, Math.sin(angle) * r)
-      group.add(marker)
-    }
-    // 画圆环辅助线
-    const ringPoints: THREE.Vector3[] = []
-    for (let i = 0; i <= 64; i++) {
-      const angle = (2 * Math.PI * i) / 64
-      ringPoints.push(new THREE.Vector3(Math.cos(angle) * r, yOff, Math.sin(angle) * r))
-    }
-    const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints)
-    const ringLine = new THREE.Line(ringGeo, new THREE.LineBasicMaterial({ color: 0x4ec9b0, transparent: true, opacity: 0.4 }))
-    group.add(ringLine)
-
-  } else if (type === "scatter") {
-    const [n = 5, r = 4] = params
-    const count = Math.max(1, Math.round(n))
-    const markerGeo = new THREE.SphereGeometry(0.2, 8, 8)
-    const markerMat = new THREE.MeshBasicMaterial({ color: 0x4ec9b0 })
-    // 使用固定种子的伪随机分布
-    for (let i = 0; i < count; i++) {
-      const angle = (2 * Math.PI * i) / count + (i * 1.618)
-      const dist = r * Math.sqrt((i + 0.5) / count)
-      const marker = new THREE.Mesh(markerGeo, markerMat)
-      marker.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist)
-      group.add(marker)
-    }
-    // 范围圆
-    const circlePoints: THREE.Vector3[] = []
-    for (let i = 0; i <= 64; i++) {
-      const angle = (2 * Math.PI * i) / 64
-      circlePoints.push(new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r))
-    }
-    const circleGeo = new THREE.BufferGeometry().setFromPoints(circlePoints)
-    const circleLine = new THREE.Line(circleGeo, new THREE.LineDashedMaterial({ color: 0x4ec9b0, dashSize: 0.3, gapSize: 0.15 }))
-    circleLine.computeLineDistances()
-    group.add(circleLine)
-
-  } else if (type === "nearest") {
-    const [, r = 10] = params
-    const geo = new THREE.SphereGeometry(r, 16, 12)
-    const wireMat = new THREE.MeshBasicMaterial({ color: 0xffd700, wireframe: true, transparent: true, opacity: 0.3 })
-    group.add(new THREE.Mesh(geo, wireMat))
-
-  } else if (type === "lookat") {
-    const [dist = 10, angle = 30] = params
-    // 射线
-    const rayPoints = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, dist)]
-    const rayGeo = new THREE.BufferGeometry().setFromPoints(rayPoints)
-    const rayLine = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({ color: 0x4ec9b0 }))
-    group.add(rayLine)
-    // 锥形视野
-    const halfAngle = (angle / 2) * (Math.PI / 180)
-    const coneR = dist * Math.tan(halfAngle)
-    const coneGeo = new THREE.ConeGeometry(coneR, dist, 24, 1, true)
-    coneGeo.rotateX(Math.PI / 2)
-    const coneMesh = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ color: 0x4ec9b0, wireframe: true, transparent: true, opacity: 0.3 }))
-    coneMesh.position.set(0, 0, dist / 2)
-    group.add(coneMesh)
+    addPolyline(group, arc)
+    addLine(group, new THREE.Vector3(0, y, 0), arc[0])
+    addLine(group, new THREE.Vector3(0, y, 0), arc[arc.length - 1])
+    edgePoints.push([arc[0], arc[arc.length - 1]])
   }
 
-  return group
+  if (edgePoints.length === 2) {
+    addLine(group, edgePoints[0][0], edgePoints[1][0])
+    addLine(group, edgePoints[0][1], edgePoints[1][1])
+  }
 }
 
-const PARAM_LABELS: Partial<Record<SelectorType, string[]>> = {
-  range: ["半径"],
-  obb: ["长度 L", "宽度 W", "高度 H", "偏移 X", "偏移 Y"],
-  sector: ["半径 R", "角度", "高度 H", "Y偏移"],
-  line: ["长度 L", "宽度 W", "高度 H"],
-  cone: ["底部半径 R", "长度 L"],
-  cylinder: ["半径 R", "高度 H", "前偏移", "Y偏移"],
-  frustum: ["上半径", "下半径", "长度 L"],
-  annular: ["最小半径", "最大半径", "高度 H"],
-  nearest: ["数量 N", "搜索半径 R"],
-  lookat: ["距离", "角度"],
-  scatter: ["数量 N", "半径 R", "前偏移"],
-  ring: ["半径 R", "数量 N", "Y偏移"],
+function createSectorGeometry(radius: number, angleDegrees: number, height: number): THREE.BufferGeometry {
+  const shape = new THREE.Shape()
+  const halfAngle = THREE.MathUtils.degToRad(angleDegrees / 2)
+  const segments = Math.max(8, Math.ceil(angleDegrees / 5))
+  shape.moveTo(0, 0)
+  for (let index = 0; index <= segments; index++) {
+    const angle = -halfAngle + (2 * halfAngle * index) / segments
+    shape.lineTo(Math.sin(angle) * radius, Math.cos(angle) * radius)
+  }
+  shape.lineTo(0, 0)
+
+  if (height <= 0) {
+    const geometry = new THREE.ShapeGeometry(shape, 24)
+    geometry.rotateX(Math.PI / 2)
+    return geometry
+  }
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 24,
+  })
+  geometry.rotateX(Math.PI / 2)
+  geometry.translate(0, height / 2, 0)
+  return geometry
 }
 
-function getSliderConfig(type: SelectorType, paramIndex: number): { min: number; max: number; step: number } {
-  if (type === "sector" && paramIndex === 1) return { min: 10, max: 360, step: 5 }
-  if (type === "lookat" && paramIndex === 1) return { min: 5, max: 180, step: 5 }
-  if ((type === "nearest" || type === "scatter" || type === "ring") && paramIndex === 0) return { min: 1, max: 30, step: 1 }
-  return { min: 0.5, max: 20, step: 0.5 }
+function createAnnularGeometry(innerRadius: number, outerRadius: number, height: number): THREE.BufferGeometry | null {
+  if (outerRadius <= 0) return null
+  if (height <= 0) {
+    const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 64)
+    geometry.rotateX(-Math.PI / 2)
+    return geometry
+  }
+
+  const shape = new THREE.Shape()
+  shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false)
+  if (innerRadius > 0) {
+    const hole = new THREE.Path()
+    hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true)
+    shape.holes.push(hole)
+  }
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 64,
+  })
+  geometry.rotateX(Math.PI / 2)
+  geometry.translate(0, height / 2, 0)
+  return geometry
 }
 
-export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) {
+function addCircleGuide(group: THREE.Group, radius: number, color = selectorColor) {
+  if (radius <= 0) return
+  const points: THREE.Vector3[] = []
+  for (let index = 0; index <= 64; index++) {
+    const angle = (Math.PI * 2 * index) / 64
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius))
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points)
+  group.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 })))
+}
+
+function createSelectorMesh(model: SelectorPreviewModel): THREE.Object3D {
+  const root = new THREE.Group()
+  root.position.y = model.originY
+
+  const oriented = new THREE.Group()
+  oriented.rotation.y = THREE.MathUtils.degToRad(-model.yawDegrees)
+  root.add(oriented)
+
+  const content = new THREE.Group()
+  content.position.set(...model.center)
+  oriented.add(content)
+
+  switch (model.kind) {
+    case "sphere": {
+      const geometry = new THREE.SphereGeometry(model.radius, 28, 18)
+      addSurface(content, geometry, model.type === "nearest" ? 0xffd166 : selectorColor)
+      break
+    }
+    case "box": {
+      addSurface(content, new THREE.BoxGeometry(...model.size))
+      break
+    }
+    case "sector": {
+      addSolid(content, createSectorGeometry(model.radius, model.angleDegrees, model.height))
+      addSectorOutline(content, model.radius, model.angleDegrees, model.height)
+      break
+    }
+    case "cone": {
+      const geometry = new THREE.ConeGeometry(model.radius, model.length, 32)
+      geometry.rotateX(-Math.PI / 2)
+      addSolid(content, geometry)
+      addAxialCircleGuide(content, model.radius, model.length / 2)
+      addAxialSideLines(content, 0, model.radius, -model.length / 2, model.length / 2)
+      break
+    }
+    case "cylinder": {
+      const geometry = new THREE.CylinderGeometry(model.radius, model.radius, model.length, 32)
+      geometry.rotateX(-Math.PI / 2)
+      addSolid(content, geometry)
+      addAxialCircleGuide(content, model.radius, -model.length / 2)
+      addAxialCircleGuide(content, model.radius, model.length / 2)
+      addAxialSideLines(content, model.radius, model.radius, -model.length / 2, model.length / 2)
+      break
+    }
+    case "frustum": {
+      const geometry = new THREE.CylinderGeometry(model.nearRadius, model.farRadius, model.length, 32)
+      geometry.rotateX(-Math.PI / 2)
+      addSolid(content, geometry)
+      addAxialCircleGuide(content, model.nearRadius, -model.length / 2)
+      addAxialCircleGuide(content, model.farRadius, model.length / 2)
+      addAxialSideLines(content, model.nearRadius, model.farRadius, -model.length / 2, model.length / 2)
+      break
+    }
+    case "annular": {
+      const geometry = createAnnularGeometry(model.innerRadius, model.outerRadius, model.height)
+      if (geometry) addSolid(content, geometry)
+      const levels = model.height > 0 ? [-model.height / 2, 0, model.height / 2] : [0]
+      for (const y of levels) {
+        const level = new THREE.Group()
+        level.position.y = y
+        addCircleGuide(level, model.outerRadius)
+        addCircleGuide(level, model.innerRadius)
+        content.add(level)
+      }
+      break
+    }
+    case "ring": {
+      addCircleGuide(content, model.radius)
+      const markerGeometry = new THREE.SphereGeometry(0.18, 10, 8)
+      const markerMaterial = new THREE.MeshBasicMaterial({ color: selectorColor })
+      for (let index = 0; index < model.amount; index++) {
+        const angle = (Math.PI * 2 * index) / model.amount
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial)
+        marker.position.set(Math.cos(angle) * model.radius, 0, Math.sin(angle) * model.radius)
+        content.add(marker)
+      }
+      break
+    }
+    case "scatter": {
+      addCircleGuide(content, model.radius)
+      const markerGeometry = new THREE.SphereGeometry(0.18, 10, 8)
+      const markerMaterial = new THREE.MeshBasicMaterial({ color: selectorColor })
+      for (let index = 0; index < model.amount; index++) {
+        const angle = index * Math.PI * (3 - Math.sqrt(5))
+        const distance = model.radius * ((index + 0.5) / model.amount)
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial)
+        marker.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance)
+        content.add(marker)
+      }
+      break
+    }
+    case "lookat": {
+      const geometry = new THREE.ConeGeometry(model.farRadius, model.distance, 32, 1, true)
+      geometry.rotateX(-Math.PI / 2)
+      addSolid(content, geometry)
+      addAxialCircleGuide(content, model.farRadius, model.distance / 2)
+      addAxialSideLines(content, 0, model.farRadius, -model.distance / 2, model.distance / 2)
+      addLine(
+        content,
+        new THREE.Vector3(0, 0, -model.distance / 2),
+        new THREE.Vector3(0, 0, model.distance / 2),
+      )
+      break
+    }
+  }
+
+  return root
+}
+
+function disposeObject(object: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh || child instanceof THREE.Line || child instanceof THREE.LineSegments) {
+      geometries.add(child.geometry)
+      const childMaterials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of childMaterials) materials.add(material)
+    }
+  })
+  for (const geometry of geometries) geometry.dispose()
+  for (const material of materials) material.dispose()
+}
+
+function fitViewToSelector(selector: THREE.Object3D, view: OrbitView) {
+  selector.updateMatrixWorld(true)
+  const bounds = new THREE.Box3().setFromObject(selector)
+  bounds.expandByPoint(new THREE.Vector3(0, 0, 0))
+  bounds.expandByPoint(new THREE.Vector3(0, PLAYER_HEIGHT, 0))
+  const sphere = bounds.getBoundingSphere(new THREE.Sphere())
+  view.target.copy(sphere.center)
+  view.radius = THREE.MathUtils.clamp(Math.max(5, sphere.radius * 2.8), 5, 160)
+}
+
+function sliderBounds(value: number, min = 0, max = 20, step = 0.5) {
+  return {
+    min: Math.min(min, Math.floor(value / step) * step),
+    max: Math.max(max, Math.ceil(value / step) * step),
+    step,
+  }
+}
+
+export function SelectorPreview({ type, params }: SelectorPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<{
-    scene: THREE.Scene
-    camera: THREE.PerspectiveCamera
-    renderer: THREE.WebGLRenderer
-    animId: number
-    selector: THREE.Object3D | null
-    trail: THREE.Object3D | null
-  } | null>(null)
-  const [localParams, setLocalParams] = useState(params)
+  const sceneRef = useRef<SceneState | null>(null)
+  const [localParams, setLocalParams] = useState<SelectorParamValue[]>(params)
+  const definition = getSelectorDefinition(type)
+  const model = useMemo(() => createSelectorPreviewModel(type, localParams), [type, localParams])
 
   useEffect(() => { setLocalParams(params) }, [params])
 
   const updateSelector = useCallback(() => {
-    if (!sceneRef.current) return
-    const { scene } = sceneRef.current
-    if (sceneRef.current.selector) {
-      scene.remove(sceneRef.current.selector)
+    const state = sceneRef.current
+    if (!state || !model) return
+    if (state.selector) {
+      state.scene.remove(state.selector)
+      disposeObject(state.selector)
     }
-    if (sceneRef.current.trail) {
-      scene.remove(sceneRef.current.trail)
-    }
-    const selector = createSelectorMesh(type, localParams)
-
-    // 应用原点偏移：flash/direct 的坐标系是 (前方=+Z, 上方=+Y, 右方=+X) 映射到 Three.js
-    const ox = offset?.[2] ?? 0  // 右方 → Three.js X
-    const oy = offset?.[1] ?? 0  // 上方 → Three.js Y
-    const oz = offset?.[0] ?? 0  // 前方 → Three.js Z
-    if (ox !== 0 || oy !== 0 || oz !== 0) {
-      selector.position.set(ox, oy, oz)
-
-      // 画位移轨迹虚线
-      const trailGroup = new THREE.Group()
-      const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(ox, oy, oz)]
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(points)
-      const lineMat = new THREE.LineDashedMaterial({ color: 0xffd700, dashSize: 0.3, gapSize: 0.15, linewidth: 1 })
-      const line = new THREE.Line(lineGeo, lineMat)
-      line.computeLineDistances()
-      trailGroup.add(line)
-
-      // 偏移位置标记球
-      const markerGeo = new THREE.SphereGeometry(0.15, 8, 8)
-      const markerMat = new THREE.MeshBasicMaterial({ color: 0xffd700 })
-      const marker = new THREE.Mesh(markerGeo, markerMat)
-      marker.position.set(ox, oy, oz)
-      trailGroup.add(marker)
-
-      scene.add(trailGroup)
-      sceneRef.current.trail = trailGroup
-    } else {
-      sceneRef.current.trail = null
-    }
-
-    scene.add(selector)
-    sceneRef.current.selector = selector
-  }, [type, localParams, offset])
+    const selector = createSelectorMesh(model)
+    state.scene.add(selector)
+    state.selector = selector
+    fitViewToSelector(selector, state.view)
+  }, [model])
 
   useEffect(() => {
     const container = containerRef.current
@@ -259,66 +355,79 @@ export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x0a0e14)
 
-    const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 100)
-    camera.position.set(8, 6, 8)
-    camera.lookAt(0, 0, 0)
-
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(container.clientWidth, container.clientHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     container.appendChild(renderer.domElement)
 
-    // 网格地面
-    const grid = new THREE.GridHelper(20, 20, 0x333333, 0x222222)
+    const grid = new THREE.GridHelper(80, 80, 0x35404d, 0x202832)
     scene.add(grid)
+    scene.add(new THREE.AxesHelper(3))
 
-    // 坐标轴
-    const axes = new THREE.AxesHelper(3)
-    scene.add(axes)
-
-    // 玩家参考点
-    const playerGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.8, 8)
-    const playerMat = new THREE.MeshBasicMaterial({ color: 0xffd700, wireframe: true })
-    const player = new THREE.Mesh(playerGeo, playerMat)
-    player.position.y = 0.9
+    const playerGeometry = new THREE.CylinderGeometry(0.3, 0.3, PLAYER_HEIGHT, 10)
+    const playerMaterial = new THREE.MeshBasicMaterial({ color: 0xffd700, wireframe: true })
+    const player = new THREE.Mesh(playerGeometry, playerMaterial)
+    player.position.y = PLAYER_HEIGHT / 2
     scene.add(player)
 
-    // 鼠标交互：左键旋转，右键/中键平移，滚轮缩放
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xfff176 }),
+    )
+    eye.position.y = PLAYER_EYE_HEIGHT
+    scene.add(eye)
+    scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), eye.position, 2, 0xffd700, 0.32, 0.18))
+
+    const view: OrbitView = {
+      theta: Math.PI / 4,
+      phi: Math.PI / 3,
+      radius: 12,
+      target: new THREE.Vector3(0, PLAYER_HEIGHT / 2, 0),
+    }
     let isDragging = false
     let isPanning = false
-    let prevX = 0, prevY = 0
-    let theta = Math.PI / 4, phi = Math.PI / 4, radius = 12
-    let panX = 0, panY = 0
+    let previousX = 0
+    let previousY = 0
+    let disposed = false
 
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button === 2 || e.button === 1) {
-        isPanning = true
-      } else {
-        isDragging = true
-      }
-      prevX = e.clientX; prevY = e.clientY
+    const resize = () => {
+      const width = Math.max(1, container.clientWidth)
+      const height = Math.max(1, container.clientHeight)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+      renderer.setSize(width, height, false)
+    }
+
+    const onMouseDown = (event: MouseEvent) => {
+      isPanning = event.button === 1 || event.button === 2
+      isDragging = !isPanning
+      previousX = event.clientX
+      previousY = event.clientY
     }
     const onMouseUp = () => { isDragging = false; isPanning = false }
-    const onMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - prevX
-      const dy = e.clientY - prevY
-      prevX = e.clientX; prevY = e.clientY
+    const onMouseMove = (event: MouseEvent) => {
+      const deltaX = event.clientX - previousX
+      const deltaY = event.clientY - previousY
+      previousX = event.clientX
+      previousY = event.clientY
 
       if (isPanning) {
-        // 平移：根据相机朝向计算右方和上方向量
-        const panSpeed = radius * 0.002
-        panX -= dx * panSpeed
-        panY += dy * panSpeed
+        const speed = view.radius * 0.0018
+        camera.updateMatrixWorld()
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+        const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+        view.target.addScaledVector(right, -deltaX * speed)
+        view.target.addScaledVector(up, deltaY * speed)
       } else if (isDragging) {
-        theta -= dx * 0.01
-        phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - dy * 0.01))
+        view.theta -= deltaX * 0.01
+        view.phi = THREE.MathUtils.clamp(view.phi - deltaY * 0.01, 0.1, Math.PI - 0.1)
       }
     }
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      radius = Math.max(3, Math.min(30, radius + e.deltaY * 0.01))
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      view.radius = THREE.MathUtils.clamp(view.radius + event.deltaY * view.radius * 0.001, 3, 180)
     }
-    const onContextMenu = (e: MouseEvent) => { e.preventDefault() }
+    const onContextMenu = (event: MouseEvent) => { event.preventDefault() }
 
     container.addEventListener("mousedown", onMouseDown)
     container.addEventListener("mouseup", onMouseUp)
@@ -327,79 +436,113 @@ export function SelectorPreview({ type, params, offset }: SelectorPreviewProps) 
     container.addEventListener("wheel", onWheel, { passive: false })
     container.addEventListener("contextmenu", onContextMenu)
 
-    const animate = () => {
-      const target = new THREE.Vector3(panX, panY, 0)
-      camera.position.set(
-        panX + radius * Math.sin(phi) * Math.cos(theta),
-        panY + radius * Math.cos(phi),
-        radius * Math.sin(phi) * Math.sin(theta)
-      )
-      camera.lookAt(target)
-      renderer.render(scene, camera)
-      sceneRef.current!.animId = requestAnimationFrame(animate)
-    }
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(container)
+    resize()
 
-    sceneRef.current = { scene, camera, renderer, animId: 0, selector: null, trail: null }
+    const state: SceneState = { scene, camera, renderer, animId: 0, selector: null, view }
+    sceneRef.current = state
+
+    const animate = () => {
+      if (disposed) return
+      const horizontalRadius = view.radius * Math.sin(view.phi)
+      camera.position.set(
+        view.target.x + horizontalRadius * Math.cos(view.theta),
+        view.target.y + view.radius * Math.cos(view.phi),
+        view.target.z + horizontalRadius * Math.sin(view.theta),
+      )
+      camera.lookAt(view.target)
+      renderer.render(scene, camera)
+      state.animId = requestAnimationFrame(animate)
+    }
     animate()
 
-    const onResize = () => {
-      camera.aspect = container.clientWidth / container.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(container.clientWidth, container.clientHeight)
-    }
-    window.addEventListener("resize", onResize)
-
     return () => {
-      cancelAnimationFrame(sceneRef.current?.animId ?? 0)
+      disposed = true
+      cancelAnimationFrame(state.animId)
+      resizeObserver.disconnect()
       container.removeEventListener("mousedown", onMouseDown)
       container.removeEventListener("mouseup", onMouseUp)
       container.removeEventListener("mouseleave", onMouseUp)
       container.removeEventListener("mousemove", onMouseMove)
       container.removeEventListener("wheel", onWheel)
       container.removeEventListener("contextmenu", onContextMenu)
-      window.removeEventListener("resize", onResize)
+      disposeObject(scene)
       renderer.dispose()
-      container.removeChild(renderer.domElement)
+      renderer.forceContextLoss()
+      if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement)
       sceneRef.current = null
     }
   }, [])
 
   useEffect(() => { updateSelector() }, [updateSelector])
 
-  const paramLabels = PARAM_LABELS[type] ?? []
-
   return (
-    <div className="space-y-4 p-4">
-      <h3 className="text-sm font-semibold">选择器 3D 预览</h3>
-
-      <div className="flex flex-wrap gap-4">
-        {paramLabels.map((label, i) => {
-          if (i >= localParams.length) return null
-          const config = getSliderConfig(type, i)
-          return (
-            <div key={i} className="space-y-1 min-w-[120px]">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] text-[#858585]">{label}</label>
-                <span className="text-[11px] text-[#007acc] font-mono">{localParams[i] ?? 0}</span>
-              </div>
-              <Slider
-                min={config.min}
-                max={config.max}
-                step={config.step}
-                value={[localParams[i] ?? 0]}
-                onValueChange={(v) => {
-                  const newParams = [...localParams]
-                  newParams[i] = v[0]
-                  setLocalParams(newParams)
-                }}
-              />
-            </div>
-          )
-        })}
+    <div className="h-full min-h-0 flex flex-col gap-3 p-4">
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <h3 className="text-sm font-semibold">选择器 3D 预览</h3>
+        {model && (
+          <span className="text-[10px] text-[#94a0b4]">
+            原点：{selectorOriginLabel(model.origin)} · 前方 +Z / 右方 +X / 上方 +Y
+          </span>
+        )}
       </div>
 
-      <div ref={containerRef} className="w-full aspect-[4/3] max-h-[360px] rounded-lg border border-border bg-black/50 overflow-hidden" />
-      <p className="text-xs text-muted-foreground">左键旋转，右键平移，滚轮缩放。黄色线框为玩家参考位置。</p>
+      {definition && (
+        <div className="flex flex-wrap gap-x-4 gap-y-2 shrink-0">
+          {definition.params.map((paramDefinition, index) => {
+            const value = localParams[index] ?? paramDefinition.defaultValue
+            if (paramDefinition.kind === "boolean") {
+              return (
+                <div key={paramDefinition.key} className="flex items-center gap-2 min-w-[120px] h-8">
+                  <span className="text-[11px] text-[#858585]">{paramDefinition.label}</span>
+                  <Switch
+                    checked={value === true}
+                    onCheckedChange={(checked) => {
+                      const next = [...localParams]
+                      next[index] = checked
+                      setLocalParams(next)
+                    }}
+                  />
+                </div>
+              )
+            }
+
+            const numericValue = typeof value === "number" ? value : Number(paramDefinition.defaultValue)
+            const config = sliderBounds(
+              numericValue,
+              paramDefinition.min,
+              paramDefinition.max,
+              paramDefinition.step,
+            )
+            return (
+              <div key={paramDefinition.key} className="space-y-1 min-w-[120px]">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[11px] text-[#858585]">{paramDefinition.label}</label>
+                  <span className="text-[11px] text-[#20a5f7] font-mono">{numericValue}</span>
+                </div>
+                <Slider
+                  min={config.min}
+                  max={config.max}
+                  step={config.step}
+                  value={[numericValue]}
+                  onValueChange={(nextValue) => {
+                    const next = [...localParams]
+                    next[index] = paramDefinition.kind === "integer" ? Math.round(nextValue[0]) : nextValue[0]
+                    setLocalParams(next)
+                  }}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div ref={containerRef} className="flex-1 min-h-[220px] rounded-lg border border-border bg-black/50 overflow-hidden" />
+      <div className="flex items-center justify-between gap-3 text-[10px] text-muted-foreground shrink-0">
+        <span>黄色箭头表示玩家水平朝向；眼睛原点位于黄色亮点。</span>
+        <span>{model?.followPitch ? "运行时跟随玩家俯仰；当前按 0° 展示。" : "按水平视角展示。"}</span>
+      </div>
     </div>
   )
 }
