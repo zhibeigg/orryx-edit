@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 import type { NodeProps } from "@xyflow/react"
@@ -10,13 +11,20 @@ import { LoopNode } from "./LoopNode"
 import { DataNode } from "./DataNode"
 import { CalcNode } from "./CalcNode"
 import { SetNode } from "./SetNode"
+import { NODE_PORT_SIZE_PX } from "./node-interaction"
 
 vi.mock("@xyflow/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@xyflow/react")>()
   return {
     ...actual,
-    Handle: ({ id, type, position }: { id?: string; type: string; position: string }) => (
-      <span data-handle-id={id} data-handle-type={type} data-handle-position={position} />
+    Handle: ({ id, type, position, style }: { id?: string; type: string; position: string; style?: CSSProperties }) => (
+      <span
+        data-handle-id={id}
+        data-handle-type={type}
+        data-handle-position={position}
+        data-handle-width={style?.width}
+        data-handle-height={style?.height}
+      />
     ),
     useUpdateNodeInternals: () => () => undefined,
   }
@@ -68,6 +76,11 @@ function handleIds(markup: string): string[] {
   return [...markup.matchAll(/data-handle-id="([^"]+)"/g)].map((match) => match[1])
 }
 
+function expectComfortableHandleSize(markup: string, count: number): void {
+  expect(markup.match(new RegExp(`data-handle-width="${NODE_PORT_SIZE_PX}"`, "g")) ?? []).toHaveLength(count)
+  expect(markup.match(new RegExp(`data-handle-height="${NODE_PORT_SIZE_PX}"`, "g")) ?? []).toHaveLength(count)
+}
+
 function baseData(nodeKind: KetherNodeData["nodeKind"]): KetherNodeData {
   return {
     label: nodeKind,
@@ -92,6 +105,7 @@ describe("Flow 节点端口", () => {
 
     expect(ids).toEqual(["flow-in", "flow-out", "target", "amount", "damageType", "output"])
     expect(new Set(ids).size).toBe(ids.length)
+    expectComfortableHandleSize(markup, ids.length)
     expect(markup).toContain('data-handle-id="target" data-handle-type="target" data-handle-position="left"')
     expect(markup).toContain('data-handle-id="output" data-handle-type="source" data-handle-position="right"')
   })
@@ -129,9 +143,11 @@ describe("Flow 节点端口", () => {
     ["set", SetNode, { inputs: { variable: "damage", value: 10 }, inputKinds: { variable: "identifier" as const, value: "number" as const }, slotChildren: {} }, ["flow-in", "flow-out", "value"]],
   ])("%s 节点的 Handle ID 稳定且无重复", (nodeKind, Component, overrides, expectedIds) => {
     const data = { ...baseData(nodeKind as KetherNodeData["nodeKind"]), ...overrides } as KetherNodeData
-    const ids = handleIds(renderNode(`${nodeKind}-1`, data, Component as typeof ActionNode))
+    const markup = renderNode(`${nodeKind}-1`, data, Component as typeof ActionNode)
+    const ids = handleIds(markup)
 
     expect(ids).toEqual(expectedIds)
     expect(new Set(ids).size).toBe(ids.length)
+    expectComfortableHandleSize(markup, ids.length)
   })
 })

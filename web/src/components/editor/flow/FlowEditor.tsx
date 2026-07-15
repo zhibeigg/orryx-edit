@@ -1038,75 +1038,75 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
     <div ref={flowRootRef} className="kether-editor flex h-full max-md:flex-col">
       <NodePalette schema={schema} onDragStart={() => {}} />
       <div className="flex-1 min-w-0 relative">
-        <div className="kether-flow-toolbar h-8 px-3 flex items-center justify-between gap-2 text-[11px]">
+        <div className="kether-flow-toolbar h-11 px-4 flex items-center justify-between gap-3 text-[13px]">
           <div className="flex shrink-0 items-center gap-2 text-[#a6adbb] max-lg:hidden">
-            <AlignVerticalSpaceAround className="w-3.5 h-3.5 text-[#56b6c2]" />
+            <AlignVerticalSpaceAround className="w-4 h-4 text-[#56b6c2]" />
             {isReadOnly ? "当前脚本仅提供只读节点预览" : "拖拽左侧节点到画布，显式编辑后同步到脚本文本"}
           </div>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto whitespace-nowrap text-[#7f8795]">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto whitespace-nowrap text-[#7f8795]">
             <button
               type="button"
               onClick={handleAutoLayout}
               disabled={nodes.length === 0}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-[#2f3136] px-3 py-1 text-[12px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title="清除手工位置并自动排列"
             >
-              <AlignVerticalSpaceAround className="w-3 h-3" />
+              <AlignVerticalSpaceAround className="w-3.5 h-3.5" />
               自动排列
             </button>
             <button
               type="button"
               onClick={() => setShowHistory((value) => !value)}
-              className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] transition-colors ${showHistory ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#aab2c0] hover:bg-[#242933] hover:text-[#dde4f0]"}`}
+              className={`inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 py-1 text-[12px] transition-colors ${showHistory ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#aab2c0] hover:bg-[#242933] hover:text-[#dde4f0]"}`}
               title="历史时间线"
             >
-              <History className="w-3 h-3" />
+              <History className="w-3.5 h-3.5" />
               历史
             </button>
             <button
               type="button"
               onClick={undo}
               disabled={!canUndo}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-[#2f3136] px-3 py-1 text-[12px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title={undoLabel ? `撤销 ${undoLabel} (Ctrl+Z)` : "撤销 (Ctrl+Z)"}
             >
-              <Undo2 className="w-3 h-3" />
+              <Undo2 className="w-3.5 h-3.5" />
               撤销
             </button>
             <button
               type="button"
               onClick={redo}
               disabled={!canRedo}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#2f3136] px-2 py-0.5 text-[10px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
+              className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-[#2f3136] px-3 py-1 text-[12px] text-[#aab2c0] enabled:hover:bg-[#242933] enabled:hover:text-[#dde4f0] disabled:opacity-45 disabled:cursor-not-allowed"
               title={redoLabel ? `重做 ${redoLabel} (Ctrl+Y / Ctrl+Shift+Z)` : "重做 (Ctrl+Y / Ctrl+Shift+Z)"}
             >
-              <Redo2 className="w-3 h-3" />
+              <Redo2 className="w-3.5 h-3.5" />
               重做
             </button>
-            <Link2 className="w-3 h-3 shrink-0" />
+            <Link2 className="w-3.5 h-3.5 shrink-0" />
             <span className="shrink-0">{isReadOnly ? "已禁用回写" : "已启用显式连接与回写"}</span>
           </div>
         </div>
         {isReadOnly && (
           <div
-            className="absolute z-20 top-10 left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-2 rounded-md border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-[11px] text-amber-100 shadow-lg md:max-w-[680px]"
+            className="absolute z-20 top-14 left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-2 rounded-md border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-[13px] text-amber-100 shadow-lg md:max-w-[680px]"
             title={`节点回写已禁用：${readOnlyReasons.join("；")}`}
           >
             <span className="truncate">节点回写已禁用：{readOnlyReasons[0]}</span>
             {readOnlyReasons.length > 1 && (
-              <span className="shrink-0 rounded bg-amber-800/60 px-1.5 py-0.5 text-[10px]">
+              <span className="shrink-0 rounded bg-amber-800/60 px-1.5 py-0.5 text-[12px]">
                 另有 {readOnlyReasons.length - 1} 项
               </span>
             )}
           </div>
         )}
         {!isReadOnly && connectionError && (
-          <div className="absolute z-20 top-10 left-1/2 -translate-x-1/2 rounded-md border border-red-500/50 bg-red-950/90 px-3 py-2 text-[11px] text-red-100 shadow-lg">
+          <div className="absolute z-20 top-14 left-1/2 -translate-x-1/2 rounded-md border border-red-500/50 bg-red-950/90 px-3 py-2 text-[13px] text-red-100 shadow-lg">
             连线已拒绝：{connectionError}
           </div>
         )}
         {showHistory && (
-          <div className="absolute z-20 top-10 right-3 w-64 rounded-lg border border-[#2f3136] bg-[#191411] shadow-[0_12px_24px_rgba(0,0,0,0.45)]">
+          <div className="absolute z-20 top-14 right-4 w-72 rounded-lg border border-[#2f3136] bg-[#191411] shadow-[0_12px_24px_rgba(0,0,0,0.45)]">
             <input
               ref={checkpointImportRef}
               type="file"
@@ -1114,12 +1114,12 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
               className="hidden"
               onChange={onImportCheckpoints}
             />
-            <div className="px-3 py-2 border-b border-[#2f3136] text-[11px] font-medium text-[#d8dee9]">历史时间线</div>
+            <div className="px-3 py-2 border-b border-[#2f3136] text-[13px] font-medium text-[#d8dee9]">历史时间线</div>
             <div className="px-2 py-2 border-b border-[#2f3136]">
               <button
                 type="button"
                 onClick={createCheckpoint}
-                className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border border-[#2f3136] text-[11px] text-[#cfe0f8] bg-[#253244] hover:bg-[#2b3a51] transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border border-[#2f3136] text-[13px] text-[#cfe0f8] bg-[#253244] hover:bg-[#2b3a51] transition-colors"
               >
                 <BookmarkPlus className="w-3.5 h-3.5" />
                 保存检查点
@@ -1129,14 +1129,14 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                   type="button"
                   onClick={exportCheckpoints}
                   disabled={checkpoints.length === 0}
-                  className="px-2 py-1 rounded-md border border-[#2f3136] text-[10px] text-[#b8c8df] enabled:hover:bg-[#222d3b] enabled:hover:text-[#e5edf8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 rounded-md border border-[#2f3136] text-[12px] text-[#b8c8df] enabled:hover:bg-[#222d3b] enabled:hover:text-[#e5edf8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   导出
                 </button>
                 <button
                   type="button"
                   onClick={openImportCheckpoints}
-                  className="px-2 py-1 rounded-md border border-[#2f3136] text-[10px] text-[#b8c8df] hover:bg-[#222d3b] hover:text-[#e5edf8] transition-colors"
+                  className="px-2 py-1 rounded-md border border-[#2f3136] text-[12px] text-[#b8c8df] hover:bg-[#222d3b] hover:text-[#e5edf8] transition-colors"
                 >
                   导入
                 </button>
@@ -1148,7 +1148,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                 value={historyQuery}
                 onChange={(event) => setHistoryQuery(event.target.value)}
                 placeholder="搜索动作..."
-                className="w-full px-2 py-1 rounded-md border border-[#2f3136] bg-[#11151c] text-[11px] text-[#d9e2ef] placeholder:text-[#6e7c92] focus:outline-none focus:ring-1 focus:ring-[#5b95d7]"
+                className="w-full px-2 py-1 rounded-md border border-[#2f3136] bg-[#11151c] text-[13px] text-[#d9e2ef] placeholder:text-[#6e7c92] focus:outline-none focus:ring-1 focus:ring-[#5b95d7]"
               />
             </div>
             <div className="px-2 py-2 border-b border-[#2f3136] flex flex-wrap gap-1">
@@ -1163,7 +1163,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                   key={value}
                   type="button"
                   onClick={() => setHistoryFilter(value)}
-                  className={`px-2 py-1 rounded-md text-[10px] border transition-colors ${historyFilter === value ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#8ea2be] hover:text-[#dbe8f8] hover:bg-[#222d3b]"}`}
+                  className={`px-2 py-1 rounded-md text-[12px] border transition-colors ${historyFilter === value ? "border-[#5b95d7] text-[#dce8f8] bg-[#253244]" : "border-[#2f3136] text-[#8ea2be] hover:text-[#dbe8f8] hover:bg-[#222d3b]"}`}
                 >
                   {label}
                 </button>
@@ -1171,10 +1171,10 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             </div>
             <div className="max-h-72 overflow-y-auto p-2 space-y-2">
               <div>
-                <div className="px-1 pb-1 text-[10px] uppercase tracking-[0.14em] text-[#7f8ca0]">检查点</div>
+                <div className="px-1 pb-1 text-[12px] uppercase tracking-[0.14em] text-[#7f8ca0]">检查点</div>
                 <div className="space-y-1">
                   {checkpoints.length === 0 && (
-                    <div className="px-2 py-1.5 text-[10px] text-[#6f7b8f]">暂无检查点</div>
+                    <div className="px-2 py-1.5 text-[12px] text-[#6f7b8f]">暂无检查点</div>
                   )}
                   {checkpoints.map((checkpoint) => (
                     <div key={checkpoint.id} className="flex items-center gap-1">
@@ -1195,14 +1195,14 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                               cancelRenameCheckpoint()
                             }
                           }}
-                          className="flex-1 px-2 py-1.5 rounded-md border border-[#5b95d7] bg-[#11151c] text-[11px] text-[#d9e2ef] focus:outline-none"
+                          className="flex-1 px-2 py-1.5 rounded-md border border-[#5b95d7] bg-[#11151c] text-[13px] text-[#d9e2ef] focus:outline-none"
                         />
                       ) : (
                         <button
                           type="button"
                           onClick={() => jumpToCheckpoint(checkpoint)}
                           onDoubleClick={() => startRenameCheckpoint(checkpoint)}
-                          className="flex-1 text-left px-2 py-1.5 rounded-md text-[11px] text-[#c7d0df] hover:bg-[#263040] hover:text-[#e5edf8] transition-colors"
+                          className="flex-1 text-left px-2 py-1.5 rounded-md text-[13px] text-[#c7d0df] hover:bg-[#263040] hover:text-[#e5edf8] transition-colors"
                           title="双击重命名"
                         >
                           {checkpoint.name}
@@ -1214,24 +1214,24 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                         className="shrink-0 p-1 rounded-md text-[#8ea2be] hover:text-[#f0b2b2] hover:bg-[#3a2a30] transition-colors"
                         title="删除检查点"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <div className="px-1 pb-1 text-[10px] uppercase tracking-[0.14em] text-[#7f8ca0]">可撤销</div>
+                <div className="px-1 pb-1 text-[12px] uppercase tracking-[0.14em] text-[#7f8ca0]">可撤销</div>
                 <div className="space-y-1">
                   {visibleUndoGroups.length === 0 && (
-                    <div className="px-2 py-1.5 text-[10px] text-[#6f7b8f]">暂无可撤销动作</div>
+                    <div className="px-2 py-1.5 text-[12px] text-[#6f7b8f]">暂无可撤销动作</div>
                   )}
                   {visibleUndoGroups.map((group, index) => (
                     <button
                       key={`undo-${index}-${group.label}-${group.count}`}
                       type="button"
                       onClick={() => undoMany(group.steps)}
-                      className="w-full text-left px-2 py-1.5 rounded-md text-[11px] text-[#c7d0df] hover:bg-[#263040] hover:text-[#e5edf8] transition-colors"
+                      className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-[#c7d0df] hover:bg-[#263040] hover:text-[#e5edf8] transition-colors"
                     >
                       <span className="text-[#8ea2be] mr-1">-{group.steps}</span>
                       {group.label}
@@ -1241,17 +1241,17 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
                 </div>
               </div>
               <div>
-                <div className="px-1 pb-1 text-[10px] uppercase tracking-[0.14em] text-[#7f8ca0]">可重做</div>
+                <div className="px-1 pb-1 text-[12px] uppercase tracking-[0.14em] text-[#7f8ca0]">可重做</div>
                 <div className="space-y-1">
                   {visibleRedoGroups.length === 0 && (
-                    <div className="px-2 py-1.5 text-[10px] text-[#6f7b8f]">暂无可重做动作</div>
+                    <div className="px-2 py-1.5 text-[12px] text-[#6f7b8f]">暂无可重做动作</div>
                   )}
                   {visibleRedoGroups.map((group, index) => (
                     <button
                       key={`redo-${index}-${group.label}-${group.count}`}
                       type="button"
                       onClick={() => redoMany(group.steps)}
-                      className="w-full text-left px-2 py-1.5 rounded-md text-[11px] text-[#c7d0df] hover:bg-[#253243] hover:text-[#e5edf8] transition-colors"
+                      className="w-full text-left px-2 py-1.5 rounded-md text-[13px] text-[#c7d0df] hover:bg-[#253243] hover:text-[#e5edf8] transition-colors"
                     >
                       <span className="text-[#8ea2be] mr-1">+{group.steps}</span>
                       {group.label}
@@ -1263,7 +1263,7 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             </div>
           </div>
         )}
-        <div className="h-[calc(100%-2rem)] max-md:h-[calc(100%-4.25rem)]">
+        <div className="h-[calc(100%-2.75rem)] max-md:h-[calc(100%-5rem)]">
           <ReactFlow
             nodes={interactiveNodes}
             edges={visualEdges}
@@ -1285,10 +1285,10 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
             fitViewOptions={{ padding: 0.24, duration: 300 }}
             className="bg-[#101216]"
           >
-            <Panel position="top-right" className="max-md:hidden rounded-md border border-[#2f3136] bg-[#181a1f]/90 px-2 py-1 text-[10px] text-[#99a0ad] shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
+            <Panel position="top-right" className="max-md:hidden rounded-md border border-[#2f3136] bg-[#181a1f]/90 px-3 py-1.5 text-[12px] text-[#99a0ad] shadow-[0_10px_24px_rgba(0,0,0,0.35)]">
               {isReadOnly ? "复杂脚本：只读预览" : "仅显式语义修改 220ms 保存"}
             </Panel>
-            <Background color="#2f3743" gap={18} size={1.1} />
+            <Background color="#2f3743" gap={22} size={1.2} />
             <Controls showInteractive={false} className="!bg-[#1c1f24] !border !border-[#2f3136] !text-[#d2d7df]" />
             <MiniMap
               nodeColor={() => "#4f8cc9"}

@@ -34,16 +34,16 @@ interface Rect extends Size {
   y: number
 }
 
-const DEFAULT_NODE_SEPARATION = 48
-const DEFAULT_RANK_SEPARATION = 72
-const DEFAULT_SLOT_GAP = 18
-const DEFAULT_SATELLITE_GAP = 56
-const SLOT_OUTER_PADDING = 12
-const SLOT_INNER_PADDING = 12
-const SLOT_LABEL_HEIGHT = 24
-const CONTAINER_HEADER_HEIGHT = 76
-const CONTAINER_BOTTOM_PADDING = 12
-const MIN_SLOT_HEIGHT = 64
+const DEFAULT_NODE_SEPARATION = 56
+const DEFAULT_RANK_SEPARATION = 84
+const DEFAULT_SLOT_GAP = 22
+const DEFAULT_SATELLITE_GAP = 64
+const SLOT_OUTER_PADDING = 16
+const SLOT_INNER_PADDING = 16
+const SLOT_LABEL_HEIGHT = 36
+const CONTAINER_HEADER_HEIGHT = 96
+const CONTAINER_BOTTOM_PADDING = 16
+const MIN_SLOT_HEIGHT = 80
 
 function finite(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback
@@ -70,14 +70,16 @@ function fallbackNodeSize(node: KetherNode): Size {
     : Object.keys(node.data.inputs ?? {}).length
 
   switch (node.data.nodeKind) {
-    case "branch": return { width: 380, height: CONTAINER_HEADER_HEIGHT }
-    case "loop": return { width: 380, height: CONTAINER_HEADER_HEIGHT }
-    case "data": return { width: 260, height: 96 }
-    case "set": return { width: 300, height: 126 }
-    case "calc": return { width: 280, height: 148 }
+    case "branch": return { width: 456, height: CONTAINER_HEADER_HEIGHT }
+    case "loop": return { width: 456, height: CONTAINER_HEADER_HEIGHT }
+    case "data": return { width: 320, height: 140 }
+    case "set": return { width: 360, height: 156 }
+    case "calc": return { width: 360, height: 152 }
     case "action":
-    default:
-      return { width: 320, height: Math.max(96, 54 + inputCount * 40) }
+    default: {
+      const outputHeight = node.data.schemaAction?.output ? 40 : 0
+      return { width: 380, height: Math.max(116, 60 + inputCount * 52 + outputHeight) }
+    }
   }
 }
 

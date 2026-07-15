@@ -3,7 +3,13 @@ import { Handle, Position, type NodeProps } from "@xyflow/react"
 import type { KetherNodeData, KetherSlotLayout } from "../flow-types"
 import { useSchema } from "../SchemaContext"
 import { getPortColor } from "./node-styles"
-import { NODE_CONTROL_CLASS, stopNodeInteraction, useNodeInternalsSync } from "./node-interaction"
+import {
+  NODE_CONTROL_CLASS,
+  NODE_PORT_EDGE_OFFSET_PX,
+  NODE_PORT_SIZE_PX,
+  stopNodeInteraction,
+  useNodeInternalsSync,
+} from "./node-interaction"
 import { ExecutionHandles } from "./ExecutionHandles"
 
 function BodyZone({
@@ -47,19 +53,19 @@ function BodyZone({
         style={{
           background: "#fbbf24",
           border: "2px solid #111318",
-          width: 10,
-          height: 10,
-          top: -5,
-          left: 28,
+          width: NODE_PORT_SIZE_PX,
+          height: NODE_PORT_SIZE_PX,
+          top: NODE_PORT_EDGE_OFFSET_PX,
+          left: 34,
           zIndex: 8,
         }}
       />
-      <div className="flex h-7 items-center justify-between gap-3 border-b border-white/10 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/74">
+      <div className="flex h-9 items-center justify-between gap-4 border-b border-white/10 px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-white/74">
         <span>循环体</span>
-        <span className="font-mono text-[9px] font-normal text-white/38">{count}</span>
+        <span className="font-mono text-[11px] font-normal text-white/38">{count}</span>
       </div>
       {count === 0 && (
-        <div className="flex h-[calc(100%-1.75rem)] min-h-10 items-center justify-center px-3 text-center text-[10px] text-white/30">
+        <div className="flex h-[calc(100%-2.25rem)] min-h-12 items-center justify-center px-4 text-center text-[12px] text-white/30">
           {disabled ? "空循环体" : "拖入节点"}
         </div>
       )}
@@ -71,18 +77,18 @@ export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps
   const nodeData = data as KetherNodeData
   const schema = useSchema()
   const layout = nodeData.layout
-  const width = layout?.width ?? 380
-  const height = layout?.height ?? 214
-  const headerHeight = layout?.headerHeight ?? 76
+  const width = layout?.width ?? 456
+  const height = layout?.height ?? 264
+  const headerHeight = layout?.headerHeight ?? 96
   const bodyLayout = layout?.slots?.body ?? {
-    x: 12,
-    y: headerHeight + 10,
-    width: width - 24,
-    height: height - headerHeight - 22,
-    contentX: 12,
-    contentY: headerHeight + 38,
-    contentWidth: width - 24,
-    contentHeight: height - headerHeight - 50,
+    x: 16,
+    y: headerHeight + 12,
+    width: width - 32,
+    height: height - headerHeight - 28,
+    contentX: 16,
+    contentY: headerHeight + 48,
+    contentWidth: width - 32,
+    contentHeight: height - headerHeight - 64,
   }
   const bodyCount = nodeData.slotChildren.body?.length ?? 0
   const iterableType = String(nodeData.inputKinds.iterable ?? "any")
@@ -92,12 +98,12 @@ export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps
     <div className="relative overflow-visible" style={{ width, height }}>
       <ExecutionHandles disabled={Boolean(nodeData.readOnly)} />
       <div className={`absolute inset-0 rounded-md border bg-[#111318] transition-shadow duration-150 ${selected ? "border-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.24),0_16px_32px_rgba(0,0,0,0.34)]" : "border-amber-800/90 shadow-[0_12px_26px_rgba(0,0,0,0.28)]"}`}>
-        <div className="absolute inset-x-0 top-0 rounded-t-[5px] border-b border-amber-700/40 bg-amber-950/80 px-3 py-2" style={{ height: headerHeight }}>
-          <div className="flex items-center justify-between gap-3 text-[12px] font-semibold text-amber-50">
+        <div className="absolute inset-x-0 top-0 rounded-t-[5px] border-b border-amber-700/40 bg-amber-950/80 px-4 py-3" style={{ height: headerHeight }}>
+          <div className="flex items-center justify-between gap-4 text-[14px] font-semibold text-amber-50">
             <span>循环</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-amber-200/55">for</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-amber-200/55">for</span>
           </div>
-          <div className="relative mt-2 flex min-h-7 items-center justify-between gap-3 rounded border border-white/10 bg-black/20 px-2 text-[10px] text-white/68">
+          <div className="relative mt-3 flex min-h-10 items-center justify-between gap-3 rounded border border-white/10 bg-black/20 px-3 text-[12px] text-white/68">
             <Handle
               type="target"
               position={Position.Left}
@@ -107,9 +113,9 @@ export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps
               style={{
                 background: schema ? getPortColor(iterableType, schema) : "#fbbf24",
                 border: "2px solid #111318",
-                width: 10,
-                height: 10,
-                left: -14,
+                width: NODE_PORT_SIZE_PX,
+                height: NODE_PORT_SIZE_PX,
+                left: -17,
                 top: "50%",
                 zIndex: 8,
               }}
@@ -122,7 +128,7 @@ export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps
               onChange={(event) => nodeData.onInputChange?.("variable", event.target.value, "identifier")}
               onPointerDown={stopNodeInteraction}
               onWheel={stopNodeInteraction}
-              className={`${NODE_CONTROL_CLASS} w-14 shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-1 font-mono text-[10px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
+              className={`${NODE_CONTROL_CLASS} min-h-9 w-20 shrink-0 rounded border border-white/10 bg-black/30 px-2.5 py-2 font-mono text-[12px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
             />
             <span className="shrink-0 text-white/40">in</span>
             <input
@@ -132,7 +138,7 @@ export const LoopNode = memo(function LoopNode({ id, data, selected }: NodeProps
               onChange={(event) => nodeData.onInputChange?.("iterable", event.target.value)}
               onPointerDown={stopNodeInteraction}
               onWheel={stopNodeInteraction}
-              className={`${NODE_CONTROL_CLASS} min-w-0 flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 font-mono text-[10px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
+              className={`${NODE_CONTROL_CLASS} min-h-9 min-w-0 flex-1 rounded border border-white/10 bg-black/30 px-3 py-2 font-mono text-[12px] text-white focus:outline-none focus:ring-1 focus:ring-amber-300/70 disabled:cursor-not-allowed disabled:opacity-55`}
             />
           </div>
         </div>

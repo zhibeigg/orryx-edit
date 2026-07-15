@@ -2,6 +2,8 @@ import { useEffect, type SyntheticEvent } from "react"
 import { useUpdateNodeInternals } from "@xyflow/react"
 
 export const NODE_CONTROL_CLASS = "nodrag nowheel nopan"
+export const NODE_PORT_SIZE_PX = 14
+export const NODE_PORT_EDGE_OFFSET_PX = -(NODE_PORT_SIZE_PX / 2)
 
 export function stopNodeInteraction(event: SyntheticEvent): void {
   event.stopPropagation()

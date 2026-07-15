@@ -1,11 +1,12 @@
 import { Handle, Position } from "@xyflow/react"
+import { NODE_PORT_EDGE_OFFSET_PX, NODE_PORT_SIZE_PX } from "./node-interaction"
 
 export function ExecutionHandles({ disabled }: { disabled: boolean }) {
   const style = {
     background: "var(--ke-fg)",
     border: "2px solid var(--ke-bg-editor)",
-    width: 10,
-    height: 10,
+    width: NODE_PORT_SIZE_PX,
+    height: NODE_PORT_SIZE_PX,
     zIndex: 8,
   }
 
@@ -17,7 +18,7 @@ export function ExecutionHandles({ disabled }: { disabled: boolean }) {
         id="flow-in"
         isConnectable={!disabled}
         title="执行输入"
-        style={{ ...style, top: -5 }}
+        style={{ ...style, top: NODE_PORT_EDGE_OFFSET_PX }}
       />
       <Handle
         type="source"
@@ -25,7 +26,7 @@ export function ExecutionHandles({ disabled }: { disabled: boolean }) {
         id="flow-out"
         isConnectable={!disabled}
         title="执行输出"
-        style={{ ...style, bottom: -5 }}
+        style={{ ...style, bottom: NODE_PORT_EDGE_OFFSET_PX }}
       />
     </>
   )
