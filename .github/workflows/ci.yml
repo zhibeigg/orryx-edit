@@ -157,7 +157,9 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: packaged-server
-          path: server/build/libs/orryx-editor-server-*.jar
+          path: |
+            server/build/libs/orryx-editor-server-*.jar
+            !server/build/libs/orryx-editor-server-*-plain.jar
           if-no-files-found: error
 
   e2e:
@@ -204,7 +206,9 @@ jobs:
           PORT: "19090"
           DATA_DIR: ${{ runner.temp }}/orryx-e2e
         run: |
-          JAR="$(ls artifacts/*.jar)"
+          VERSION_VALUE="$(tr -d '\r\n' < VERSION)"
+          JAR="artifacts/orryx-editor-server-$VERSION_VALUE.jar"
+          test -f "$JAR"
           java -jar "$JAR" > server-e2e.log 2>&1 &
           echo $! > server-e2e.pid
           for attempt in {1..30}; do curl --fail --silent --connect-timeout 1 --max-time 5 http://127.0.0.1:19090/health/ready && exit 0; sleep 2; done

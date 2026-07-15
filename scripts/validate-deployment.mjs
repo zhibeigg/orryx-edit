@@ -97,4 +97,13 @@ for (const workflow of [ci, release]) {
 if (!release.includes("update-manifest.json") || !release.includes(".jar.sha256")) {
   throw new Error("Release workflow 缺少更新清单或 SHA-256 资产")
 }
+if (ci.includes('ls artifacts/*.jar')) {
+  throw new Error("CI E2E 禁止使用可同时匹配 plain 与发行包的模糊 JAR 选择")
+}
+for (const expected of [
+  "!server/build/libs/orryx-editor-server-*-plain.jar",
+  'JAR="artifacts/orryx-editor-server-$VERSION_VALUE.jar"',
+]) {
+  if (!ci.includes(expected)) throw new Error(`CI 缺少确定性发行 JAR 选择: ${expected}`)
+}
 console.log("Deployment configuration validation passed")
