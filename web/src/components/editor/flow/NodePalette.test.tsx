@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { ActionsSchemaV2 } from "@/types/schema"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { NodePalette, PaletteItem } from "./NodePalette"
 
 const schema: ActionsSchemaV2 = {
@@ -50,6 +50,10 @@ const schema: ActionsSchemaV2 = {
 }
 
 describe("NodePalette", () => {
+  it("Tooltip 内容使用稳定名称，避免生产拆包循环依赖初始化崩溃", () => {
+    expect(TooltipContent.displayName).toBe("TooltipContent")
+  })
+
   it("使用中文分类标题，同时保留原始分类 ID 作为提示", () => {
     const markup = renderToStaticMarkup(<NodePalette schema={schema} onDragStart={() => undefined} />)
 
