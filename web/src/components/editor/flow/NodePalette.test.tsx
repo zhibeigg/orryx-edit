@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { ActionsSchemaV2 } from "@/types/schema"
-import { NodePalette } from "./NodePalette"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { NodePalette, PaletteItem } from "./NodePalette"
 
 const schema: ActionsSchemaV2 = {
   version: 2,
@@ -57,5 +58,42 @@ describe("NodePalette", () => {
     expect(markup).toContain("其他 · custom-addon")
     expect(markup).toContain("原始分类：logic")
     expect(markup).toContain("var(--ke-symbol-teal)")
+  })
+
+  it("节点项可通过键盘聚焦并暴露简介与语法", () => {
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <PaletteItem
+          label="check"
+          meta="value"
+          description="检查条件"
+          syntax="check <value>"
+          color="#42A5F5"
+          dragValue={schema.actions[0]}
+          onDragStart={() => undefined}
+        />
+      </TooltipProvider>,
+    )
+
+    expect(markup).toContain('tabindex="0"')
+    expect(markup).toContain("check：检查条件。语法：check &lt;value&gt;")
+    expect(markup).not.toContain('title="检查条件')
+  })
+
+  it("空白简介使用防御性回退", () => {
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <PaletteItem
+          label="unknown"
+          meta="unknown"
+          description="   "
+          color="#cccccc"
+          dragValue={{ builtin: "unknown" }}
+          onDragStart={() => undefined}
+        />
+      </TooltipProvider>,
+    )
+
+    expect(markup).toContain("unknown：此节点暂未提供简介。标识：unknown")
   })
 })

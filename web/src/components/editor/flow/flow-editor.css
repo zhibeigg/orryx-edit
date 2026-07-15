@@ -349,6 +349,12 @@
 }
 
 .kether-palette__item:hover { background: var(--ke-bg-hover); color: var(--ke-fg-bright); }
+.kether-palette__item:focus-visible {
+  outline: 1px solid var(--ke-focus);
+  outline-offset: -1px;
+  background: var(--ke-bg-hover);
+  color: var(--ke-fg-bright);
+}
 .kether-palette__item:active { background: var(--ke-bg-active); cursor: grabbing; }
 
 .kether-palette__item-icon {
@@ -373,6 +379,61 @@
   overflow: hidden;
   color: var(--ke-symbol-blue);
   font: var(--ke-text-micro)/1.3 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kether-palette__tooltip {
+  width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-color: #454545;
+  border-radius: 2px;
+  background: #252526;
+  color: #cccccc;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 38%);
+  font-family: var(--font-ui);
+}
+
+.kether-palette__tooltip-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kether-palette__tooltip-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f0f0f0;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kether-palette__tooltip-heading code {
+  flex: 0 0 auto;
+  color: #569cd6;
+  font: 0.6875rem/1.3 var(--font-mono);
+}
+
+.kether-palette__tooltip-description {
+  margin: 6px 0 0;
+  color: #cccccc;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.kether-palette__tooltip-syntax {
+  display: block;
+  max-width: 100%;
+  margin-top: 8px;
+  overflow: hidden;
+  border-top: 1px solid #3c3c3c;
+  padding-top: 7px;
+  color: #9cdcfe;
+  font: 0.6875rem/1.45 var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { ChevronDown, ChevronRight, GripVertical, MoveRight, PanelLeftOpen, Search } from "lucide-react"
 import type { ActionsSchemaV2, SchemaAction } from "@/types/schema"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   getKetherBuiltinColor,
   getKetherCategoryPresentation,
@@ -26,6 +27,55 @@ const BUILTIN_NODES = [
   { builtin: "async", category: "flow", label: "异步块", description: "在异步上下文执行" },
   { builtin: "raw", category: "misc", label: "原始 Kether", description: "保留无法结构化的原文" },
 ]
+
+interface PaletteItemProps {
+  label: string
+  meta: string
+  description: string
+  syntax?: string
+  color: string
+  dragValue: SchemaAction | { builtin: string }
+  onDragStart: (event: React.DragEvent, value: SchemaAction | { builtin: string }) => void
+}
+
+export function PaletteItem({ label, meta, description, syntax, color, dragValue, onDragStart }: PaletteItemProps) {
+  const normalizedDescription = description.trim() || "此节点暂未提供简介"
+  const accessibleDescription = syntax
+    ? `${label}：${normalizedDescription}。语法：${syntax}`
+    : `${label}：${normalizedDescription}。标识：${meta}`
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          draggable
+          tabIndex={0}
+          onDragStart={(event) => onDragStart(event, dragValue)}
+          className="kether-palette__item"
+          aria-label={accessibleDescription}
+        >
+          <GripVertical className="kether-palette__item-icon" style={{ color }} aria-hidden />
+          <span className="kether-palette__item-label">{label}</span>
+          <code className="kether-palette__item-meta">{meta}</code>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        collisionPadding={12}
+        className="kether-palette__tooltip"
+      >
+        <div className="kether-palette__tooltip-heading">
+          <strong>{label}</strong>
+          <code>{meta}</code>
+        </div>
+        <p className="kether-palette__tooltip-description">{normalizedDescription}</p>
+        {syntax && <code className="kether-palette__tooltip-syntax">{syntax}</code>}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 function actionMatchesQuery(action: SchemaAction, query: string): boolean {
   const normalizedQuery = query.toLocaleLowerCase("zh-CN")
@@ -82,7 +132,8 @@ export function NodePalette({ schema, onDragStart }: NodePaletteProps) {
   const hasResults = filteredBuiltins.length > 0 || filteredCategories.size > 0
 
   return (
-    <aside className="kether-palette" data-collapsed={collapsed} aria-label="Kether 节点库">
+    <TooltipProvider delayDuration={250} skipDelayDuration={100}>
+      <aside className="kether-palette" data-collapsed={collapsed} aria-label="Kether 节点库">
       <header className="kether-palette__header">
         <div className="kether-palette__title-row">
           <span className="kether-palette__title">节点库</span>
@@ -127,17 +178,15 @@ export function NodePalette({ schema, onDragStart }: NodePaletteProps) {
             <span className="kether-palette__count">{filteredBuiltins.length}</span>
           </button>
           {showBuiltins && filteredBuiltins.map((node) => (
-            <div
+            <PaletteItem
               key={node.builtin}
-              draggable
-              onDragStart={(event) => handleDragStart(event, node)}
-              className="kether-palette__item"
-              title={`${node.description}（${node.builtin}）`}
-            >
-              <GripVertical className="kether-palette__item-icon" style={{ color: getKetherBuiltinColor(node.builtin) }} aria-hidden />
-              <span className="kether-palette__item-label">{node.label}</span>
-              <code className="kether-palette__item-meta">{node.builtin}</code>
-            </div>
+              label={node.label}
+              meta={node.builtin}
+              description={node.description}
+              color={getKetherBuiltinColor(node.builtin)}
+              dragValue={node}
+              onDragStart={handleDragStart}
+            />
           ))}
         </section>
 
@@ -162,17 +211,16 @@ export function NodePalette({ schema, onDragStart }: NodePaletteProps) {
               {expanded && actions.map((action) => {
                 const discriminator = action.syntax.split(/\s+/).slice(1, 3).join(" ") || action.variantId.split(".").at(-1) || "default"
                 return (
-                  <div
+                  <PaletteItem
                     key={action.id}
-                    draggable
-                    onDragStart={(event) => handleDragStart(event, action)}
-                    className="kether-palette__item"
-                    title={`${action.description}\n${action.syntax}`}
-                  >
-                    <GripVertical className="kether-palette__item-icon" style={{ color: presentation.color }} aria-hidden />
-                    <span className="kether-palette__item-label">{action.name}</span>
-                    <code className="kether-palette__item-meta">{discriminator}</code>
-                  </div>
+                    label={action.name}
+                    meta={discriminator}
+                    description={action.description}
+                    syntax={action.syntax}
+                    color={presentation.color}
+                    dragValue={action}
+                    onDragStart={handleDragStart}
+                  />
                 )
               })}
             </section>
@@ -180,7 +228,8 @@ export function NodePalette({ schema, onDragStart }: NodePaletteProps) {
         })}
 
         {!hasResults && <div className="kether-palette__empty">未找到匹配节点</div>}
-      </nav>
-    </aside>
+        </nav>
+      </aside>
+    </TooltipProvider>
   )
 }
