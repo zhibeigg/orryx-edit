@@ -1,3 +1,4 @@
+import "@/lib/monaco-loader"
 import { lazy, Suspense } from "react"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"

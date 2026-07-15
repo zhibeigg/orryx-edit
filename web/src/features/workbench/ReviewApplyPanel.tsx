@@ -1,3 +1,4 @@
+import "@/lib/monaco-loader"
 import { DiffEditor } from "@monaco-editor/react"
 import { Check, CircleAlert, RotateCcw, Rocket, X } from "lucide-react"
 import type { CloudDraft, CloudDraftFileChange, CloudDraftVersion } from "@/lib/cloud-drafts"

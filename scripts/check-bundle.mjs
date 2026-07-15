@@ -25,4 +25,12 @@ for (const pagePattern of [/^AdminPage-.*\.js$/, /^PortalPage-.*\.js$/]) {
   }
 }
 
+for (const required of [/^vendor-monaco-.*\.js$/, /^monaco-loader-.*\.js$/, /^editor\.worker-.*\.js$/, /^json\.worker-.*\.js$/]) {
+  if (!files.some((name) => required.test(name))) throw new Error(`缺少本地 Monaco 资产: ${required}`)
+}
+for (const forbidden of [/^css\.worker-.*\.js$/, /^html\.worker-.*\.js$/, /^ts\.worker-.*\.js$/]) {
+  const file = files.find((name) => forbidden.test(name))
+  if (file) throw new Error(`当前编辑器未使用该 Monaco worker，不应打包: ${file}`)
+}
+
 console.log("Bundle budgets passed")

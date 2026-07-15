@@ -49,6 +49,17 @@ describe("前端路由隔离", () => {
     expect(authenticatedEditor).toMatch(/useDraftSync\(workspaceId\)[\s\S]*useKeyboardShortcuts\(\)[\s\S]*useCrossRefLoader\(\)/)
     expect(authenticatedEditor).toContain('lazy(() => import("@/pages/EditorPage")')
   })
+
+  it("认证编辑器与工作台使用本地 Monaco 和本地 Worker", () => {
+    const monacoLoader = source("../monaco-loader.ts")
+    const reviewPanel = source("../../features/workbench/ReviewApplyPanel.tsx")
+    expect(authenticatedEditor).toContain('import "@/lib/monaco-loader"')
+    expect(reviewPanel).toContain('import "@/lib/monaco-loader"')
+    expect(monacoLoader).toContain("loader.config({ monaco })")
+    expect(monacoLoader).toContain("editor.worker?worker")
+    expect(monacoLoader).toContain("json.worker?worker")
+    expect(monacoLoader).not.toMatch(/cdn\.jsdelivr|https?:\/\//)
+  })
 })
 
 describe("账户与连接表单语义", () => {

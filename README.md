@@ -2,7 +2,7 @@
 
 面向 Minecraft 服主与 Orryx 开发者的商业化配置变更控制平台。浏览器通过 Ktor 服务管理账户、服务器实例、云端草稿、AI Job、审核、签名发布和不可变历史；Orryx 插件负责最终的签名验证、文件事务、主线程激活、Readiness 与崩溃恢复。
 
-当前版本：`0.11.15`，数据库 Schema：`12`，Editor 协议：V1/V2。
+当前版本：`0.11.16`，数据库 Schema：`12`，Editor 协议：V1/V2。
 
 ## 核心边界
 
@@ -33,7 +33,7 @@ Orryx Editor Server (Ktor)
                                   └── async Readiness / rollback / recovery
 ```
 
-Web 使用 React 19、TypeScript、Vite、Monaco、React Flow 和 Three.js。服务端使用 Kotlin、Ktor 3、协程与 R2DBC PostgreSQL。插件端兼容 Minecraft 1.12–1.21。
+Web 使用 React 19、TypeScript、Vite、Monaco、React Flow 和 Three.js。Monaco 与所需 Worker 随发行包本地构建，运行时不依赖第三方 CDN。服务端使用 Kotlin、Ktor 3、协程与 R2DBC PostgreSQL。插件端兼容 Minecraft 1.12–1.21。
 
 ## 用户流程
 
