@@ -2,7 +2,7 @@
 
 面向 Minecraft 服主与 Orryx 开发者的商业化配置变更控制平台。浏览器通过 Ktor 服务管理账户、服务器实例、云端草稿、AI Job、审核、签名发布和不可变历史；Orryx 插件负责最终的签名验证、文件事务、主线程激活、Readiness 与崩溃恢复。
 
-当前版本：`0.10.15`，数据库 Schema：`12`，Editor 协议：V1/V2。
+当前版本：`0.11.15`，数据库 Schema：`12`，Editor 协议：V1/V2。
 
 ## 核心边界
 
@@ -53,7 +53,7 @@ Web 使用 React 19、TypeScript、Vite、Monaco、React Flow 和 Three.js。服
 - `/`：Orryx 插件门户介绍页。
 - `/register`：独立邮箱账户注册页。
 - `/portal`：账户登录、License 认领、服务器、钱包、订单与工作台入口。
-- `/connect`：玩家命令生成的一次性实时 Editor 连接入口；凭据只接受 URL Fragment。
+- `/connect`：玩家命令生成的一次性实时 Editor 连接入口；凭据只接受 URL Fragment。连接后的职业“技能列表”可直接打开对应 `skills/**/*.yml`，同名配置会提示选择路径，缺失配置会明确标识。
 - `/workspaces/{workspaceId}/servers/{serverInstanceId}`：AI 三栏工作台、审核发布和历史。
 - `/admin`：License、更新、Kether 文档、AI Provider 与商业运行状态。
 

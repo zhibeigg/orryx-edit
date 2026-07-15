@@ -1,12 +1,23 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { ArrowUpRight, Files, FileWarning, LoaderCircle } from "lucide-react"
 import type { JobData, JobOptions } from "@/types"
 import { safeParseYaml, updateYamlFromObject } from "@/lib/yaml-parser"
+import {
+  buildJobSkillTargetIndex,
+  resolveJobSkillTarget,
+  type JobSkillTarget,
+  type JobSkillTargetResolution,
+} from "@/lib/job-skill-targets"
+import { openServerFile } from "@/lib/server-file"
 import { YamlVisualGuard } from "./YamlVisualGuard"
 import { useEditorStore } from "@/store/editor-store"
+import { useFileStore } from "@/store/file-store"
 import { ActionsEditor } from "./ActionsEditor"
 import { CrossRefPanel } from "./CrossRefPanel"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Editor from "@monaco-editor/react"
 
 interface JobEditorProps {
@@ -51,7 +62,7 @@ export function JobEditor({ content, onChange, filePath }: JobEditorProps) {
       </TabsContent>
 
       <TabsContent value="skills" className="flex-1 overflow-y-auto">
-        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><SkillsPanel skills={job.Options.Skills ?? []} onChange={(skills) => updateOptions({ Skills: skills })} /></YamlVisualGuard>
+        <YamlVisualGuard error={parsed.ok ? undefined : parsed.error}><SkillsPanel skills={job.Options.Skills ?? []} currentFile={filePath} onChange={(skills) => updateOptions({ Skills: skills })} /></YamlVisualGuard>
       </TabsContent>
 
       <TabsContent value="attributes" className="flex-1 overflow-y-auto">
@@ -134,26 +145,27 @@ function GeneralPanel({ options, onChange }: { options: JobOptions; onChange: (p
 }
 
 // ---- 技能列表面板 ----
-function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: string[]) => void }) {
+function SkillsPanel({
+  skills,
+  currentFile,
+  onChange,
+}: {
+  skills: string[]
+  currentFile?: string
+  onChange: (s: string[]) => void
+}) {
   const [search, setSearch] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
+  const [openingPath, setOpeningPath] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const fileTree = useFileStore((state) => state.fileTree)
+  const fileTreeLoading = useFileStore((state) => state.loading)
 
-  // 从文件缓存中提取所有技能名
-  const availableSkills = useMemo(() => {
-    const cache = useEditorStore.getState().fileContents
-    const names: string[] = []
-    for (const key of cache.keys()) {
-      if (key.startsWith("skills/") && key.endsWith(".yml")) {
-        // 只取文件名（去掉路径和扩展名）
-        const fileName = key.substring(key.lastIndexOf("/") + 1).replace(".yml", "")
-        if (!names.includes(fileName)) names.push(fileName)
-      }
-    }
-    return names.sort()
-  }, [])
+  const skillTargetIndex = useMemo(() => buildJobSkillTargetIndex(fileTree), [fileTree])
+  const availableSkills = useMemo(() => Array.from(skillTargetIndex.keys()), [skillTargetIndex])
+  const indexingSkills = fileTreeLoading && skillTargetIndex.size === 0
 
-  // 过滤：排除已添加的 + 搜索匹配
   const filtered = availableSkills.filter(
     (name) => !skills.includes(name) && (!search || name.toLowerCase().includes(search.toLowerCase()))
   )
@@ -177,6 +189,25 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
     onChange(arr)
   }
 
+  const openSkillTarget = useCallback(async (skill: string, target: JobSkillTarget) => {
+    if (openingPath) return
+    setOpenError(null)
+    setOpeningPath(target.path)
+    try {
+      await openServerFile(target.path)
+    } catch (error) {
+      const detail = error instanceof Error && error.message ? `：${error.message}` : ""
+      setOpenError(`无法打开技能“${skill}”的配置${detail}`)
+    } finally {
+      setOpeningPath((current) => current === target.path ? null : current)
+    }
+  }, [openingPath])
+
+  useEffect(() => {
+    setOpenError(null)
+    setOpeningPath(null)
+  }, [currentFile])
+
   // 点击外部关闭下拉
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -197,7 +228,6 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
             onFocus={() => setShowDropdown(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && search.trim()) {
-                // 精确匹配或手动输入
                 const exact = availableSkills.find(s => s.toLowerCase() === search.toLowerCase())
                 addSkill(exact ?? search.trim())
               }
@@ -205,6 +235,7 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
             placeholder="搜索或输入技能名称..."
           />
           <button
+            type="button"
             onClick={() => {
               if (search.trim()) {
                 const exact = availableSkills.find(s => s.toLowerCase() === search.toLowerCase())
@@ -219,15 +250,22 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
         </div>
         {showDropdown && filtered.length > 0 && (
           <div className="absolute z-20 top-full left-0 right-12 mt-1 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg">
-            {filtered.slice(0, 30).map((name) => (
-              <button
-                key={name}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent font-mono"
-                onMouseDown={(e) => { e.preventDefault(); addSkill(name) }}
-              >
-                {name}
-              </button>
-            ))}
+            {filtered.slice(0, 30).map((name) => {
+              const targetCount = skillTargetIndex.get(name)?.length ?? 0
+              return (
+                <button
+                  type="button"
+                  key={name}
+                  className="flex w-full items-center gap-3 px-3 py-1.5 text-left text-sm font-mono hover:bg-accent"
+                  onMouseDown={(e) => { e.preventDefault(); addSkill(name) }}
+                >
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  {targetCount > 1 && (
+                    <span className="shrink-0 text-[11px] font-sans text-muted-foreground">{targetCount} 个配置</span>
+                  )}
+                </button>
+              )
+            })}
             {filtered.length > 30 && (
               <div className="px-3 py-1 text-xs text-muted-foreground">还有 {filtered.length - 30} 项...</div>
             )}
@@ -235,38 +273,175 @@ function SkillsPanel({ skills, onChange }: { skills: string[]; onChange: (s: str
         )}
       </div>
 
+      {openError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="flex items-start gap-2 rounded border border-red-500/35 bg-red-950/30 px-3 py-2 text-xs text-red-200"
+        >
+          <FileWarning className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-danger)]" aria-hidden="true" />
+          <span>{openError}</span>
+        </div>
+      )}
+
       <div className="space-y-1">
         {skills.map((skill, i) => (
-          <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded border border-border group">
-            <span className="text-xs text-muted-foreground w-6">{i + 1}</span>
-            <span className="flex-1 text-sm font-mono">{skill}</span>
-            <button
-              onClick={() => moveSkill(i, -1)}
-              disabled={i === 0}
-              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 opacity-0 group-hover:opacity-100"
-            >
-              ↑
-            </button>
-            <button
-              onClick={() => moveSkill(i, 1)}
-              disabled={i === skills.length - 1}
-              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 opacity-0 group-hover:opacity-100"
-            >
-              ↓
-            </button>
-            <button
-              onClick={() => removeSkill(i)}
-              className="text-xs text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100"
-            >
-              删除
-            </button>
+          <div key={`${skill}:${i}`} className="group flex min-h-9 items-center gap-2 rounded border border-border bg-muted/50 px-3 py-1.5">
+            <span className="w-6 shrink-0 text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+            <SkillNavigationControl
+              skill={skill}
+              resolution={resolveJobSkillTarget(skill, skillTargetIndex)}
+              indexing={indexingSkills}
+              openingPath={openingPath}
+              onOpen={openSkillTarget}
+            />
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={`上移技能 ${skill}`}
+                title="上移"
+                onClick={() => moveSkill(i, -1)}
+                disabled={i === 0}
+                className="h-7 min-w-6 rounded px-1 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] disabled:pointer-events-none disabled:opacity-0 group-hover:opacity-100 group-hover:disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label={`下移技能 ${skill}`}
+                title="下移"
+                onClick={() => moveSkill(i, 1)}
+                disabled={i === skills.length - 1}
+                className="h-7 min-w-6 rounded px-1 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] disabled:pointer-events-none disabled:opacity-0 group-hover:opacity-100 group-hover:disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                aria-label={`删除技能 ${skill}`}
+                onClick={() => removeSkill(i)}
+                className="h-7 rounded px-1.5 text-xs text-red-400 opacity-0 transition-opacity hover:text-red-300 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)] group-hover:opacity-100"
+              >
+                删除
+              </button>
+            </div>
           </div>
         ))}
         {skills.length === 0 && (
-          <div className="text-sm text-muted-foreground py-4 text-center">暂无技能，搜索或输入名称添加</div>
+          <div className="py-4 text-center text-sm text-muted-foreground">暂无技能，搜索或输入名称添加</div>
         )}
       </div>
     </div>
+  )
+}
+
+function SkillNavigationControl({
+  skill,
+  resolution,
+  indexing,
+  openingPath,
+  onOpen,
+}: {
+  skill: string
+  resolution: JobSkillTargetResolution
+  indexing: boolean
+  openingPath: string | null
+  onOpen: (skill: string, target: JobSkillTarget) => void
+}) {
+  if (indexing) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-mono text-foreground">{skill}</span>
+        <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+          <LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />
+          索引中
+        </span>
+      </div>
+    )
+  }
+
+  if (resolution.status === "missing") {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-mono text-foreground">{skill}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              tabIndex={0}
+              className="flex shrink-0 items-center gap-1 rounded-sm text-[11px] text-[var(--accent-danger)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
+            >
+              <FileWarning className="h-3 w-3" aria-hidden="true" />
+              未找到配置
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">未找到同名 skills/*.yml，请检查技能名、大小写或文件是否存在。</TooltipContent>
+        </Tooltip>
+      </div>
+    )
+  }
+
+  if (resolution.status === "ambiguous") {
+    const openingCandidate = resolution.targets.some((target) => target.path === openingPath)
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={openingPath !== null}
+            aria-label={`选择技能 ${skill} 的配置文件`}
+            className="group/skill-link flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-0.5 text-left -ml-1 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm font-mono text-foreground transition-colors group-hover/skill-link:text-[var(--focus-ring)] group-focus-visible/skill-link:text-[var(--focus-ring)]">
+              {skill}
+            </span>
+            {openingCandidate ? (
+              <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--accent-warning)]" aria-hidden="true" />
+            ) : (
+              <Files className="h-3.5 w-3.5 shrink-0 text-[var(--accent-warning)]" aria-hidden="true" />
+            )}
+            <span className="shrink-0 text-[11px] text-muted-foreground">{resolution.targets.length} 个配置</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-96 max-w-[calc(100vw-2rem)]">
+          <DropdownMenuLabel>选择“{skill}”对应的技能配置</DropdownMenuLabel>
+          {resolution.targets.map((target) => (
+            <DropdownMenuItem
+              key={target.path}
+              className="gap-2 font-mono hover:bg-[var(--surface-hover)] focus:bg-[var(--surface-active)]"
+              onSelect={() => void onOpen(skill, target)}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[var(--accent-warning)]" aria-hidden="true" />
+              <span className="truncate">{target.path}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  const isOpening = openingPath === resolution.target.path
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          disabled={openingPath !== null}
+          aria-label={`打开技能 ${skill} 的配置文件`}
+          onClick={() => void onOpen(skill, resolution.target)}
+          className="group/skill-link flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-0.5 text-left -ml-1 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-mono text-foreground transition-colors group-hover/skill-link:text-[var(--focus-ring)] group-focus-visible/skill-link:text-[var(--focus-ring)]">
+            {skill}
+          </span>
+          {isOpening ? (
+            <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--accent-warning)]" aria-hidden="true" />
+          ) : (
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[var(--accent-warning)]" aria-hidden="true" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">打开 {resolution.target.path}</TooltipContent>
+    </Tooltip>
   )
 }
 
