@@ -136,24 +136,22 @@ export function ActionsEditor({ value, onChange, height = "300px", context }: Ac
   }, [mode])
 
   return (
-    <div style={{ height }} className="kether-editor flex flex-col relative border border-[oklch(0.38_0.055_34)] bg-[oklch(0.13_0.012_35)]">
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[oklch(0.38_0.055_34)] bg-[oklch(0.17_0.018_32)] shrink-0">
-        <button type="button" onClick={() => switchMode("text")} aria-pressed={mode === "text"}
-          className={`flex items-center gap-1 border px-2.5 py-1 text-[11px] rounded-[2px] ${mode === "text" ? "border-[oklch(0.72_0.17_48)] bg-[oklch(0.31_0.095_25)] text-[oklch(0.91_0.025_78)]" : "border-[oklch(0.38_0.055_34)] text-[oklch(0.72_0.025_62)] hover:border-[oklch(0.48_0.13_35)] hover:text-[oklch(0.91_0.025_78)]"}`}>
+    <div style={{ height }} className="kether-editor kether-editor-frame flex flex-col relative">
+      <div className="kether-editor__modebar">
+        <button type="button" onClick={() => switchMode("text")} aria-pressed={mode === "text"} className="kether-editor__mode-button">
           <Code className="w-3 h-3" />文本
         </button>
-        <button type="button" onClick={() => switchMode("flow")} aria-pressed={mode === "flow"}
-          className={`flex items-center gap-1 border px-2.5 py-1 text-[11px] rounded-[2px] ${mode === "flow" ? "border-[oklch(0.72_0.17_48)] bg-[oklch(0.31_0.095_25)] text-[oklch(0.91_0.025_78)]" : "border-[oklch(0.38_0.055_34)] text-[oklch(0.72_0.025_62)] hover:border-[oklch(0.48_0.13_35)] hover:text-[oklch(0.91_0.025_78)]"}`}>
+        <button type="button" onClick={() => switchMode("flow")} aria-pressed={mode === "flow"} className="kether-editor__mode-button">
           <Workflow className="w-3 h-3" />块文档
         </button>
-        {mode === "flow" && <div className="ml-auto text-[10px] text-[oklch(0.72_0.025_62)]">堆叠顺序即执行顺序 · 局部 Raw 保真</div>}
+        {mode === "flow" && <div className="kether-editor__mode-note">堆叠顺序即执行顺序 · 局部 Raw 保真</div>}
       </div>
       {context?.trigger && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[oklch(0.38_0.055_34)] bg-[oklch(0.21_0.025_30)] px-2.5 py-1.5 text-[10px] text-[oklch(0.78_0.035_67)]">
-          <span className="inline-flex items-center gap-1 font-semibold text-[oklch(0.91_0.025_78)]"><Info className="h-3 w-3 text-[oklch(0.72_0.17_48)]" />{context.trigger.name}</span>
+        <div className="kether-editor__context">
+          <span className="kether-editor__context-title"><Info className="h-3 w-3" />{context.trigger.name}</span>
           {context.trigger.description && <span>{context.trigger.description}</span>}
           {(context.trigger.variables ?? []).map((field) => (
-            <code key={field.name} title={field.description} className="border border-[oklch(0.44_0.09_35)] bg-[oklch(0.13_0.012_35)] px-1 py-0.5 text-[oklch(0.84_0.08_65)]">&event[{field.name}] : {field.type}</code>
+            <code key={field.name} title={field.description} className="kether-editor__context-code">&event[{field.name}] : {field.type}</code>
           ))}
         </div>
       )}

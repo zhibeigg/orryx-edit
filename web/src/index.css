@@ -725,11 +725,54 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .editor-viewport-notice p:last-child { color: var(--industrial-muted); line-height: 1.65; }
 
 /* Existing editor: flatten Material-like decoration into a dense industrial workspace. */
-.editor-shell { color: #d7dce2; background: #15171b; }
+.editor-shell {
+  --surface-canvas: #1e1e1e;
+  --surface-base: #252526;
+  --surface-raised: #2d2d30;
+  --surface-hover: #2a2d2e;
+  --surface-active: #37373d;
+  --surface-input: #313131;
+  --text-primary: #cccccc;
+  --text-secondary: #9d9d9d;
+  --text-muted: #858585;
+  --border-subtle: #3c3c3c;
+  --border-strong: #565656;
+  --accent-primary: #007acc;
+  --accent-primary-strong: #007acc;
+  --accent-success: #89d185;
+  --accent-warning: #cca700;
+  --accent-danger: #f14c4c;
+  --focus-ring: #007acc;
+  --industrial-bg: #1e1e1e;
+  --industrial-surface: #252526;
+  --industrial-surface-raised: #2d2d30;
+  --industrial-border: #3c3c3c;
+  --industrial-border-strong: #565656;
+  --industrial-text: #cccccc;
+  --industrial-muted: #9d9d9d;
+  --industrial-accent: #007acc;
+  --industrial-accent-hover: #1f8ad2;
+  --md-dark-bg-primary: #1e1e1e;
+  --md-dark-bg-secondary: #252526;
+  --md-dark-bg-tertiary: #2d2d30;
+  --md-dark-bg-hover: #2a2d2e;
+  --md-dark-bg-active: #37373d;
+  --md-dark-text-primary: #cccccc;
+  --md-dark-text-secondary: #9d9d9d;
+  --md-dark-text-muted: #858585;
+  --md-dark-border: #3c3c3c;
+  --md-dark-border-active: #007acc;
+  --md-dark-accent-primary: #007acc;
+  --md-dark-accent-success: #89d185;
+  --md-dark-accent-warning: #cca700;
+  --md-dark-accent-error: #f14c4c;
+  color: #cccccc;
+  background: #1e1e1e;
+}
 .editor-shell :where(.rounded-xl, .rounded-2xl, .rounded-lg) { border-radius: 3px; }
 .editor-shell :where(.shadow-lg, .shadow-xl) { box-shadow: none; }
-.editor-shell header { background: #22262d; border-color: #414750; }
-.editor-shell aside { background: #1b1e23; border-color: #414750; }
+.editor-shell header { background: #181818; border-color: #3c3c3c; }
+.editor-shell aside { background: #252526; border-color: #3c3c3c; }
 .conflict-dialog { width: min(94vw, 880px); max-height: 88vh; overflow: auto; background: var(--industrial-surface); border: 1px solid var(--industrial-border-strong); box-shadow: 0 18px 60px rgb(0 0 0 / 48%); }
 .conflict-dialog .section-heading { align-items: flex-start; }
 .conflict-dialog .section-heading > svg { color: var(--industrial-warning); }

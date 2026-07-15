@@ -49,6 +49,82 @@
   outline-offset: 0;
 }
 
+.kether-editor-frame {
+  border: 1px solid var(--ke-border);
+  background: var(--ke-bg-editor);
+}
+
+.kether-editor__modebar {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--ke-border);
+  background: var(--ke-bg-sidebar);
+}
+
+.kether-editor__mode-button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--ke-fg-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.kether-editor__mode-button:hover {
+  background: var(--ke-bg-hover);
+  color: var(--ke-fg-bright);
+}
+
+.kether-editor__mode-button[aria-pressed="true"] {
+  border-color: var(--ke-focus);
+  background: #0e639c;
+  color: var(--ke-fg-bright);
+}
+
+.kether-editor__mode-note {
+  margin-left: auto;
+  color: var(--ke-fg-subtle);
+  font-size: 10px;
+}
+
+.kether-editor__context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ke-border);
+  background: var(--ke-bg-panel);
+  color: var(--ke-fg-muted);
+  font-size: 10px;
+}
+
+.kether-editor__context-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ke-fg-bright);
+  font-weight: 650;
+}
+
+.kether-editor__context-title svg { color: var(--ke-focus-hover); }
+
+.kether-editor__context-code {
+  border: 1px solid var(--ke-border);
+  padding: 2px 5px;
+  background: var(--ke-bg-editor);
+  color: var(--ke-symbol-blue);
+  font-family: var(--font-mono);
+}
+
 .kether-block {
   width: 320px;
   overflow: hidden;
