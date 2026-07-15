@@ -124,6 +124,14 @@ function typedExpressionInput(
 function convertAction(node: ActionCallNode, context: BuildContext, parent: DocumentBlock["parent"], order: number): string {
   const action = resolveAction(node, context.catalog)
   if (!action) return convertRaw(node, context, parent, order, `未知 action ${node.name}`)
+  const positional = action.inputs.filter((input) => keywordAlternatives(input).length === 0)
+  const unmatchedKeyword = Object.keys(node.keywordArgs).some((keyword) => !action.inputs.some((input) => (
+    keywordAlternatives(input).some((alternative) => alternative.toLowerCase() === keyword.toLowerCase())
+    || input.keyword?.toLowerCase() === keyword.toLowerCase()
+  )))
+  if (node.args.length > positional.length || unmatchedKeyword) {
+    return convertRaw(node, context, parent, order, `action ${node.name} 的 grammar 尚未完整映射`)
+  }
   const id = nextBlockId(context, action.shape, node.start.offset)
   const block: DocumentBlock = {
     id,
@@ -139,7 +147,6 @@ function convertAction(node: ActionCallNode, context: BuildContext, parent: Docu
     parent,
   }
   context.blocks[id] = block
-  const positional = action.inputs.filter((input) => keywordAlternatives(input).length === 0)
   node.args.forEach((argument, index) => {
     const input = positional[index]
     if (input) block.inputs[input.key] = expressionToInput(argument, input, context, id)
@@ -378,6 +385,7 @@ function convertNode(node: ASTNode, context: BuildContext, parent: DocumentBlock
     case "comment":
     case "error":
     case "raw":
+    case "list":
     case "inline":
     case "lazy":
     case "flag":

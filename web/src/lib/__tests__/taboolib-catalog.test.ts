@@ -72,6 +72,19 @@ describe("TabooLib 6.3.0 baseline", () => {
       shape: "raw",
       grammar: { localRawRemainder: true, fallback: "local-block" },
     })
+    expect(catalog.byName.get("all")?.[0]).toMatchObject({
+      shape: "predicate",
+      inputs: [expect.objectContaining({ key: "conditions", type: "list", required: true })],
+      grammar: { sequence: ["all", { actionList: "conditions" }] },
+    })
+    expect(catalog.byName.get("array")?.[0]).toMatchObject({
+      shape: "reporter",
+      output: { type: "list" },
+      grammar: { sequence: ["array", { actionList: "elements" }] },
+    })
+    expect(overlay.rules.case).toEqual(expect.objectContaining({
+      sequence: ["case", { input: "value", accepts: ["action"] }, { caseArms: "branches" }],
+    }))
     expect(overlay.fallback).toEqual({
       scope: "local",
       representation: "raw-block",

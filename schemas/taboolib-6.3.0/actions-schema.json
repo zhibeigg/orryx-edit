@@ -968,27 +968,29 @@
       "category": "core",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：await_all",
-      "syntax": "await_all <local-raw...>",
+      "syntax": "await_all [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "动作列表",
+          "key": "actions",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
       "output": null,
       "flow": "normal",
-      "shape": "raw",
+      "shape": "command",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "await_all",
+          {
+            "actionList": "actions"
+          }
+        ]
       },
       "source": {
         "parserGroup": 18,
@@ -1008,27 +1010,31 @@
       "category": "core",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：await_any",
-      "syntax": "await_any <local-raw...>",
+      "syntax": "await_any [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "动作列表",
+          "key": "actions",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
-      "output": null,
+      "output": {
+        "type": "any"
+      },
       "flow": "normal",
-      "shape": "raw",
+      "shape": "reporter",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "await_any",
+          {
+            "actionList": "actions"
+          }
+        ]
       },
       "source": {
         "parserGroup": 19,
@@ -1048,27 +1054,31 @@
       "category": "core",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：all",
-      "syntax": "all <local-raw...>",
+      "syntax": "all [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "条件动作列表",
+          "key": "conditions",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
-      "output": null,
+      "output": {
+        "type": "boolean"
+      },
       "flow": "normal",
-      "shape": "raw",
+      "shape": "predicate",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "all",
+          {
+            "actionList": "conditions"
+          }
+        ]
       },
       "source": {
         "parserGroup": 20,
@@ -1088,27 +1098,31 @@
       "category": "core",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：any",
-      "syntax": "any <local-raw...>",
+      "syntax": "any [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "条件动作列表",
+          "key": "conditions",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
-      "output": null,
+      "output": {
+        "type": "boolean"
+      },
       "flow": "normal",
-      "shape": "raw",
+      "shape": "predicate",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "any",
+          {
+            "actionList": "conditions"
+          }
+        ]
       },
       "source": {
         "parserGroup": 21,
@@ -1128,27 +1142,31 @@
       "category": "core",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：seq",
-      "syntax": "seq <local-raw...>",
+      "syntax": "seq [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "动作列表",
+          "key": "actions",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
-      "output": null,
+      "output": {
+        "type": "any"
+      },
       "flow": "normal",
-      "shape": "raw",
+      "shape": "reporter",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "seq",
+          {
+            "actionList": "actions"
+          }
+        ]
       },
       "source": {
         "parserGroup": 22,
@@ -2799,27 +2817,31 @@
       "category": "data",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：array, arr",
-      "syntax": "array <local-raw...>",
+      "syntax": "array [ <action>* ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "元素列表",
+          "key": "elements",
+          "type": "list",
           "accepts": [
-            "raw"
+            "list"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
-      "output": null,
+      "output": {
+        "type": "list"
+      },
       "flow": "normal",
-      "shape": "raw",
+      "shape": "reporter",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "array",
+          {
+            "actionList": "elements"
+          }
+        ]
       },
       "source": {
         "parserGroup": 62,
@@ -3465,27 +3487,13 @@
       "category": "data",
       "namespace": "kether_inner:when",
       "description": "TabooLib 6.3.0 注册 parser：when",
-      "syntax": "when <local-raw...>",
-      "inputs": [
-        {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
-          "accepts": [
-            "raw"
-          ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
-        }
-      ],
+      "syntax": "when [<operator>] <action|action-list> then|-> <action>",
+      "inputs": [],
       "output": null,
       "flow": "normal",
       "shape": "raw",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "caseArm": true
       },
       "source": {
         "parserGroup": 78,
@@ -3545,27 +3553,35 @@
       "category": "data",
       "namespace": "kether",
       "description": "TabooLib 6.3.0 注册 parser：case",
-      "syntax": "case <local-raw...>",
+      "syntax": "case <action> [ when [<operator>] <action|action-list> then|-> <action> ... else <action> ]",
       "inputs": [
         {
-          "name": "本地原始参数",
-          "key": "arguments",
-          "type": "raw",
+          "name": "比较值",
+          "key": "value",
+          "type": "action",
           "accepts": [
-            "raw"
+            "action"
           ],
-          "required": false,
-          "default": null,
-          "rawEditor": "text"
+          "required": true,
+          "default": null
         }
       ],
       "output": null,
-      "flow": "normal",
-      "shape": "raw",
+      "flow": "branch",
+      "shape": "container",
       "grammar": {
-        "localRawRemainder": true,
-        "fallback": "local-block",
-        "reason": "grammar-not-declared-by-source-extractor"
+        "sequence": [
+          "case",
+          {
+            "input": "value",
+            "accepts": [
+              "action"
+            ]
+          },
+          {
+            "caseArms": "branches"
+          }
+        ]
       },
       "source": {
         "parserGroup": 80,

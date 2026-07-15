@@ -92,6 +92,71 @@
         }
       ]
     },
+    "all": {
+      "sequence": [
+        "all",
+        {
+          "actionList": "conditions"
+        }
+      ]
+    },
+    "any": {
+      "sequence": [
+        "any",
+        {
+          "actionList": "conditions"
+        }
+      ]
+    },
+    "seq": {
+      "sequence": [
+        "seq",
+        {
+          "actionList": "actions"
+        }
+      ]
+    },
+    "await_all": {
+      "sequence": [
+        "await_all",
+        {
+          "actionList": "actions"
+        }
+      ]
+    },
+    "await_any": {
+      "sequence": [
+        "await_any",
+        {
+          "actionList": "actions"
+        }
+      ]
+    },
+    "array": {
+      "sequence": [
+        "array",
+        {
+          "actionList": "elements"
+        }
+      ]
+    },
+    "case": {
+      "sequence": [
+        "case",
+        {
+          "input": "value",
+          "accepts": [
+            "action"
+          ]
+        },
+        {
+          "caseArms": "branches"
+        }
+      ]
+    },
+    "when": {
+      "caseArm": true
+    },
     "range": {
       "sequence": [
         "range",

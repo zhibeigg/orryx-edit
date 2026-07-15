@@ -16,6 +16,8 @@ const schema = normalizeSchema({
   actions: [
     { id: "test.action.report", variantId: "test.action.report", name: "report", aliases: [], category: "test", namespace: "test", description: "report", syntax: "report <number>", flow: "normal", shape: "reporter", inputs: [{ name: "value", key: "value", type: "number", accepts: ["number"], required: true, default: 0 }], output: { type: "number" } },
     { id: "test.action.use", variantId: "test.action.use", name: "use", aliases: [], category: "test", namespace: "test", description: "use", syntax: "use <number>", flow: "normal", shape: "command", inputs: [{ name: "value", key: "value", type: "number", accepts: ["number"], required: true, default: 0 }], output: null },
+    { id: "test.action.opaque", variantId: "test.action.opaque", name: "opaque", aliases: [], category: "test", namespace: "test", description: "opaque", syntax: "opaque <raw...>", flow: "normal", shape: "raw", inputs: [{ name: "arguments", key: "arguments", type: "raw", accepts: ["raw"], required: false, default: null }], output: null, grammar: { localRawRemainder: true } },
+    { id: "test.action.grammar-only", variantId: "test.action.grammar-only", name: "grammar-only", aliases: [], category: "test", namespace: "test", description: "grammar only", syntax: "grammar-only <value> then <action>", flow: "normal", shape: "command", inputs: [], output: null, grammar: { sequence: ["grammar-only", { input: "value" }, "then", { input: "body" }] } },
   ],
   selectors: [], triggers: [], properties: [],
 })
@@ -53,5 +55,30 @@ describe("BlockDocument", () => {
     expect(caseBlock?.inputs.value?.kind).toBe("block")
     expect(Object.values(document.blocks).some((block) => block.opcode === "sync" && block.kind === "container")).toBe(true)
     expect(serializeBlockDocument(document, schema)).toContain("case report 1")
+  })
+
+  it("ListNode 可作为 raw input 保存且 BlockDocument 公开结构不变", () => {
+    const document = parseBlockDocument("use [ \"a\" \"b\" ]", schema)
+    const block = document.blocks[document.roots[0]]
+    expect(document).toEqual(expect.objectContaining({ version: 1, roots: expect.any(Array), blocks: expect.any(Object) }))
+    expect(block?.inputs.value).toEqual(expect.objectContaining({ kind: "raw", source: "[ \"a\" \"b\" ]" }))
+    expect(serializeBlockDocument(document, schema)).toBe("use [ \"a\" \"b\" ]")
+  })
+
+  it("localRawRemainder 整段保真，不拆成多个碎片块", () => {
+    const source = "opaque alpha [ beta ]\nuse 1"
+    const document = parseBlockDocument(source, schema)
+    const rawBlocks = Object.values(document.blocks).filter((block) => block.kind === "raw" && block.source?.startsWith("opaque"))
+    expect(rawBlocks).toHaveLength(1)
+    expect(rawBlocks[0]?.source).toBe("opaque alpha [ beta ]")
+    expect(serializeBlockDocument(document, schema)).toBe(source)
+  })
+
+  it("grammar 参数无法映射到公开输入时整段 raw，禁止保存时静默丢参", () => {
+    const source = "grammar-only alpha then { use 1 }"
+    const document = parseBlockDocument(source, schema)
+    const block = document.blocks[document.roots[0]]
+    expect(block).toEqual(expect.objectContaining({ kind: "raw", source }))
+    expect(serializeBlockDocument(document, schema)).toBe(source)
   })
 })

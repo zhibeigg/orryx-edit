@@ -265,6 +265,59 @@ const manualOverlay = {
     output: { type: "boolean" },
     grammar: { sequence: ["check", { input: "left", accepts: ["any"] }, { localRaw: "operator" }, { input: "right", accepts: ["any"] }] },
   },
+  all: {
+    syntax: "all [ <action>* ]",
+    shape: "predicate",
+    output: { type: "boolean" },
+    inputs: [{ name: "条件动作列表", key: "conditions", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["all", { actionList: "conditions" }] },
+  },
+  any: {
+    syntax: "any [ <action>* ]",
+    shape: "predicate",
+    output: { type: "boolean" },
+    inputs: [{ name: "条件动作列表", key: "conditions", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["any", { actionList: "conditions" }] },
+  },
+  seq: {
+    syntax: "seq [ <action>* ]",
+    shape: "reporter",
+    output: { type: "any" },
+    inputs: [{ name: "动作列表", key: "actions", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["seq", { actionList: "actions" }] },
+  },
+  await_all: {
+    syntax: "await_all [ <action>* ]",
+    shape: "command",
+    inputs: [{ name: "动作列表", key: "actions", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["await_all", { actionList: "actions" }] },
+  },
+  await_any: {
+    syntax: "await_any [ <action>* ]",
+    shape: "reporter",
+    output: { type: "any" },
+    inputs: [{ name: "动作列表", key: "actions", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["await_any", { actionList: "actions" }] },
+  },
+  array: {
+    syntax: "array [ <action>* ]",
+    shape: "reporter",
+    output: { type: "list" },
+    inputs: [{ name: "元素列表", key: "elements", type: "list", accepts: ["list"], required: true, default: null }],
+    grammar: { sequence: ["array", { actionList: "elements" }] },
+  },
+  case: {
+    syntax: "case <action> [ when [<operator>] <action|action-list> then|-> <action> ... else <action> ]",
+    shape: "container",
+    flow: "branch",
+    inputs: [{ name: "比较值", key: "value", type: "action", accepts: ["action"], required: true, default: null }],
+    grammar: { sequence: ["case", { input: "value", accepts: ["action"] }, { caseArms: "branches" }] },
+  },
+  when: {
+    syntax: "when [<operator>] <action|action-list> then|-> <action>",
+    shape: "raw",
+    grammar: { caseArm: true },
+  },
   range: {
     syntax: "range <from> to <to> [step <step>]",
     shape: "reporter",
@@ -302,7 +355,7 @@ function actionFromGroup(group, index) {
     namespace: group.namespace,
     description: `TabooLib ${VERSION} 注册 parser：${group.names.join(", ")}`,
     syntax: overlay?.syntax ?? `${name} <local-raw...>`,
-    inputs: overlay ? [] : [{ name: "本地原始参数", key: "arguments", type: "raw", accepts: ["raw"], required: false, default: null, rawEditor: "text" }],
+    inputs: overlay?.inputs ?? (overlay ? [] : [{ name: "本地原始参数", key: "arguments", type: "raw", accepts: ["raw"], required: false, default: null, rawEditor: "text" }]),
     output: overlay?.output ?? null,
     flow: overlay?.flow ?? "normal",
     shape: overlay?.shape ?? "raw",
@@ -318,8 +371,8 @@ function actionFromGroup(group, index) {
   }
 }
 
-const head = git("rev-parse", "HEAD")
-invariant(head === COMMIT, `Baseline HEAD mismatch: expected ${COMMIT}, got ${head}`)
+// 所有提取均通过 git show/ls-tree 固定在 BASELINE commit，不要求用户切换当前 TabooLib 工作树。
+git("cat-file", "-e", `${COMMIT}^{commit}`)
 const files = kotlinFilesAtCommit()
 const parserGroups = extractParserGroups(files)
 const registeredNames = parserGroups.flatMap((group) => group.names)

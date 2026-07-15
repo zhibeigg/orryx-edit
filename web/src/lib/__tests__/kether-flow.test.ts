@@ -11,11 +11,14 @@ import { toParserActionsSchema, type ActionsSchemaV2, type SchemaAction } from "
 import type { FlowState, KetherNode } from "@/components/editor/flow/flow-types"
 
 const demoAction: SchemaAction = {
+  id: "test.action.demo",
+  variantId: "test.action.demo.default",
   name: "demo",
   aliases: ["d"],
   category: "test",
   namespace: "test",
   description: "roundtrip action",
+  syntax: "demo <value> [count <count>] [target <target>]",
   inputs: [
     { name: "value", key: "value", type: "STRING", required: true, default: null },
     { name: "count", key: "count", type: "INT", required: false, default: null, keyword: "count" },
@@ -23,6 +26,9 @@ const demoAction: SchemaAction = {
   ],
   output: null,
   flow: "normal",
+  shape: "command",
+  slots: [{ name: "body", label: "Body", multiple: true, optional: true, accepts: ["action"] }],
+  grammar: { source: "test-fixture" },
 }
 
 const schema: ActionsSchemaV2 = {
@@ -75,6 +81,13 @@ function actionNode(id: string, y = 100): KetherNode {
 describe("V2 schema parser adapter", () => {
   it("将 inputs 正式映射为 parser params", () => {
     const parserSchema = toParserActionsSchema(schema)
+    expect(parserSchema.actions[0]).toEqual(expect.objectContaining({
+      namespace: "test",
+      grammar: { source: "test-fixture" },
+      shape: "command",
+      flow: "normal",
+      slots: demoAction.slots,
+    }))
     expect(parserSchema.actions[0].params).toEqual([
       expect.objectContaining({ name: "value", type: "STRING", optional: false }),
       expect.objectContaining({ name: "count", keyword: "count", optional: true }),

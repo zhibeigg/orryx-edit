@@ -652,6 +652,11 @@ export function toParserActionsSchema(schemaInput: UnifiedActionsSchema): Action
       name: action.name,
       aliases: action.aliases,
       category: action.category,
+      namespace: action.namespace,
+      grammar: action.grammar,
+      shape: action.shape,
+      flow: action.flow,
+      slots: action.slots,
       params: action.inputs.map(toParserParam),
     })),
     selectors: catalog.schema.selectors.map((selector) => ({
