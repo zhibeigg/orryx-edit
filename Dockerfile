@@ -9,7 +9,7 @@ COPY scripts ./scripts
 COPY server ./server
 RUN cd web && npm run lint && npm run typecheck && npm run test:ci && npm run build && npm run check:bundle && npm run check:secrets
 
-FROM eclipse-temurin:21-jdk-jammy AS server-build
+FROM eclipse-temurin:25-jdk-jammy AS server-build
 WORKDIR /workspace
 COPY VERSION ./VERSION
 COPY schemas ./schemas
@@ -17,7 +17,7 @@ COPY server ./server
 COPY --from=web-build /workspace/server/src/main/resources/static ./server/src/main/resources/static
 RUN --mount=type=cache,target=/root/.gradle cd server && ./gradlew --no-daemon test shadowJar
 
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 orryx \
