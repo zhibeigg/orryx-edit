@@ -208,6 +208,9 @@ describe("AST 与 Flow 的执行顺序", () => {
       .map(({ index }) => index)
     expect(branchDescendantIndexes.every((index) => branchIndex < index)).toBe(true)
     expect(loopChildIndexes.every((index) => loopIndex < index)).toBe(true)
+    expect(flow.nodes.filter((node) => node.parentId).every((node) => (
+      node.extent === undefined && node.expandParent !== true
+    ))).toBe(true)
 
     const structureEdges = flow.edges.filter((edge) => edge.data?.kind === "structure")
     expect(structureEdges).toEqual(expect.arrayContaining([

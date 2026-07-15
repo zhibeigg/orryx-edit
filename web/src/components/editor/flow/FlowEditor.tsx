@@ -753,11 +753,10 @@ function FlowEditorInner({ value, onChange, schema }: FlowEditorProps) {
       const nextNode = createNodeFromPayload(payload, 24, 96 + existing.length * 86)
       if (!nextNode) return current
 
+      // 不设置 extent="parent"：父容器尺寸由下一轮递归布局计算，提前约束会把子节点夹到旧边界。
       const childNode: KetherNode = {
         ...nextNode,
         parentId,
-        extent: "parent",
-        expandParent: true,
         position: nextNode.position,
       }
 

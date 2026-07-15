@@ -330,8 +330,6 @@ function convertActionCall(
     type: "actionNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: node.name,
       schemaAction,
@@ -353,8 +351,6 @@ function convertSet(node: ASTSetNode, nodes: KetherNode[], parentId: string | nu
     type: "setNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: `set ${node.variable}`,
       schemaAction: null,
@@ -385,8 +381,6 @@ function convertIf(
     type: "branchNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: "if",
       schemaAction: null,
@@ -430,8 +424,6 @@ function convertFor(
     type: "loopNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: `for ${node.variable}`,
       schemaAction: null,
@@ -463,8 +455,6 @@ function convertDataNode(node: ASTNode, nodes: KetherNode[], parentId: string | 
     type: "dataNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: String(value),
       schemaAction: null,
@@ -485,8 +475,6 @@ function convertCalcNode(node: ASTCalcNode, nodes: KetherNode[], parentId: strin
     type: "calcNode",
     position: { x: 0, y: 0 },
     parentId: parentId ?? undefined,
-    extent: parentId ? "parent" : undefined,
-    expandParent: Boolean(parentId),
     data: {
       label: "calc",
       schemaAction: null,
