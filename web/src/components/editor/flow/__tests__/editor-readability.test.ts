@@ -46,6 +46,19 @@ describe("Kether 编辑器舒适可读尺寸", () => {
     expect(toPixels(declaration(".kether-editor .react-flow__controls-button", "width"))).toBeGreaterThanOrEqual(36)
   })
 
+  it("深层 Scratch 块按内部最小宽度逐层撑开，由画布统一横向滚动", () => {
+    expect(declaration(".scratch-canvas", "overflow")).toBe("auto")
+    expect(declaration(".scratch-stack", "width")).toBe("max-content")
+    expect(declaration(".scratch-stack .scratch-stack", "width")).toBe("max-content")
+    expect(declaration(".scratch-stack .scratch-stack", "min-width")).toBe("100%")
+    expect(declaration(".scratch-block", "width")).toBe("max-content")
+    expect(declaration(".scratch-block__inputs", "width")).toBe("max-content")
+    expect(declaration(".scratch-input-row", "width")).toBe("max-content")
+    expect(declaration(".scratch-input-row", "grid-template-columns")).toContain("320px")
+    expect(declaration(".scratch-input-slot > .scratch-block", "width")).toBe("max-content")
+    expect(declaration(".scratch-input-slot > .scratch-block", "min-width")).toBe("100%")
+  })
+
   it("Flow 节点不再使用 10px 及以下文字，并保留清晰端口", () => {
     const nodeSource = ["ActionNode.tsx", "BranchNode.tsx", "LoopNode.tsx", "DataNode.tsx", "CalcNode.tsx", "SetNode.tsx"]
       .map((file) => source(`../nodes/${file}`))
