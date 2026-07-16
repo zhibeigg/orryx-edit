@@ -7,7 +7,9 @@ const source = (relativePath: string) => readFileSync(resolve(__dirname, relativ
 const css = source("../flow-editor.css")
 
 function declaration(selector: string, property: string): string {
-  const ruleStart = css.indexOf(`${selector} {`)
+  const lineMarker = `\n${selector} {`
+  const markerStart = css.indexOf(lineMarker)
+  const ruleStart = markerStart >= 0 ? markerStart + 1 : css.startsWith(`${selector} {`) ? 0 : -1
   expect(ruleStart, `缺少 ${selector} 样式`).toBeGreaterThanOrEqual(0)
   const bodyStart = css.indexOf("{", ruleStart) + 1
   const bodyEnd = css.indexOf("}", bodyStart)
@@ -46,17 +48,27 @@ describe("Kether 编辑器舒适可读尺寸", () => {
     expect(toPixels(declaration(".kether-editor .react-flow__controls-button", "width"))).toBeGreaterThanOrEqual(36)
   })
 
-  it("深层 Scratch 块按内部最小宽度逐层撑开，由画布统一横向滚动", () => {
+  it("深层 Scratch 子块使用无循环宽度的横向轨道，并保持卡片自然高度", () => {
     expect(declaration(".scratch-canvas", "overflow")).toBe("auto")
-    expect(declaration(".scratch-stack", "width")).toBe("max-content")
-    expect(declaration(".scratch-stack .scratch-stack", "width")).toBe("max-content")
-    expect(declaration(".scratch-stack .scratch-stack", "min-width")).toBe("100%")
+    expect(declaration(".scratch-stack", "display")).toBe("grid")
+    expect(declaration(".scratch-stack", "grid-template-columns")).toContain("520px")
+    expect(declaration(".scratch-stack", "grid-template-columns")).toContain("max-content")
+    expect(declaration(".scratch-block-tree", "display")).toBe("inline-flex")
+    expect(declaration(".scratch-block-tree", "align-items")).toBe("flex-start")
+    expect(declaration(".scratch-block-tree", "height")).toBe("max-content")
+    expect(declaration(".scratch-block-tree__children", "display")).toBe("flex")
     expect(declaration(".scratch-block", "width")).toBe("max-content")
-    expect(declaration(".scratch-block__inputs", "width")).toBe("max-content")
-    expect(declaration(".scratch-input-row", "width")).toBe("max-content")
+    expect(declaration(".scratch-block", "min-width")).toBe("520px")
+    expect(declaration(".scratch-block", "height")).toBe("max-content")
+    expect(declaration(".scratch-block__inputs", "min-width")).toBe("0")
+    expect(declaration(".scratch-input-row", "min-width")).toBe("0")
     expect(declaration(".scratch-input-row", "grid-template-columns")).toContain("320px")
-    expect(declaration(".scratch-input-slot > .scratch-block", "width")).toBe("max-content")
-    expect(declaration(".scratch-input-slot > .scratch-block", "min-width")).toBe("100%")
+    expect(declaration(".scratch-block-tree__children > .scratch-input-row", "grid-template-columns")).toBe("150px max-content")
+    expect(declaration(".scratch-input-slot", "width")).toBe("320px")
+    expect(declaration(".scratch-block-tree__children > .scratch-input-row > .scratch-input-slot", "padding")).toBe("0")
+    expect(declaration(".scratch-block-tree__children > .scratch-input-row > .scratch-input-slot", "border")).toBe("0")
+    expect(declaration(".scratch-block-tree__children > .scratch-input-row > .scratch-input-slot", "background")).toBe("transparent")
+    expect(declaration(".scratch-input-slot > .scratch-block-tree", "min-width")).toBe("520px")
   })
 
   it("Flow 节点不再使用 10px 及以下文字，并保留清晰端口", () => {

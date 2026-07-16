@@ -538,17 +538,18 @@
 }
 
 .scratch-stack {
+  display: grid;
+  grid-template-columns: minmax(520px, max-content);
+  align-items: start;
   width: max-content;
-  min-width: min(900px, 100%);
+  min-width: 520px;
   min-height: 32px;
 }
 
-.scratch-stack .scratch-stack {
-  width: max-content;
-  min-width: 100%;
+.scratch-stack > div {
+  min-width: 0;
+  align-self: start;
 }
-
-.scratch-stack > div { min-width: 100%; }
 
 .scratch-drop-line {
   height: 12px;
@@ -578,11 +579,54 @@
   color: var(--ke-fg-bright);
 }
 
-.scratch-block {
+.scratch-block-tree {
   --block-accent: var(--ke-symbol-blue);
-  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 12px;
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
+  height: max-content;
+  vertical-align: top;
+}
+
+.scratch-block-tree__children {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: max-content;
+  min-width: 0;
+  height: max-content;
+}
+
+.scratch-block-tree__children > .scratch-input-row {
+  position: relative;
+  grid-template-columns: 150px max-content;
+  gap: 8px;
+}
+
+.scratch-block-tree__children > .scratch-input-row::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: -12px;
+  width: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--block-accent) 45%, var(--ke-border));
+}
+
+.scratch-block-tree__children > .scratch-input-row > label {
+  max-width: 150px;
+  overflow-wrap: anywhere;
+}
+
+.scratch-block {
+  position: relative;
+  display: grid;
+  align-content: start;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 520px;
+  height: max-content;
   margin: 0;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--block-accent) 38%, var(--ke-border));
@@ -644,7 +688,7 @@
 .scratch-block__inputs {
   display: grid;
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
   gap: 8px;
   padding: 12px;
 }
@@ -653,7 +697,7 @@
   display: grid;
   grid-template-columns: minmax(150px, max-content) minmax(320px, max-content);
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
   align-items: start;
   gap: 12px;
 }
@@ -661,12 +705,22 @@
 .scratch-input-row > label small { display: block; margin-top: 3px; color: var(--ke-fg-subtle); font: var(--ke-text-micro)/1.35 var(--font-mono); }
 
 .scratch-input-slot {
+  width: 320px;
   min-width: 320px;
   min-height: 2.5rem;
   padding: 4px;
   border: 1px solid var(--ke-border);
   border-radius: 2px;
   background: var(--ke-bg-input);
+}
+
+.scratch-block-tree__children > .scratch-input-row > .scratch-input-slot {
+  width: max-content;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .scratch-input-slot:hover { border-color: var(--ke-border-strong); }
@@ -686,9 +740,12 @@
 }
 
 .scratch-input-slot > textarea { resize: vertical; }
-.scratch-input-slot > .scratch-block {
+.scratch-input-slot > .scratch-block-tree {
   width: max-content;
-  min-width: 100%;
+  min-width: 520px;
+}
+
+.scratch-input-slot > .scratch-block-tree > .scratch-block {
   border-width: 1px;
   box-shadow: none;
 }
@@ -1131,8 +1188,8 @@
   .kether-palette[data-collapsed="true"] .kether-palette__hint { display: none; }
   .scratch-toolbar { align-items: flex-start; flex-direction: column; padding: 10px 12px; }
   .scratch-canvas { padding: 16px 10px 64px; }
-  .scratch-input-row { grid-template-columns: 1fr; gap: 6px; }
-  .scratch-input-row > label { padding-top: 2px; }
+  .scratch-block__inputs > .scratch-input-row { grid-template-columns: 1fr; gap: 6px; }
+  .scratch-block__inputs > .scratch-input-row > label { padding-top: 2px; }
 }
 
 @media (pointer: coarse) {

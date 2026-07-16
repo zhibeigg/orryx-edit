@@ -361,35 +361,47 @@ function BlockView({ blockId, document, schema, catalog, onDelete, onMove, onInp
   if (!block) return null
   const action = block.actionId ? catalog.byId.get(block.actionId) ?? catalog.byVariantId.get(block.variantId ?? "") : undefined
   const inputs = action?.inputs ?? builtinInputs(block)
+  const fieldInputs = inputs.filter((input) => block.inputs[input.key]?.kind !== "block")
+  const nestedInputs = inputs.filter((input) => block.inputs[input.key]?.kind === "block")
   const slots = action?.slots?.map((slot) => ({ name: slot.name, label: slot.label }))
     ?? Object.keys(block.branches).map((name) => ({ name, label: name === "then" ? "条件为真" : name === "else" ? "否则" : name === "body" ? "执行体" : name.startsWith("when:") ? `分支 ${Number(name.split(":")[1]) + 1}` : name }))
   const categoryColor = action ? getKetherCategoryColor(action.category) : getKetherBuiltinColor(block.opcode)
+  const renderInput = (input: SchemaInput) => (
+    <InputSlot key={input.key} block={block} input={input} document={document} schema={schema} catalog={catalog} onInput={onInput} onAttach={onAttach} onDelete={onDelete} onMove={onMove} renderStack={renderStack} />
+  )
   return (
-    <article className="scratch-block" data-shape={block.kind} style={{ "--block-accent": categoryColor } as React.CSSProperties}>
-      <header className="scratch-block__header" draggable onDragStart={(event) => { event.dataTransfer.setData(BLOCK_MIME, blockId); event.dataTransfer.effectAllowed = "move" }}>
-        <GripVertical className="h-3.5 w-3.5" aria-hidden />
-        <strong>{block.opcode}</strong>
-        {action && <span className="scratch-block__variant">{action.syntax.split(/\s+/).slice(1, 3).join(" ") || action.variantId}</span>}
-        <div className="scratch-block__actions">
-          <button type="button" onClick={() => onMove(blockId, -1)} aria-label="上移块"><ChevronUp /></button>
-          <button type="button" onClick={() => onMove(blockId, 1)} aria-label="下移块"><ChevronDown /></button>
-          <button type="button" onClick={() => onDelete(blockId)} aria-label="删除块"><Trash2 /></button>
-        </div>
-      </header>
-      {block.kind === "raw" ? (
-        <textarea className="scratch-raw" rows={3} value={block.inputs.source?.kind === "raw" ? block.inputs.source.source : block.source ?? ""} onChange={(event) => onInput(blockId, { name: "原文", key: "source", type: "raw", accepts: ["raw"], required: true, default: null }, event.target.value, true)} />
-      ) : (
-        <div className="scratch-block__inputs">
-          {inputs.map((input) => <InputSlot key={input.key} block={block} input={input} document={document} schema={schema} catalog={catalog} onInput={onInput} onAttach={onAttach} onDelete={onDelete} onMove={onMove} renderStack={renderStack} />)}
+    <div className="scratch-block-tree" style={{ "--block-accent": categoryColor } as React.CSSProperties}>
+      <article className="scratch-block" data-shape={block.kind}>
+        <header className="scratch-block__header" draggable onDragStart={(event) => { event.dataTransfer.setData(BLOCK_MIME, blockId); event.dataTransfer.effectAllowed = "move" }}>
+          <GripVertical className="h-3.5 w-3.5" aria-hidden />
+          <strong>{block.opcode}</strong>
+          {action && <span className="scratch-block__variant">{action.syntax.split(/\s+/).slice(1, 3).join(" ") || action.variantId}</span>}
+          <div className="scratch-block__actions">
+            <button type="button" onClick={() => onMove(blockId, -1)} aria-label="上移块"><ChevronUp /></button>
+            <button type="button" onClick={() => onMove(blockId, 1)} aria-label="下移块"><ChevronDown /></button>
+            <button type="button" onClick={() => onDelete(blockId)} aria-label="删除块"><Trash2 /></button>
+          </div>
+        </header>
+        {block.kind === "raw" ? (
+          <textarea className="scratch-raw" rows={3} value={block.inputs.source?.kind === "raw" ? block.inputs.source.source : block.source ?? ""} onChange={(event) => onInput(blockId, { name: "原文", key: "source", type: "raw", accepts: ["raw"], required: true, default: null }, event.target.value, true)} />
+        ) : fieldInputs.length > 0 ? (
+          <div className="scratch-block__inputs">
+            {fieldInputs.map(renderInput)}
+          </div>
+        ) : null}
+        {slots.map((slot) => (
+          <section className="scratch-c-slot" key={slot.name}>
+            <div className="scratch-c-slot__label">{slot.label}</div>
+            {renderStack({ blockId, slot: slot.name }, block.branches[slot.name] ?? [])}
+          </section>
+        ))}
+      </article>
+      {nestedInputs.length > 0 && (
+        <div className="scratch-block-tree__children">
+          {nestedInputs.map(renderInput)}
         </div>
       )}
-      {slots.map((slot) => (
-        <section className="scratch-c-slot" key={slot.name}>
-          <div className="scratch-c-slot__label">{slot.label}</div>
-          {renderStack({ blockId, slot: slot.name }, block.branches[slot.name] ?? [])}
-        </section>
-      ))}
-    </article>
+    </div>
   )
 }
 
