@@ -11,6 +11,11 @@ const [dockerfile, compose, service, ci, release] = await Promise.all([
 for (const expected of ["COPY scripts ./scripts", "USER 10001:10001", "DEPLOYMENT_MODE=container", "HEALTHCHECK"]) {
   if (!dockerfile.includes(expected)) throw new Error(`Dockerfile 缺少 ${expected}`)
 }
+const webBuildStage = dockerfile.match(/FROM\s+\S+\s+AS\s+web-build([\s\S]*?)\nFROM\s+/)?.[1]
+if (!webBuildStage) throw new Error("Dockerfile 缺少 web-build 阶段")
+for (const expected of ["COPY VERSION ./VERSION", "COPY web/package.json web/package-lock.json ./web/"]) {
+  if (!webBuildStage.includes(expected)) throw new Error(`Dockerfile web-build 阶段缺少 ${expected}`)
+}
 for (const expected of [
   "read_only: true",
   "no-new-privileges:true",

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM node:22-alpine AS web-build
 WORKDIR /workspace
+COPY VERSION ./VERSION
 COPY web/package.json web/package-lock.json ./web/
 RUN --mount=type=cache,target=/root/.npm cd web && npm ci
 COPY web ./web
