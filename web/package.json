@@ -16,7 +16,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^2.0.4",
+    "@dagrejs/dagre": "^3.0.0",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
