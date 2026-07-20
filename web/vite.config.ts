@@ -1,9 +1,18 @@
 import path from "path"
+import { readFileSync } from "node:fs"
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+const appVersion = readFileSync(path.resolve(__dirname, "../VERSION"), "utf8").trim()
+if (!/^\d+\.\d+\.\d+$/.test(appVersion)) {
+  throw new Error(`根 VERSION 格式无效：${appVersion}`)
+}
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [react(), tailwindcss()],
   // 将受版本控制的 schema 作为 /actions-schema.json 复制到静态资源目录。
   publicDir: path.resolve(__dirname, "../schemas"),
