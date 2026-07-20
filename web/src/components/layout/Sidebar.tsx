@@ -93,7 +93,10 @@ function TreeNode({ node, depth = 0, onAction }: {
 // ---- Sidebar ----
 
 export function Sidebar() {
-  const { fileTree, loading, setFileTree, setLoading } = useFileStore()
+  const fileTree = useFileStore((s) => s.fileTree)
+  const loading = useFileStore((s) => s.loading)
+  const setFileTree = useFileStore((s) => s.setFileTree)
+  const setLoading = useFileStore((s) => s.setLoading)
   const [dialogState, setDialogState] = useState<{
     type: "rename" | "newFile" | "newFolder"
     node: FileTreeNode

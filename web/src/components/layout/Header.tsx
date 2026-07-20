@@ -2,7 +2,12 @@ import { Wifi, WifiOff, Server, RefreshCw, Users } from "lucide-react"
 import { useConnectionStore } from "@/store/connection-store"
 
 export function Header() {
-  const { connected, reconnecting, serverOnline, serverName, collaborators, browserId } = useConnectionStore()
+  const connected = useConnectionStore((s) => s.connected)
+  const reconnecting = useConnectionStore((s) => s.reconnecting)
+  const serverOnline = useConnectionStore((s) => s.serverOnline)
+  const serverName = useConnectionStore((s) => s.serverName)
+  const collaborators = useConnectionStore((s) => s.collaborators)
+  const browserId = useConnectionStore((s) => s.browserId)
   const activeCollaborators = collaborators.filter((member) => member.browserId !== browserId)
 
   const statusColor = connected && serverOnline ? "text-green-400" : reconnecting ? "text-yellow-400" : "text-red-400"

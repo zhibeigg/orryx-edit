@@ -51,8 +51,12 @@ function connectionFailureMessage(cause: unknown): string {
 }
 
 export function ConnectPage() {
-  const { setConnected, setAuthenticated, setError, error } = useConnectionStore()
-  const { setFileTree, setLoading } = useFileStore()
+  const setConnected = useConnectionStore((s) => s.setConnected)
+  const setAuthenticated = useConnectionStore((s) => s.setAuthenticated)
+  const setError = useConnectionStore((s) => s.setError)
+  const error = useConnectionStore((s) => s.error)
+  const setFileTree = useFileStore((s) => s.setFileTree)
+  const setLoading = useFileStore((s) => s.setLoading)
   const [phase, setPhase] = useState<ConnectPhase>("idle")
   const [resumeExpired, setResumeExpired] = useState(false)
   const autoConnectTriggered = useRef(false)

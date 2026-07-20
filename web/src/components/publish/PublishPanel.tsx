@@ -9,7 +9,8 @@ import { Upload, RotateCcw, Check, AlertCircle, Eye, Undo2 } from "lucide-react"
 import { DiffView } from "@/components/editor/DiffView"
 
 export function PublishPanel() {
-  const { openFiles, updateDraft } = useEditorStore()
+  const openFiles = useEditorStore((s) => s.openFiles)
+  const updateDraft = useEditorStore((s) => s.updateDraft)
   const connected = useConnectionStore((s) => s.connected)
   const serverOnline = useConnectionStore((s) => s.serverOnline)
   const serverAvailable = connected && serverOnline

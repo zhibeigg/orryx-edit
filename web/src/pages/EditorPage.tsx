@@ -63,16 +63,14 @@ function resolveEditor(file: OpenFile): React.ComponentType<EditorProps> {
 }
 
 export function EditorPage() {
-  const {
-    openFiles,
-    activeFilePath,
-    setActiveFile,
-    closeFile,
-    closeAllFiles,
-    closeSavedFiles,
-    lifecycleError,
-    clearLifecycleError,
-  } = useEditorStore()
+  const openFiles = useEditorStore((s) => s.openFiles)
+  const activeFilePath = useEditorStore((s) => s.activeFilePath)
+  const setActiveFile = useEditorStore((s) => s.setActiveFile)
+  const closeFile = useEditorStore((s) => s.closeFile)
+  const closeAllFiles = useEditorStore((s) => s.closeAllFiles)
+  const closeSavedFiles = useEditorStore((s) => s.closeSavedFiles)
+  const lifecycleError = useEditorStore((s) => s.lifecycleError)
+  const clearLifecycleError = useEditorStore((s) => s.clearLifecycleError)
   const connected = useConnectionStore((s) => s.connected)
   const serverOnline = useConnectionStore((s) => s.serverOnline)
   const serverAvailable = connected && serverOnline
@@ -91,6 +89,23 @@ export function EditorPage() {
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [])
+
+  // 标签栏方向键导航（自动激活模式，与桌面编辑器习惯一致）
+  const handleTabListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return
+    const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'))
+    if (tabs.length === 0) return
+    const current = tabs.indexOf(e.target as HTMLElement)
+    if (current < 0) return
+    e.preventDefault()
+    const next = e.key === "ArrowRight" ? (current + 1) % tabs.length
+      : e.key === "ArrowLeft" ? (current - 1 + tabs.length) % tabs.length
+        : e.key === "Home" ? 0
+          : tabs.length - 1
+    tabs[next].focus()
+    const nextPath = openFiles[next]?.path
+    if (nextPath) setActiveFile(nextPath)
+  }
 
   if (openFiles.length === 0) {
     return (
@@ -122,58 +137,47 @@ export function EditorPage() {
     <div className="h-full flex flex-col" style={{ background: 'var(--md-dark-bg-primary)' }}>
       {/* 标签栏 - Material Design 风格 */}
       <div className="flex border-b shrink-0" style={{ borderColor: 'var(--md-dark-border)', background: 'var(--md-dark-bg-secondary)' }}>
-        <div className="flex-1 flex overflow-x-auto gap-1 p-1">
+        <div className="flex-1 flex overflow-x-auto gap-1 p-1" role="tablist" aria-label="打开的文件" onKeyDown={handleTabListKeyDown}>
           {openFiles.map((file) => {
             const { icon: FileIcon, color: iconColor } = getFileIconInfo(file.path)
             const isActive = file.path === activeFilePath
             return (
               <div
                 key={file.path}
-                className={cn(
-                  "group flex items-center gap-2 px-3 py-1.5 text-[13px] cursor-pointer min-w-0 transition-all duration-[var(--md-transition-fast)]",
-                  "rounded-lg relative overflow-hidden"
-                )}
-                style={{
-                  background: isActive ? 'var(--md-dark-bg-primary)' : 'transparent',
-                  boxShadow: isActive ? 'var(--md-elevation-1)' : 'none',
-                  color: isActive ? 'var(--md-dark-text-primary)' : 'var(--md-dark-text-secondary)',
-                }}
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                data-editor-tab="true"
+                className={cn("editor-tab group", isActive && "editor-tab--active")}
                 title={file.externalRevision != null ? "服务器上的文件已被其他协作者修改；保存时会进行版本检查" : undefined}
                 onClick={() => setActiveFile(file.path)}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'var(--md-dark-bg-tertiary)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent'
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setActiveFile(file.path)
                   }
                 }}
               >
-                {isActive && (
-                  <div 
-                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-t-full"
-                    style={{ background: 'var(--md-dark-accent-primary)' }}
-                  />
-                )}
                 <FileIcon className={cn("w-4 h-4 shrink-0", iconColor)} />
                 <span className="truncate max-w-[150px] font-medium">{file.name}</span>
                 {file.dirty && (
-                  <span 
+                  <span
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ background: 'var(--md-dark-accent-primary)' }}
+                    aria-label="未保存"
                   />
                 )}
                 {file.externalRevision != null && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" aria-label="存在外部修改" />}
                 <button
+                  type="button"
+                  aria-label={`关闭 ${file.name}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     void closeFile(file.path)
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity hover:bg-[var(--md-dark-bg-active)]"
+                  className="editor-tab__close"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
             )
@@ -343,25 +347,22 @@ export function EditorPage() {
       >
         <button
           onClick={() => setBottomPanel(bottomPanel === "log" ? null : "log")}
-          className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors font-medium"
+          className="editor-statusbar-btn flex items-center gap-2 px-2 py-1 font-medium"
           style={{ color: 'white' }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
         >
-          <Terminal className="w-3.5 h-3.5" />
+          <Terminal className="w-3.5 h-3.5" aria-hidden="true" />
           <span>日志</span>
-          {bottomPanel === null ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          {bottomPanel === null ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
         </button>
         <div className="flex-1" />
         <button
           onClick={() => setShowShortcuts(true)}
-          className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors"
+          className="editor-statusbar-btn flex items-center gap-2 px-2 py-1"
           style={{ color: 'rgba(255,255,255,0.9)' }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           title="快捷键 (Ctrl+/)"
+          aria-label="快捷键"
         >
-          <Keyboard className="w-3.5 h-3.5" />
+          <Keyboard className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
         {activeFile && (
           <span className="opacity-80 ml-2">{activeFile.path}</span>
@@ -370,7 +371,7 @@ export function EditorPage() {
 
       {/* 快捷键面板 - Material Design 风格 */}
       <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-        <DialogContent className="w-[480px] max-h-[80vh]" style={{ background: 'var(--md-dark-bg-secondary)' }}>
+        <DialogContent className="w-[480px] max-w-[calc(100vw-2rem)] max-h-[80vh]" style={{ background: 'var(--md-dark-bg-secondary)' }}>
           <DialogHeader>
             <DialogTitle style={{ color: 'var(--md-dark-text-primary)' }}>快捷键</DialogTitle>
             <DialogDescription style={{ color: 'var(--md-dark-text-secondary)' }}>Ctrl+/ 打开/关闭此面板</DialogDescription>

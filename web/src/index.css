@@ -4,6 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* 共享断点令牌（覆盖 Tailwind 默认，与下方媒体查询保持一致） */
+  --breakpoint-xs: 430px;
+  --breakpoint-sm: 760px;
   /* VSCode Dark+ 色板 */
   --color-background: #1e1e1e;
   --color-foreground: #cccccc;
@@ -140,11 +143,14 @@ select:focus {
 
 /* Outlined Button */
 .btn-outlined {
-  background-color: transparent;
-  color: var(--md-sys-color-primary);
-  padding: var(--md-spacing-sm) var(--md-spacing-md);
-  height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-text, var(--md-sys-color-primary));
+  background: transparent;
   border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-shape-corner-medium);
+  transition: all var(--md-motion-duration-short4) var(--md-motion-easing-standard);
 }
 
 .btn-outlined:hover:not(:disabled) {
@@ -157,10 +163,13 @@ select:focus {
 
 /* Text Button */
 .btn-text {
-  background-color: transparent;
-  color: var(--md-sys-color-primary);
-  padding: var(--md-spacing-sm) var(--md-spacing-md);
-  height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-text, var(--md-sys-color-primary));
+  background: transparent;
+  border-radius: var(--md-shape-corner-medium);
+  transition: background-color var(--md-motion-duration-short4) var(--md-motion-easing-standard);
 }
 
 .btn-text:hover:not(:disabled) {
@@ -318,25 +327,7 @@ select:focus {
 /* ===== Dark Theme Overrides ===== */
 /* For the existing dark VS Code theme, we keep the dark colors */
 /* and apply Material Design shapes and interactions */
-
-.dark {
-  --md-sys-color-primary: #007acc;
-  --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #005a9e;
-  --md-sys-color-on-primary-container: #d0e8ff;
-
-  --md-sys-color-surface: #1e1e1e;
-  --md-sys-color-surface-container: #252526;
-  --md-sys-color-surface-container-low: #1e1e1e;
-  --md-sys-color-surface-container-high: #2d2d2d;
-  --md-sys-color-surface-container-highest: #37373d;
-  
-  --md-sys-color-on-surface: #cccccc;
-  --md-sys-color-on-surface-variant: #858585;
-  
-  --md-sys-color-outline: #3c3c3c;
-  --md-sys-color-outline-variant: #424242;
-}
+/* （原先 .dark 死代码块已删除：项目统一使用 .editor-shell / :root 令牌） */
 
 /* ===== Utility Classes ===== */
 .text-display-large {
@@ -766,6 +757,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   --md-dark-accent-success: #89d185;
   --md-dark-accent-warning: #cca700;
   --md-dark-accent-error: #f14c4c;
+  /* WCAG AA：#007acc 作普通文字在深色面上仅 ~3.4:1，文字态主色用更亮的蓝 */
+  --accent-text: #4da3e8;
   color: #cccccc;
   background: #1e1e1e;
 }
@@ -773,12 +766,64 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .editor-shell :where(.shadow-lg, .shadow-xl) { box-shadow: none; }
 .editor-shell header { background: #181818; border-color: #3c3c3c; }
 .editor-shell aside { background: #252526; border-color: #3c3c3c; }
+
+/* 文件标签页：role=tab 语义，hover/focus 由 CSS 驱动（不再直接写 DOM style） */
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 13px;
+  color: var(--md-dark-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.editor-tab:hover { background: var(--md-dark-bg-tertiary); }
+.editor-tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.editor-tab--active {
+  background: var(--md-dark-bg-primary);
+  color: var(--md-dark-text-primary);
+  box-shadow: var(--md-elevation-1);
+}
+.editor-tab--active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--md-dark-accent-primary);
+}
+.editor-tab__close {
+  flex: 0 0 auto;
+  padding: 4px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease, background-color var(--motion-fast) ease;
+  cursor: pointer;
+}
+.editor-tab:hover .editor-tab__close,
+.editor-tab:focus-within .editor-tab__close,
+.editor-tab__close:focus-visible { opacity: 1; }
+.editor-tab__close:hover { background: var(--md-dark-bg-active); }
+
+/* 状态栏按钮 hover：替代 onMouseEnter/Leave 直接写 DOM */
+.editor-statusbar-btn { border-radius: 3px; transition: background-color var(--motion-fast) ease; }
+.editor-statusbar-btn:hover { background: rgb(255 255 255 / 10%); }
 .conflict-dialog { width: min(94vw, 880px); max-height: 88vh; overflow: auto; background: var(--industrial-surface); border: 1px solid var(--industrial-border-strong); box-shadow: 0 18px 60px rgb(0 0 0 / 48%); }
 .conflict-dialog .section-heading { align-items: flex-start; }
 .conflict-dialog .section-heading > svg { color: var(--industrial-warning); }
 .conflict-diff { height: min(48vh, 440px); margin-top: 16px; overflow: hidden; border: 1px solid var(--industrial-border); }
 .conflict-actions { flex-wrap: wrap; }
 
+/* 断点 = --breakpoint-sm (760px) */
 @media (max-width: 760px) {
   .access-shell, .portal-shell { place-items: start center; padding: 14px; }
   .access-card, .portal-panel { padding: 18px; }
@@ -818,6 +863,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .binding-panel > .industrial-button { width: 100%; }
 }
 
+/* 断点 = --breakpoint-xs (430px) */
 @media (max-width: 430px) {
   .access-header { display: block; }
   .product-mark { margin-bottom: 14px; }
